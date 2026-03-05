@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale SEO AI Optimizer
  * Plugin URI:  https://andrewbaker.ninja/2026/02/24/cloudscale-seo-ai-optimiser-enterprise-grade-wordpress-seo-completely-free/
  * Description: Lightweight SEO with AI meta descriptions via Claude API. Titles, canonicals, OpenGraph, Twitter Cards, JSON-LD schema, sitemaps, robots.txt, and font display optimization.
- * Version:     4.10.34
+ * Version:     4.10.36
  * Author:      Andrew Baker
  * Author URI:  https://andrewbaker.ninja/
  * License:     GPLv2 or later
@@ -33,7 +33,7 @@ final class CloudScale_SEO_AI_Optimizer {
     const META_TITLE = '_cs_seo_title';
     const META_DESC  = '_cs_seo_desc';
     const META_OGIMG = '_cs_seo_ogimg';
-    const VERSION    = '4.10.34';
+    const VERSION    = '4.10.36';
 
     // Separate option key for AI config — keeps sensitive data isolated.
     const AI_OPT     = 'cs_seo_ai_options';
@@ -999,9 +999,11 @@ Write a single meta description for the article provided. Rules:
     // =========================================================================
 
     /**
-     * WP Cron callback — fires daily. Checks if today is a scheduled day,
-     * then generates descriptions for all posts that don't have one yet.
-     * Logs results to a transient so the admin UI can show last run status.
+     * WP Cron callback — fires daily. Checks if today is a scheduled day, then:
+     *   Pass 1 — generates meta descriptions for posts that don't have one yet.
+     *   Pass 2 — generates ALT text for images that are missing it across all posts.
+     * Both passes are missing-only: existing data is never overwritten.
+     * Works with both Anthropic and Gemini via dispatch_ai().
      */
     public function run_scheduled_batch(): void {
         $ai = $this->get_ai_opts();
@@ -1030,14 +1032,15 @@ Write a single meta description for the article provided. Rules:
             'order'               => 'DESC',
         ]);
 
+        // ── Pass 1: generate missing meta descriptions ────────────────────────
         foreach ($q->posts as $p) {
             $existing = trim((string) get_post_meta($p->ID, self::META_DESC, true));
             if ($existing) {
                 $skipped++;
-                continue; // Scheduled batch only processes unprocessed posts.
+                continue; // Already has a description — skip.
             }
             try {
-                $desc = $this->call_anthropic($p->ID);
+                $desc = $this->call_ai_generate_desc($p->ID);
                 update_post_meta($p->ID, self::META_DESC, sanitize_textarea_field($desc));
                 $log[] = ['status' => 'ok', 'title' => get_the_title($p->ID), 'chars' => mb_strlen($desc)];
                 $done++;
@@ -1049,22 +1052,148 @@ Write a single meta description for the article provided. Rules:
             sleep(1); // Pace requests — T4g Micro friendly.
         }
 
+        // ── Pass 2: generate missing ALT text across all posts ────────────────
+        // Re-query all posts — Pass 1 skipped posts with existing descriptions,
+        // but those posts may still have images with missing ALT text.
+        $alt_done          = 0;
+        $alt_errors        = 0;
+        $alt_skipped_posts = 0;
+
+        $q2 = new WP_Query([
+            'post_type'           => ['post', 'page'],
+            'post_status'         => 'publish',
+            'posts_per_page'      => 500,
+            'no_found_rows'       => true,
+            'ignore_sticky_posts' => true,
+            'orderby'             => 'date',
+            'order'               => 'DESC',
+        ]);
+
+        foreach ($q2->posts as $p) {
+            $images = $this->collect_images_needing_alt($p->ID);
+            if (empty($images)) {
+                $alt_skipped_posts++;
+                continue; // All images already have ALT text — nothing to do.
+            }
+            try {
+                $saved = $this->batch_generate_alt_for_post($p->ID, $images);
+                $alt_done += $saved;
+            } catch (\Throwable $e) {
+                $log[] = ['status' => 'alt_err', 'title' => get_the_title($p->ID), 'message' => $e->getMessage()];
+                $alt_errors++;
+                sleep(2);
+            }
+            sleep(1); // Pace requests — T4g Micro friendly.
+        }
+
         // Append to batch history (keep 28 days of runs).
         $history = get_option('cs_seo_batch_history', []);
         if (!is_array($history)) $history = [];
         $history[] = [
-            'date'    => gmdate('Y-m-d H:i:s'),
-            'day'     => ucfirst($today),
-            'done'    => $done,
-            'skipped' => $skipped,
-            'errors'  => $errors,
-            'elapsed' => round((time() - $start) / 60, 1),
-            'log'     => array_slice($log, 0, 100), // Keep last 100 entries per run.
+            'date'              => gmdate('Y-m-d H:i:s'),
+            'day'               => ucfirst($today),
+            'done'              => $done,
+            'skipped'           => $skipped,
+            'errors'            => $errors,
+            'alt_done'          => $alt_done,
+            'alt_skipped_posts' => $alt_skipped_posts,
+            'alt_errors'        => $alt_errors,
+            'elapsed'           => round((time() - $start) / 60, 1),
+            'log'               => array_slice($log, 0, 100), // Keep last 100 entries per run.
         ];
         // Prune entries older than 28 days.
         $cutoff  = gmdate('Y-m-d H:i:s', strtotime('-28 days'));
         $history = array_values(array_filter($history, fn($r) => ($r['date'] ?? '') >= $cutoff));
         update_option('cs_seo_batch_history', $history, false);
+    }
+
+    /**
+     * Generate ALT text for images that are missing it in a single post.
+     * Used by run_scheduled_batch (Pass 2). Missing-only — never overwrites existing ALT.
+     * Works with both Anthropic and Gemini via dispatch_ai().
+     *
+     * @param int   $post_id Post to process.
+     * @param array $images  Output of collect_images_needing_alt() — pass it in to avoid
+     *                       a duplicate call when the caller has already run the scan.
+     * @return int  Number of ALT texts saved.
+     */
+    private function batch_generate_alt_for_post(int $post_id, array $images): int {
+        $post = get_post($post_id);
+        if (!$post || empty($images)) return 0;
+
+        $provider = $this->ai_opts['ai_provider'] ?? 'anthropic';
+        $key      = $provider === 'gemini'
+            ? trim((string)($this->ai_opts['gemini_key'] ?? ''))
+            : trim((string) $this->ai_opts['anthropic_key']);
+        if (!$key) return 0;
+
+        // Use a lighter model for ALT text — same as the manual ALT generator.
+        $model = trim((string) $this->ai_opts['model'])
+            ?: ($provider === 'gemini' ? 'gemini-2.0-flash' : 'claude-haiku-4-5-20251001');
+
+        $title         = get_the_title($post_id);
+        $excerpt_limit = max(100, min(2000, (int)($this->ai_opts['alt_excerpt_chars'] ?? 600)));
+        $article_text  = wp_strip_all_tags((string) $post->post_content);
+        $article_text  = (string) preg_replace('/\s+/', ' ', $article_text);
+        $article_text  = trim($article_text);
+        if (mb_strlen($article_text) > $excerpt_limit) {
+            $article_text = mb_substr($article_text, 0, $excerpt_limit) . '…';
+        }
+
+        $new_content     = (string) $post->post_content;
+        $content_changed = false;
+        $saved           = 0;
+        $min_words       = 5;
+        $max_words       = 15;
+
+        $system = 'You write concise, descriptive image alt text for blog post images. '
+            . 'Alt text should describe what the image shows in 5–15 words, relevant to the post context. '
+            . 'Do not start with "Image of" or "Photo of". Output ONLY the alt text, nothing else.';
+
+        foreach ($images as $img) {
+            $filename = $img['filename'] ?? '';
+            $user_msg = "Post title: \"{$title}\"\n"
+                . "Article excerpt: \"{$article_text}\"\n"
+                . "Image filename hint: \"{$filename}\"\n"
+                . "Write appropriate alt text for this image.";
+
+            $alt_text = $this->dispatch_ai($provider, $key, $model, $system, $user_msg, null, 80);
+            $alt_text = trim(trim($alt_text, '"\''));
+            if (!$alt_text) continue;
+
+            // One retry if word count is out of range.
+            $word_count = str_word_count($alt_text);
+            if ($word_count < $min_words || $word_count > $max_words) {
+                $retry_msg = "Your previous alt text was {$word_count} words: \"{$alt_text}\"\n"
+                    . "Post title: \"{$title}\"\n"
+                    . "Image filename hint: \"{$filename}\"\n"
+                    . "Rewrite the alt text to be between {$min_words} and {$max_words} words. Output ONLY the alt text.";
+                $retry = $this->dispatch_ai($provider, $key, $model, $system, $retry_msg, null, 80);
+                $retry = trim(trim($retry, '"\''));
+                if ($retry) $alt_text = $retry;
+            }
+
+            $alt_text = sanitize_text_field($alt_text);
+
+            // Save to attachment meta if we have an ID.
+            if (!empty($img['attach_id'])) {
+                update_post_meta((int) $img['attach_id'], '_wp_attachment_image_alt', $alt_text);
+            }
+
+            // Replace alt="" in post content.
+            $new_tag     = preg_replace('/alt=["\'][^"\']*["\']/', 'alt="' . esc_attr($alt_text) . '"', $img['img_tag'], 1);
+            $new_content = str_replace($img['img_tag'], $new_tag, $new_content);
+            $content_changed = true;
+            $saved++;
+
+            sleep(1); // Pace per-image requests — T4g Micro friendly.
+        }
+
+        if ($content_changed) {
+            wp_update_post(['ID' => $post_id, 'post_content' => $new_content]);
+        }
+
+        return $saved;
     }
 
     /**
@@ -1412,10 +1541,10 @@ Write a single meta description for the article provided. Rules:
 
     /**
      * Call the configured AI provider and return a generated description for a single post.
-     * Used by the fix-description flow (ajax_fix). Kept separate so fix-desc remains
-     * a targeted single-purpose call.
+     * Works with both Anthropic and Gemini — routes through dispatch_ai().
+     * Used by the scheduled batch and fix-description flow.
      */
-    private function call_anthropic(int $post_id): string {
+    private function call_ai_generate_desc(int $post_id): string {
         $post = get_post($post_id);
         if (!$post) throw new \RuntimeException( "Post {$post_id} not found" ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
 
@@ -1602,7 +1731,7 @@ Write a single meta description for the article provided. Rules:
     /**
      * Fix an existing description that is too short or too long.
      */
-    private function call_anthropic_fix(int $post_id, string $existing_desc): string {
+    private function call_ai_fix_desc(int $post_id, string $existing_desc): string {
         $post = get_post($post_id);
         if (!$post) throw new \RuntimeException( "Post {$post_id} not found" ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
 
@@ -1700,7 +1829,7 @@ Write a single meta description for the article provided. Rules:
         }
 
         try {
-            $desc      = $this->call_anthropic_fix($post_id, $existing);
+            $desc      = $this->call_ai_fix_desc($post_id, $existing);
             $new_len   = mb_strlen($desc);
             $in_range  = ($new_len >= $min && $new_len <= $max);
             update_post_meta($post_id, self::META_DESC, sanitize_textarea_field($desc));
@@ -2510,13 +2639,47 @@ Write a single meta description for the article provided. Rules:
         );
     }
 
-    public function render_dashboard_widget(): void { ?>
+    public function render_dashboard_widget(): void {
+        // ── Batch status line ─────────────────────────────────────────────────
+        $ai_opts         = $this->get_ai_opts();
+        $schedule_enabled = (int) ($ai_opts['schedule_enabled'] ?? 0);
+        $history         = get_option('cs_seo_batch_history', []);
+        $last_run        = (is_array($history) && !empty($history))
+            ? $history[count($history) - 1]
+            : null;
+
+        if (!$schedule_enabled) {
+            $batch_line  = '⏸ Batch disabled';
+            $batch_style = 'background:linear-gradient(135deg,#6b7280 0%,#4b5563 100%);box-shadow:0 3px 10px rgba(107,114,128,0.35);';
+        } elseif (!$last_run) {
+            $batch_line  = '⏳ Batch pending';
+            $batch_style = 'background:linear-gradient(135deg,#f59e0b 0%,#b45309 100%);box-shadow:0 3px 10px rgba(245,158,11,0.4);';
+        } else {
+            $date_fmt  = gmdate('d M Y', strtotime($last_run['date'] ?? ''));
+            $desc_done = (int) ($last_run['done']      ?? 0);
+            $alt_done  = (int) ($last_run['alt_done']  ?? 0);
+            $errors    = (int) ($last_run['errors']    ?? 0) + (int) ($last_run['alt_errors'] ?? 0);
+            $batch_line = $date_fmt . ' · ' . $desc_done . ' descs · ' . $alt_done . ' ALTs';
+            if ($errors) $batch_line .= ' · ' . $errors . ' err';
+            $batch_style = 'background:linear-gradient(135deg,#22c55e 0%,#15803d 100%);box-shadow:0 3px 10px rgba(34,197,94,0.4);';
+        }
+        ?>
         <div style="padding:4px 0 8px">
-            <p style="margin:0 0 14px;font-size:13px;color:#50575e;line-height:1.5">
+            <p style="margin:0 0 10px;font-size:13px;color:#50575e;line-height:1.5">
                 CloudScale SEO AI Optimizer is keeping your site sharp —
                 meta descriptions, ALT text, sitemaps, and render-blocking scripts all handled.
             </p>
             <div style="display:flex;flex-direction:column;gap:10px">
+                <a href="<?php echo esc_url(admin_url('tools.php?page=cs-seo-optimizer&tab=batch')); ?>"
+                   style="display:flex;align-items:center;justify-content:center;gap:8px;
+                          <?php echo esc_attr($batch_style); ?>
+                          color:#fff;font-weight:700;font-size:12px;padding:10px 16px;
+                          border-radius:8px;text-decoration:none;
+                          transition:filter 0.15s,transform 0.15s"
+                   onmouseover="this.style.filter='brightness(1.15)';this.style.transform='scale(1.02)'"
+                   onmouseout="this.style.filter='';this.style.transform=''">
+                    <?php echo esc_html($batch_line); ?>
+                </a>
                 <a href="https://andrewbaker.ninja" target="_blank" rel="noopener"
                    style="display:flex;align-items:center;justify-content:center;gap:8px;
                           background:linear-gradient(135deg,#f953c6 0%,#b91d73 40%,#4f46e5 100%);
