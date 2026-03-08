@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale SEO AI Optimizer
  * Plugin URI:  https://andrewbaker.ninja/2026/02/24/cloudscale-seo-ai-optimiser-enterprise-grade-wordpress-seo-completely-free/
  * Description: Lightweight SEO with AI meta descriptions via Claude API. Titles, canonicals, OpenGraph, Twitter Cards, JSON-LD schema, sitemaps, robots.txt, and font display optimization.
- * Version:     4.10.45
+ * Version:     4.10.55
  * Author:      Andrew Baker
  * Author URI:  https://andrewbaker.ninja/
  * License:     GPLv2 or later
@@ -36,7 +36,7 @@ final class CloudScale_SEO_AI_Optimizer {
     const META_SUM_WHAT = '_cs_seo_summary_what';
     const META_SUM_WHY  = '_cs_seo_summary_why';
     const META_SUM_KEY  = '_cs_seo_summary_takeaway';
-    const VERSION    = '4.10.45';
+    const VERSION    = '4.10.48';
 
     // Separate option key for AI config — keeps sensitive data isolated.
     const AI_OPT     = 'cs_seo_ai_options';
@@ -139,6 +139,7 @@ final class CloudScale_SEO_AI_Optimizer {
         add_action('wp_ajax_cs_seo_alt_generate_one',     [$this, 'ajax_alt_generate_one']);
         add_action('wp_ajax_cs_seo_alt_generate_all',     [$this, 'ajax_alt_generate_all']);
         add_action('wp_ajax_cs_seo_summary_generate_one', [$this, 'ajax_summary_generate_one']);
+        add_action('wp_ajax_cs_seo_summary_load',         [$this, 'ajax_summary_load']);
         add_action('wp_ajax_cs_seo_summary_generate_all', [$this, 'ajax_summary_generate_all']);
 
         // Font-display optimization
@@ -965,9 +966,13 @@ Write a single meta description for the article provided. Rules:
         if (!empty($cats[0])) $s['articleSection'] = $cats[0]->name;
         if (!empty($tags))    $s['keywords']       = implode(', ', $tags);
 
-        // Enrich description with the AI summary 'what' field if available.
+        // Enrich schema with AI summary fields if available.
         $sum_what = trim((string) get_post_meta($pid, self::META_SUM_WHAT, true));
-        if ($sum_what) $s['description'] = $sum_what;
+        $sum_why  = trim((string) get_post_meta($pid, self::META_SUM_WHY,  true));
+        $sum_key  = trim((string) get_post_meta($pid, self::META_SUM_KEY,  true));
+        if ($sum_what) $s['description']              = $sum_what;
+        if ($sum_why)  $s['abstract']                 = $sum_why;
+        if ($sum_key)  $s['disambiguatingDescription'] = $sum_key;
 
         return $s;
     }
@@ -2645,6 +2650,44 @@ PROMPT;
     }
 
     /**
+     * AJAX: count posts with/without AI summaries for the bulk panel.
+     */
+    public function ajax_summary_load(): void {
+        check_ajax_referer('cs_seo_nonce', 'nonce');
+        if (!current_user_can('edit_posts')) wp_send_json_error('Forbidden', 403);
+
+        $total = (int) wp_count_posts('post')->publish;
+
+        // Fetch all published posts with their summary status in one query.
+        $all_posts = get_posts([
+            'post_type'      => 'post',
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+        ]);
+
+        $posts = [];
+        $has   = 0;
+        foreach ($all_posts as $p) {
+            $has_sum = !empty(get_post_meta($p->ID, self::META_SUM_WHAT, true));
+            if ($has_sum) $has++;
+            $posts[] = [
+                'id'      => $p->ID,
+                'title'   => $p->post_title,
+                'has_sum' => $has_sum,
+            ];
+        }
+
+        wp_send_json_success([
+            'total'   => $total,
+            'has'     => $has,
+            'missing' => max(0, $total - $has),
+            'posts'   => $posts,
+        ]);
+    }
+
+    /**
      * AJAX: generate summaries for all posts missing them (batch).
      * Processes one post per call — JS loops until done (same pattern as ALT batch).
      */
@@ -2691,6 +2734,7 @@ PROMPT;
 
             wp_send_json_success([
                 'post_id'   => $post_id,
+                'title'     => get_the_title($post_id),
                 'what'      => $summary['what'],
                 'why'       => $summary['why'],
                 'takeaway'  => $summary['takeaway'],
@@ -3083,9 +3127,13 @@ PROMPT;
             editPost({ meta: patch });
         };
 
+        var titleLen   = title.length;
+        var titleColor = titleLen >= 50 && titleLen <= 60 ? '#46b450' : (titleLen > 0 ? '#dc3232' : '#888');
+        var titleHint  = titleLen > 0 ? titleLen + ' chars (ideal 50–60)' : 'No title set';
+
         var descLen  = desc.length;
         var descColor = descLen >= 140 && descLen <= 160 ? '#46b450' : (descLen > 0 ? '#dc3232' : '#888');
-        var descHint  = descLen > 0 ? descLen + ' chars' : 'No description set';
+        var descHint  = descLen > 0 ? descLen + ' chars (ideal 140–160)' : 'No description set';
 
         var genStatus = useState('');
         var genLoading = useState(false);
@@ -3165,7 +3213,8 @@ PROMPT;
                     style: { width: '100%', fontSize: '12px' },
                     value: title,
                     onChange: function(e) { setMeta(keys.title, e.target.value); }
-                })
+                }),
+                el('span', { style: { fontSize: '11px', color: titleColor } }, titleHint)
             ),
 
             // Meta Description
@@ -4277,6 +4326,7 @@ JSCODE;
             .ab-zone-card.ab-card-schedule .ab-zone-header  { background:#e67e00; } /* orange */
             .ab-zone-card.ab-card-lastrun  .ab-zone-header  { background:#1a4a7a; } /* dark blue */
             .ab-zone-card.ab-card-alt      .ab-zone-header  { background:#0e6b6b; } /* teal */
+            .ab-zone-card.ab-card-summary  .ab-zone-header  { background:#6b3fa0; } /* purple */
             .ab-zone-card.ab-card-sitemap-settings .ab-zone-header { background:#1a7a34; }
             .ab-zone-card.ab-card-sitemap-preview .ab-zone-header  { background:#0e5229; }
             .ab-zone-card.ab-card-llms .ab-zone-header             { background:#1a4a8a; }
@@ -4605,7 +4655,10 @@ JSCODE;
             <div class="ab-zone-card ab-card-update-posts">
                 <div class="ab-zone-header" style="justify-content:space-between">
                     <span><span class="ab-zone-icon">✦</span> Update Posts with AI Descriptions</span>
-                    <?php $this->explain_btn('updateposts', '✦ Update Posts — How this works', [
+                    <span style="display:flex;align-items:center;gap:8px;margin-left:auto">
+                        <button class="button" id="ab-posts-hide-hdr" onclick="abTogglePosts(document.getElementById('ab-posts-hide-hdr'))" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↑ Hide Posts</button>
+                        <button class="button" id="ab-reload-hdr" onclick="abLoadPosts()" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↻ Reload</button>
+                        <?php $this->explain_btn('updateposts', '✦ Update Posts — How this works', [
                         ['rec'=>'ℹ️ Summary','name'=>'What this panel does','desc'=>'Writes the short text snippet that appears under your page title in Google search results — using AI to craft a compelling 140–155 character summary for each post.'],
                         ['rec'=>'ℹ️ Info','name'=>'Total Posts','desc'=>'The total number of published posts and pages on your site that are eligible for meta description generation.'],
                         ['rec'=>'ℹ️ Info','name'=>'Have Description','desc'=>'Posts that already have a meta description saved — either written manually or previously generated by the AI.'],
@@ -4620,6 +4673,7 @@ JSCODE;
                         ['rec'=>'ℹ️ Info','name'=>'ALT Images column','desc'=>'Shows how many images in each post are still missing ALT text. ⚠ yellow means images need attention — generating the description will fix them automatically. ✓ green means all images have ALT text.'],
                         ['rec'=>'ℹ️ Info','name'=>'Title column','desc'=>'Shows the character count of each post\'s effective title tag (custom SEO title if set, otherwise the WordPress post title). Green = 50–60 chars (ideal). Amber = 40–69 chars (acceptable). Red = outside that range (too short or too long for Google). Hover the badge to see the full title text. Use Fix Titles to auto-fix all out-of-range titles in one pass.'],
                     ]); ?>
+                    </span>
                 </div>
                 <div class="ab-zone-body" style="padding:20px 24px 24px">
 
@@ -4663,9 +4717,10 @@ JSCODE;
                     <button class="button ab-action-btn ab-fix-btn" id="ab-ai-fix" onclick="abFixAll()" disabled>⚑ Fix Long/Short</button>
                     <button class="button ab-action-btn" id="ab-ai-fix-titles" onclick="abFixTitles()" disabled style="background:#7c3aed;color:#fff;border-color:#6d28d9">✎ Fix Titles</button>
                     <button class="button ab-action-btn ab-static-btn" id="ab-ai-static" onclick="abRegenStatic()" disabled>🖼 Regenerate Static</button>
-                    <button class="button" id="ab-load-posts-again" onclick="abLoadPosts()" style="margin-left:auto">↻ Reload</button>
-                    <button class="button" id="ab-ai-stop" onclick="abStop()" style="display:none">◻ Stop</button>
                     <span id="ab-toolbar-status" style="font-size:12px;color:#50575e;"></span>
+                    <button class="button" id="ab-load-posts-again" onclick="abLoadPosts()" style="margin-left:auto">↻ Reload</button>
+                    <button class="button" id="ab-posts-hide" onclick="abTogglePosts(this)">↑ Hide Posts</button>
+                    <button class="button" id="ab-ai-stop" onclick="abStop()" style="display:none">◻ Stop</button>
                 </div>
 
                 <?php /* ── Progress bar ── */ ?>
@@ -4696,7 +4751,10 @@ JSCODE;
             <div class="ab-zone-card ab-card-alt">
                 <div class="ab-zone-header" style="justify-content:space-between">
                     <span><span class="ab-zone-icon">🖼</span> AI Image ALT Text Generator</span>
-                    <?php $this->explain_btn('alttext', '🖼 ALT Text — How this works', [
+                    <span style="display:flex;align-items:center;gap:8px;margin-left:auto">
+                        <button class="button" id="ab-alt-hide-hdr" onclick="altTogglePosts(document.getElementById('ab-alt-hide-hdr'))" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↑ Hide Posts</button>
+                        <button class="button" id="ab-alt-reload-hdr" onclick="altLoad()" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↻ Reload</button>
+                        <?php $this->explain_btn('alttext', '🖼 ALT Text — How this works', [
                         ['rec'=>'ℹ️ Summary','name'=>'What this panel does','desc'=>'Adds descriptive labels to every image on your site — used by screen readers for accessibility and by Google to understand image content for search ranking.'],
                         ['rec'=>'✅ Recommended','name'=>'Why ALT text matters','desc'=>'ALT (alternative) text describes images to screen readers and search engines. Missing ALT text is an accessibility failure and an SEO missed opportunity — Google uses ALT text to understand image content and rank your images in Google Images search.'],
                         ['rec'=>'ℹ️ Info','name'=>'Posts with missing ALT','desc'=>'Shows how many posts have at least one image with an empty ALT attribute. Click Load to scan your site.'],
@@ -4705,6 +4763,7 @@ JSCODE;
                         ['rec'=>'ℹ️ Info','name'=>'Force Regenerate All','desc'=>'Overwrites ALL existing ALT text across every post, not just missing ones. Useful if you want to improve previously generated ALT text or standardise quality across your site. A confirmation prompt appears before running. The same 5 to 15 word validation with retry applies.'],
                         ['rec'=>'ℹ️ Info','name'=>'Generate (per row)','desc'=>'Process a single post — useful to check results before running the full batch. All images in that post with empty ALT will be processed.'],
                     ]); ?>
+                    </span>
                 </div>
                 <div class="ab-zone-body" style="padding:20px 24px 24px">
 
@@ -4740,9 +4799,11 @@ JSCODE;
                 <div class="ab-ai-toolbar" id="ab-alt-toolbar" style="display:none">
                     <button class="button button-primary ab-action-btn" id="ab-alt-gen-all" onclick="altGenAll(false)" <?php echo ($alt_has_key ? '' : 'disabled'); ?>>✦ Generate All Missing</button>
                     <button class="button ab-action-btn" id="ab-alt-force-all" onclick="altGenAll(true)" style="background:#b45309;border-color:#92400e;color:#fff;font-weight:600" <?php echo ($alt_has_key ? '' : 'disabled'); ?>>🔄 Force Regenerate All</button>
+                    <span id="ab-alt-status" style="font-size:12px;color:#50575e;"></span>
                     <button class="button" id="ab-alt-stop" onclick="altStop()" style="display:none">◻ Stop</button>
-                    <span id="ab-alt-status" style="font-size:12px;color:#50575e;margin-left:8px"></span>
-                    <label id="ab-alt-show-all-wrap" style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-left:auto">
+                    <button class="button" id="ab-alt-reload" onclick="altLoad()" style="margin-left:auto">↻ Reload</button>
+                    <button class="button" id="ab-alt-hide" onclick="altTogglePosts(this)">↑ Hide Posts</button>
+                    <label id="ab-alt-show-all-wrap" style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
                         <input type="checkbox" id="ab-alt-show-all" onchange="altState.showAll=this.checked;altRenderTable()"> Show all
                     </label>
                 </div>
@@ -4761,6 +4822,71 @@ JSCODE;
 
                 </div><!-- /ab-zone-body -->
             </div><!-- /ab-card-alt -->
+
+            <div class="ab-zone-card ab-card-summary">
+                <div class="ab-zone-header" style="justify-content:space-between">
+                    <span><span class="ab-zone-icon">📋</span> AI Summary Box Generator</span>
+                    <span style="display:flex;align-items:center;gap:8px;margin-left:auto">
+                        <button class="button" id="ab-sum-hide-hdr" onclick="sumTogglePosts(document.getElementById('ab-sum-hide-hdr'))" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↑ Hide Posts</button>
+                        <button class="button" id="ab-sum-reload-hdr" onclick="sumLoad()" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↻ Reload</button>
+                        <?php $this->explain_btn('summary', '📋 AI Summary Box — How this works', [
+                        ['rec'=>'ℹ️ Summary','name'=>'What this panel does','desc'=>'Generates the three-field AI Summary Box shown at the top of each post — What it is, Why it matters, and Key takeaway. These are displayed to readers and used by AI search engines to understand your content.'],
+                        ['rec'=>'✅ Recommended','name'=>'Why it matters','desc'=>'AI-powered search engines like Perplexity and SearchGPT use structured summaries to decide whether to cite your content. A well-written summary box increases the chance your post appears as a source in AI-generated answers.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Generate Missing','desc'=>'Processes every published post that has no existing AI summary. Runs one post at a time and shows progress. Safe to stop and restart at any time.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Force Regenerate All','desc'=>'Overwrites all existing AI summaries across every post. Use this to refresh summaries after changing your AI provider or if you want to improve older generated content.'],
+                    ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body" style="padding:20px 24px 24px">
+
+                <div class="ab-api-key-warning" id="ab-sum-api-warn" style="<?php echo $alt_has_key ? 'display:none' : ''; ?>">
+                    <div class="ab-warn-icon">⚠️</div>
+                    <div class="ab-warn-body">
+                        <strong>No AI API key saved — summary generation is disabled.</strong>
+                        Add an Anthropic API key in the <strong>✦ AI Meta Writer</strong> section above and save.
+                    </div>
+                </div>
+
+                <div class="ab-load-cta" id="ab-sum-load-cta">
+                    <div class="ab-load-cta-icon">📋</div>
+                    <div class="ab-load-cta-text">
+                        <strong>Load your posts to get started</strong>
+                        <span>Counts how many published posts are missing their AI Summary Box fields</span>
+                    </div>
+                    <button class="ab-load-btn" id="ab-sum-load-btn" onclick="sumLoad()">Load Posts</button>
+                </div>
+
+                <div class="ab-summary-row" id="ab-sum-summary" style="display:none">
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-s-total">0</div><div class="ab-summary-lbl">Total Posts</div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-s-has" style="color:#1a7a34">0</div><div class="ab-summary-lbl">Have Summary</div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-s-missing" style="color:#6b3fa0">0</div><div class="ab-summary-lbl">Missing Summary</div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-s-done" style="color:#2271b1">0</div><div class="ab-summary-lbl">Generated This Session</div></div>
+                </div>
+
+                <div class="ab-ai-toolbar" id="ab-sum-toolbar" style="display:none">
+                    <button class="button button-primary ab-action-btn" id="ab-sum-gen-all" onclick="sumGenAll(false)" <?php echo $alt_has_key ? '' : 'disabled'; ?>>✦ Generate Missing</button>
+                    <button class="button ab-action-btn" id="ab-sum-force-all" onclick="sumGenAll(true)" style="background:#b45309;border-color:#92400e;color:#fff;font-weight:600" <?php echo $alt_has_key ? '' : 'disabled'; ?>>🔄 Force Regenerate All</button>
+                    <span id="ab-sum-status" style="font-size:12px;color:#50575e;"></span>
+                    <button class="button" id="ab-sum-stop" onclick="sumStop()" style="display:none">◻ Stop</button>
+                    <button class="button" id="ab-sum-reload" onclick="sumLoad()" style="margin-left:auto">↻ Reload</button>
+                    <button class="button" id="ab-sum-hide" onclick="sumTogglePosts(this)">↑ Hide Posts</button>
+                </div>
+
+                <div class="ab-progress" id="ab-sum-progress">
+                    <div class="ab-progress-fill" id="ab-sum-progress-fill"></div>
+                </div>
+                <div class="ab-stats" id="ab-sum-prog-label"></div>
+                <div id="ab-sum-posts-wrap" style="margin-top:12px"></div>
+
+                <div id="ab-sum-log-wrap" style="display:none">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                        <span style="background:linear-gradient(135deg,#f953c6 0%,#4f46e5 100%);color:#fff;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:3px 10px;border-radius:20px">⚡ Activity Log</span>
+                    </div>
+                    <div id="ab-sum-log"></div>
+                </div>
+
+                </div><!-- /ab-zone-body -->
+            </div><!-- /ab-card-summary -->
 
         </div><!-- /ab-pane-seo -->
 
@@ -6600,6 +6726,14 @@ JSCODE;
         }
 
         // ── Load posts ───────────────────────────────────────────────────────
+        function abTogglePosts(btn) {
+            const wrap = document.getElementById('ab-posts-wrap');
+            if (!wrap) return;
+            const hidden = wrap.style.display === 'none';
+            wrap.style.display = hidden ? '' : 'none';
+            btn.textContent = hidden ? '↑ Hide Posts' : '↓ Show Posts';
+        }
+
         function abLoadPosts(page) {
             page = page || 1;
             abState.page = page;
@@ -6619,6 +6753,8 @@ JSCODE;
                 // Hide the load CTA, show the action toolbar
                 document.getElementById('ab-load-cta').style.display = 'none';
                 document.getElementById('ab-ai-toolbar').style.display = 'flex';
+                document.getElementById('ab-reload-hdr').style.display = '';
+                document.getElementById('ab-posts-hide-hdr').style.display = '';
                 document.getElementById('ab-ai-gen-missing').disabled = false;
                 document.getElementById('ab-ai-gen-all').disabled = false;
                 document.getElementById('ab-ai-fix').disabled = false;
@@ -7163,6 +7299,7 @@ JSCODE;
             running: false,
             stopped: false,
             fixed:   0,
+            page:    0,
         };
 
         function altLog(msg, type) {
@@ -7221,7 +7358,13 @@ JSCODE;
                 return;
             }
 
-            let rows = visiblePosts.map(p => {
+            const PAGE_SIZE  = 100;
+            const totalPages = Math.ceil(visiblePosts.length / PAGE_SIZE);
+            if (altState.page >= totalPages) altState.page = Math.max(0, totalPages - 1);
+            const pageStart  = altState.page * PAGE_SIZE;
+            const pagePosts  = visiblePosts.slice(pageStart, pageStart + PAGE_SIZE);
+
+            let rows = pagePosts.map(p => {
                 const hasMissing = p.missing_count > 0 && !p._done;
                 const statusBadge = p._done
                     ? '<span class="ab-badge ab-badge-ok">✓ Fixed</span>'
@@ -7281,10 +7424,21 @@ JSCODE;
                 '</tr>';
             }).join('');
 
+            let altPager = '';
+            if (totalPages > 1) {
+                const from = pageStart + 1;
+                const to   = Math.min(pageStart + PAGE_SIZE, visiblePosts.length);
+                altPager = '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:#50575e">' +
+                    '<button class="button" onclick="altState.page--;altRenderTable()" ' + (altState.page === 0 ? 'disabled' : '') + '>← Prev</button>' +
+                    '<span>Showing ' + from + '–' + to + ' of ' + visiblePosts.length + '</span>' +
+                    '<button class="button" onclick="altState.page++;altRenderTable()" ' + (altState.page >= totalPages - 1 ? 'disabled' : '') + '>Next →</button>' +
+                    '</div>';
+            }
+
             wrap.innerHTML =
                 '<table class="ab-posts" style="width:100%">' +
                 '<thead><tr><th style="width:45%">Post</th><th style="width:20%">Status</th><th style="width:35%">Actions</th></tr></thead>' +
-                '<tbody>' + rows + '</tbody></table>';
+                '<tbody>' + rows + '</tbody></table>' + altPager;
         }
 
         function altToggleImages(postId) {
@@ -7292,6 +7446,14 @@ JSCODE;
             if (!post) return;
             post._expanded = !post._expanded;
             altRenderTable();
+        }
+
+        function altTogglePosts(btn) {
+            const wrap = document.getElementById('ab-alt-posts-wrap');
+            if (!wrap) return;
+            const hidden = wrap.style.display === 'none';
+            wrap.style.display = hidden ? '' : 'none';
+            btn.textContent = hidden ? '↑ Hide Posts' : '↓ Show Posts';
         }
 
         function altLoad() {
@@ -7307,8 +7469,11 @@ JSCODE;
                 if (cbx) cbx.checked = altState.showAll;
                 altUpdateSummary();
                 altRenderTable();
+                altState.page = 0;
                 document.getElementById('ab-alt-load-cta').style.display = 'none';
                 document.getElementById('ab-alt-toolbar').style.display  = 'flex';
+                document.getElementById('ab-alt-reload-hdr').style.display = '';
+                document.getElementById('ab-alt-hide-hdr').style.display = '';
                 document.getElementById('ab-alt-gen-all').disabled       = data.data.missing_alt === 0;
                 const total = data.data.missing_alt;
                 altSetStatus(total > 0
@@ -7435,6 +7600,169 @@ JSCODE;
         }
 
         function altStop() { altState.stopped = true; altSetStatus('Stopping...'); }
+
+        // ── AI Summary Box bulk generator ─────────────────────────────────────
+        const sumState = { running: false, stopped: false, done: 0, total: 0, missing: 0, page: 0 };
+
+        function sumLog(msg, cls) {
+            const wrap = document.getElementById('ab-sum-log-wrap');
+            const log  = document.getElementById('ab-sum-log');
+            wrap.style.display = 'block';
+            const d = document.createElement('div');
+            d.className = 'ab-log-entry' + (cls ? ' ' + cls : '');
+            d.textContent = msg;
+            log.prepend(d);
+        }
+
+        function sumSetStatus(msg) {
+            document.getElementById('ab-sum-status').textContent = msg;
+            document.getElementById('ab-sum-prog-label').textContent = msg;
+        }
+
+        function sumSetProgress(pct) {
+            document.getElementById('ab-sum-progress-fill').style.width = pct + '%';
+        }
+
+        async function sumLoad() {
+            const btn = document.getElementById('ab-sum-load-btn');
+            btn.disabled = true;
+            btn.textContent = 'Loading...';
+            sumSetStatus('Loading...');
+            const data = await abPost('cs_seo_summary_load', {});
+            btn.disabled = false;
+            if (!data.success) { btn.textContent = 'Load Posts'; sumSetStatus('Error: ' + (data.data || 'Unknown')); return; }
+            const d = data.data;
+            sumState.page    = 0;
+            sumState.total   = d.total;
+            sumState.missing = d.missing;
+            document.getElementById('sum-s-total').textContent   = d.total;
+            document.getElementById('sum-s-has').textContent     = d.has;
+            document.getElementById('sum-s-missing').textContent = d.missing;
+            document.getElementById('sum-s-done').textContent    = 0;
+            document.getElementById('ab-sum-summary').style.display = '';
+            document.getElementById('ab-sum-toolbar').style.display = '';
+            document.getElementById('ab-sum-gen-all').disabled = d.missing === 0;
+            sumSetStatus(d.missing === 0 ? '✓ All posts have summaries' : d.missing + ' posts need summaries');
+            // Store posts and render table
+            sumState.posts = d.posts || [];
+            sumRenderTable();
+            document.getElementById('ab-sum-load-cta').style.display = 'none';
+            document.getElementById('ab-sum-reload-hdr').style.display = '';
+            document.getElementById('ab-sum-hide-hdr').style.display = '';
+        }
+
+        function sumRenderTable() {
+            const wrap = document.getElementById('ab-sum-posts-wrap');
+            if (!wrap) return;
+            const posts = sumState.posts || [];
+            if (!posts.length) {
+                wrap.innerHTML = '<p style="color:#1a7a34;margin-top:8px">✓ No posts found.</p>';
+                return;
+            }
+            const SUM_PAGE_SIZE  = 100;
+            const sumTotalPages  = Math.ceil(posts.length / SUM_PAGE_SIZE);
+            if (sumState.page >= sumTotalPages) sumState.page = Math.max(0, sumTotalPages - 1);
+            const sumPageStart   = sumState.page * SUM_PAGE_SIZE;
+            const pagePosts      = posts.slice(sumPageStart, sumPageStart + SUM_PAGE_SIZE);
+
+            let rows = pagePosts.map(function(p) {
+                const done   = p._done;
+                const badge  = done
+                    ? '<span class="ab-badge ab-badge-ok">✓ Generated</span>'
+                    : p.has_sum
+                        ? '<span class="ab-badge ab-badge-ok">✓ Has Summary</span>'
+                        : '<span class="ab-badge ab-badge-none">Missing</span>';
+                return '<tr>' +
+                    '<td style="padding:6px 10px;font-size:13px;color:#1d2327">' + abEsc(p.title) + '</td>' +
+                    '<td style="padding:6px 10px;text-align:right">' + badge + '</td>' +
+                    '</tr>';
+            }).join('');
+
+            let sumPager = '';
+            if (sumTotalPages > 1) {
+                const from = sumPageStart + 1;
+                const to   = Math.min(sumPageStart + SUM_PAGE_SIZE, posts.length);
+                sumPager = '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:#50575e">' +
+                    '<button class="button" onclick="sumState.page--;sumRenderTable()" ' + (sumState.page === 0 ? 'disabled' : '') + '>← Prev</button>' +
+                    '<span>Showing ' + from + '–' + to + ' of ' + posts.length + '</span>' +
+                    '<button class="button" onclick="sumState.page++;sumRenderTable()" ' + (sumState.page >= sumTotalPages - 1 ? 'disabled' : '') + '>Next →</button>' +
+                    '</div>';
+            }
+
+            wrap.innerHTML = '<table style="width:100%;border-collapse:collapse;margin-top:4px">' +
+                '<thead><tr style="background:#f0f0f0">' +
+                '<th style="padding:6px 10px;text-align:left;font-size:12px;color:#50575e;font-weight:600">Post Title</th>' +
+                '<th style="padding:6px 10px;text-align:right;font-size:12px;color:#50575e;font-weight:600">Status</th>' +
+                '</tr></thead>' +
+                '<tbody>' + rows + '</tbody>' +
+                '</table>' + sumPager;
+        }
+
+        function sumTogglePosts(btn) {
+            const wrap = document.getElementById('ab-sum-posts-wrap');
+            if (!wrap) return;
+            const hidden = wrap.style.display === 'none';
+            wrap.style.display = hidden ? '' : 'none';
+            btn.textContent = hidden ? '↑ Hide Posts' : '↓ Show Posts';
+        }
+
+        function sumToggle() {
+            const btn      = document.getElementById('ab-sum-load-btn');
+            const summary  = document.getElementById('ab-sum-summary');
+            const toolbar  = document.getElementById('ab-sum-toolbar');
+            const postsWrap = document.getElementById('ab-sum-posts-wrap');
+            const isHidden = summary.style.display === 'none';
+            summary.style.display   = isHidden ? '' : 'none';
+            toolbar.style.display   = isHidden ? '' : 'none';
+            if (postsWrap) postsWrap.style.display = isHidden ? '' : 'none';
+            btn.textContent = isHidden ? '↑ Hide' : '↺ Refresh';
+            btn.onclick = isHidden ? function() { sumToggle(); } : function() { sumLoad(); };
+        }
+
+        async function sumGenAll(force) {
+            if (sumState.running) return;
+            if (force && !confirm('This will overwrite ALL existing AI summaries. Continue?')) return;
+            sumState.running = true;
+            sumState.stopped = false;
+            sumState.done    = 0;
+            document.getElementById('ab-sum-gen-all').disabled   = true;
+            document.getElementById('ab-sum-force-all').disabled = true;
+            document.getElementById('ab-sum-stop').style.display = '';
+            sumSetProgress(0);
+
+            while (!sumState.stopped) {
+                const data = await abPost('cs_seo_summary_generate_all', { force: force ? 1 : 0 });
+                if (!data.success) {
+                    sumLog('✗ Error: ' + (data.data || 'Unknown'), 'ab-log-error');
+                    break;
+                }
+                const d = data.data;
+                if (d.done) break;
+                sumState.done++;
+                document.getElementById('sum-s-done').textContent = sumState.done;
+                const title = d.title || 'Post #' + d.post_id;
+                sumLog('✓ ' + title, 'ab-log-ok');
+                const total = force ? sumState.total : sumState.missing;
+                const pct   = total > 0 ? Math.round((sumState.done / total) * 100) : 0;
+                sumSetProgress(pct);
+                sumSetStatus(sumState.done + ' generated' + (d.remaining > 0 ? ', ' + d.remaining + ' remaining' : ''));
+            }
+
+            sumState.running = false;
+            document.getElementById('ab-sum-gen-all').disabled   = false;
+            document.getElementById('ab-sum-force-all').disabled = false;
+            document.getElementById('ab-sum-stop').style.display = 'none';
+            if (!sumState.stopped) {
+                sumSetProgress(100);
+                sumSetStatus('✓ Done — ' + sumState.done + ' summaries generated');
+                sumLog('✓ Batch complete: ' + sumState.done + ' generated', 'ab-log-ok');
+                document.getElementById('ab-sum-gen-all').disabled = true;
+            } else {
+                sumSetStatus('Stopped after ' + sumState.done + ' generated');
+            }
+        }
+
+        function sumStop() { sumState.stopped = true; sumSetStatus('Stopping...'); }
         </script>
         </div><!-- /wrap -->
         <?php
