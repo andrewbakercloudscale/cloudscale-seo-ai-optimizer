@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale SEO AI Optimizer
  * Plugin URI:  https://andrewbaker.ninja/2026/02/24/cloudscale-seo-ai-optimiser-enterprise-grade-wordpress-seo-completely-free/
  * Description: Lightweight SEO with AI meta descriptions via Claude API. Titles, canonicals, OpenGraph, Twitter Cards, JSON-LD schema, sitemaps, robots.txt, and font display optimization.
- * Version:     4.11.23
+ * Version:     4.11.38
  * Author:      Andrew Baker
  * Author URI:  https://andrewbaker.ninja/
  * License:     GPLv2 or later
@@ -37,6 +37,7 @@ final class CloudScale_SEO_AI_Optimizer {
     const META_SUM_WHY     = '_cs_seo_summary_why';
     const META_SUM_KEY     = '_cs_seo_summary_takeaway';
     const META_HIDE_SUMMARY = '_cs_seo_hide_summary';
+    const META_NOINDEX      = '_cs_seo_noindex';
 
     // Related Articles meta keys
     const META_RC_TOP        = '_cs_rc_top_ids';
@@ -49,6 +50,11 @@ final class CloudScale_SEO_AI_Optimizer {
     const META_RC_LAST_STEP  = '_cs_rc_last_step';
     const META_RC_STATUS     = '_cs_rc_status';
     const META_RC_ERROR      = '_cs_rc_error';
+
+    // SEO Health cache
+    const META_ALT_ALL_DONE     = '_cs_alt_all_done';
+    const META_ALT_CONTENT_HASH = '_cs_alt_content_hash';
+    const OPT_HEALTH_CACHE      = 'cs_seo_health_cache';
 
     // Related Articles step constants
     const RC_STEP_LOAD         = 1;
@@ -63,7 +69,7 @@ final class CloudScale_SEO_AI_Optimizer {
     // Related Articles generator version — bump when scoring logic changes
     const RC_VERSION = '1.0';
 
-    const VERSION    = '4.11.23';
+    const VERSION    = '4.11.38';
 
     // Separate option key for AI config — keeps sensitive data isolated.
     const AI_OPT     = 'cs_seo_ai_options';
@@ -105,6 +111,8 @@ final class CloudScale_SEO_AI_Optimizer {
         add_action('wp_dashboard_setup', [$this, 'register_dashboard_widget']);
         add_action('add_meta_boxes', [$this, 'add_metabox']);
         add_action('save_post',      [$this, 'save_metabox'], 10, 2);
+        add_action('save_post',      function() { delete_transient('cs_seo_llms_txt'); });
+        add_action('deleted_post',   function() { delete_transient('cs_seo_llms_txt'); });
         add_filter('the_content',    [$this, 'prepend_summary_box']);
         add_filter('the_content',    [$this, 'inject_related_links'], 20);
         // Clear stale custom OG image when the featured image is changed.
@@ -190,6 +198,9 @@ final class CloudScale_SEO_AI_Optimizer {
         add_action('wp_ajax_cs_seo_font_scan', [$this, 'ajax_font_scan']);
         add_action('wp_ajax_cs_seo_font_fix', [$this, 'ajax_font_fix']);
         add_action('wp_ajax_cs_seo_font_undo', [$this, 'ajax_font_undo']);
+
+        // SEO Health cache rebuild
+        add_action('wp_ajax_cs_seo_rebuild_health', [$this, 'ajax_rebuild_health_cache']);
     }
 
     // =========================================================================
@@ -640,6 +651,10 @@ Write a single meta description for the article provided. Rules:
         if ((int) $this->opts['noindex_attachment']      && is_attachment()) return 'noindex,follow';
         if ((int) $this->opts['noindex_author_archives'] && is_author())     return 'noindex,follow';
         if ((int) $this->opts['noindex_tag_archives']    && is_tag())        return 'noindex,follow';
+        if (is_singular()) {
+            $pid = (int) get_queried_object_id();
+            if ($pid && (int) get_post_meta($pid, self::META_NOINDEX, true)) return 'noindex,follow';
+        }
         return '';
     }
 
@@ -671,8 +686,15 @@ Write a single meta description for the article provided. Rules:
             $pid    = (int) get_queried_object_id();
             $custom = trim((string) get_post_meta($pid, self::META_OGIMG, true));
             if ($custom) {
-                $url = $custom;
-                $att_id = attachment_url_to_postid($custom);
+                $url    = $custom;
+                $ck     = 'cs_seo_attid_' . md5($custom);
+                $cached = get_transient($ck);
+                if ($cached !== false) {
+                    $att_id = (int) $cached;
+                } else {
+                    $att_id = attachment_url_to_postid($custom);
+                    set_transient($ck, (int) $att_id, 12 * HOUR_IN_SECONDS);
+                }
                 if ($att_id) {
                     $meta = wp_get_attachment_metadata($att_id);
                     if (!empty($meta['width']))  $width  = (int) $meta['width'];
@@ -707,7 +729,14 @@ Write a single meta description for the article provided. Rules:
         if (!$url) {
             $url = trim((string) $this->opts['default_og_image']);
             if ($url) {
-                $att_id = attachment_url_to_postid($url);
+                $ck     = 'cs_seo_attid_' . md5($url);
+                $cached = get_transient($ck);
+                if ($cached !== false) {
+                    $att_id = (int) $cached;
+                } else {
+                    $att_id = attachment_url_to_postid($url);
+                    set_transient($ck, (int) $att_id, 12 * HOUR_IN_SECONDS);
+                }
                 if ($att_id) {
                     $meta = wp_get_attachment_metadata($att_id);
                     if (!empty($meta['width']))  $width  = (int) $meta['width'];
@@ -1237,6 +1266,7 @@ Write a single meta description for the article provided. Rules:
 
     public function render_metabox(WP_Post $post): void {
         wp_nonce_field('cs_seo_save', 'cs_seo_nonce');
+        $noindex = (int) get_post_meta($post->ID, self::META_NOINDEX, true);
         $title   = (string) get_post_meta($post->ID, self::META_TITLE,    true);
         $desc    = (string) get_post_meta($post->ID, self::META_DESC,     true);
         $ogimg   = (string) get_post_meta($post->ID, self::META_OGIMG,    true);
@@ -1245,6 +1275,17 @@ Write a single meta description for the article provided. Rules:
         $sum_key  = (string) get_post_meta($post->ID, self::META_SUM_KEY,  true);
         $has_key = !empty($this->ai_opts['anthropic_key']) || !empty($this->ai_opts['gemini_key']);
         ?>
+        <p style="margin:0 0 12px;padding:8px 10px;background:<?php echo $noindex ? '#fff3cd' : '#f6f7f7'; ?>;border:1px solid <?php echo $noindex ? '#ffc107' : '#ddd'; ?>;border-radius:4px;display:flex;align-items:center;gap:8px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;margin:0">
+                <input type="checkbox" name="cs_seo_noindex" value="1" <?php checked($noindex, 1); ?>>
+                <span style="color:<?php echo $noindex ? '#856404' : '#3c434a'; ?>">
+                    <?php echo $noindex ? '⛔ Noindex — hidden from search engines' : 'Noindex this post/page'; ?>
+                </span>
+            </label>
+            <?php if (!$noindex): ?>
+            <span style="font-size:11px;color:#888;font-weight:400">— tick to exclude from search engines</span>
+            <?php endif; ?>
+        </p>
         <p><strong>Custom SEO title</strong> — leave blank to auto-generate<br>
             <input class="widefat" name="cs_seo_title" value="<?php echo esc_attr($title); ?>"></p>
         <p>
@@ -1426,6 +1467,8 @@ Write a single meta description for the article provided. Rules:
         $this->set_meta($post_id, self::META_SUM_KEY,  sanitize_textarea_field( wp_unslash( (string) ($_POST['cs_seo_sum_key']  ?? '') ) ));
         $hide = isset($_POST['cs_seo_hide_summary']) ? 1 : 0;
         $hide ? update_post_meta($post_id, self::META_HIDE_SUMMARY, 1) : delete_post_meta($post_id, self::META_HIDE_SUMMARY);
+        $noindex = isset($_POST['cs_seo_noindex']) ? 1 : 0;
+        $noindex ? update_post_meta($post_id, self::META_NOINDEX, 1) : delete_post_meta($post_id, self::META_NOINDEX);
     }
 
     private function set_meta(int $id, string $key, string $val): void {
@@ -2479,14 +2522,23 @@ Write a single meta description for the article provided. Rules:
     public function ajax_alt_get_posts(): void {
         $this->ajax_check();
 
-        $posts = get_posts([
-            'post_type'      => ['post', 'page'],
-            'post_status'    => 'publish',
-            'posts_per_page' => -1,
-            'orderby'        => 'date',
-            'order'          => 'DESC',
-            'fields'         => 'ids',
-        ]);
+        $posts = [];
+        $page  = 1;
+        $batch = 500;
+        do {
+            $chunk = get_posts([
+                'post_type'           => ['post', 'page'],
+                'post_status'         => 'publish',
+                'posts_per_page'      => $batch,
+                'paged'               => $page++,
+                'orderby'             => 'date',
+                'order'               => 'DESC',
+                'fields'              => 'ids',
+                'no_found_rows'       => true,
+                'ignore_sticky_posts' => true,
+            ]);
+            $posts = array_merge($posts, $chunk);
+        } while (count($chunk) === $batch);
 
         $results      = [];
         $total_images = 0;
@@ -2565,6 +2617,7 @@ Write a single meta description for the article provided. Rules:
                     'date'         => get_the_date('d M Y', $post_id),
                     'missing_count'=> $post_missing,
                     'images'       => $post_images,
+                    'edit_link'    => get_edit_post_link($post_id),
                 ];
             }
         }
@@ -2860,24 +2913,28 @@ Write a single meta description for the article provided. Rules:
 
         $total = (int) wp_count_posts('post')->publish;
 
-        // Fetch all published posts with their summary status in one query.
-        $all_posts = get_posts([
-            'post_type'      => 'post',
-            'post_status'    => 'publish',
-            'posts_per_page' => -1,
-            'orderby'        => 'title',
-            'order'          => 'ASC',
+        // Fetch all published post IDs — fields=ids avoids loading post_content/excerpt objects.
+        $all_ids = get_posts([
+            'post_type'           => 'post',
+            'post_status'         => 'publish',
+            'posts_per_page'      => -1,
+            'orderby'             => 'date',
+            'order'               => 'DESC',
+            'fields'              => 'ids',
+            'no_found_rows'       => true,
+            'ignore_sticky_posts' => true,
         ]);
 
         $posts = [];
         $has   = 0;
-        foreach ($all_posts as $p) {
-            $has_sum = !empty(get_post_meta($p->ID, self::META_SUM_WHAT, true));
+        foreach ($all_ids as $id) {
+            $has_sum = !empty(get_post_meta($id, self::META_SUM_WHAT, true));
             if ($has_sum) $has++;
             $posts[] = [
-                'id'      => $p->ID,
-                'title'   => $p->post_title,
-                'has_sum' => $has_sum,
+                'id'       => $id,
+                'title'    => get_the_title($id),
+                'has_sum'  => $has_sum,
+                'edit_link'=> get_edit_post_link($id),
             ];
         }
 
@@ -2929,10 +2986,12 @@ Write a single meta description for the article provided. Rules:
             update_post_meta($post_id, self::META_SUM_WHY,  $summary['why']);
             update_post_meta($post_id, self::META_SUM_KEY,  $summary['takeaway']);
 
-            // Count remaining after this one.
-            $remaining_args = $args;
-            $remaining_args['posts_per_page'] = -1;
-            $remaining = count(get_posts($remaining_args));
+            // Count remaining after this one — use found_posts to avoid loading IDs.
+            $remaining_args                    = $args;
+            $remaining_args['posts_per_page']  = 1;
+            $remaining_args['no_found_rows']   = false;
+            $remaining_q = new \WP_Query( $remaining_args );
+            $remaining   = (int) $remaining_q->found_posts;
 
             wp_send_json_success([
                 'post_id'   => $post_id,
@@ -3041,6 +3100,14 @@ Write a single meta description for the article provided. Rules:
             // Exclude front page from main list — it's already pinned at top.
             // phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.PostNotIn_post__not_in -- excluding front page from sitemap batch is intentional and low-volume
             'post__not_in'        => $front_page_id ? [$front_page_id] : [],
+            // Exclude posts marked as noindex — no value in generating SEO descriptions for them.
+            'meta_query'          => [ // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+                [
+                    'relation' => 'OR',
+                    ['key' => self::META_NOINDEX, 'compare' => 'NOT EXISTS'],
+                    ['key' => self::META_NOINDEX, 'value' => '1', 'compare' => '!='],
+                ],
+            ],
         ]);
 
         $items = [];
@@ -3066,6 +3133,8 @@ Write a single meta description for the article provided. Rules:
                 'desc'             => $desc,
                 'desc_chars'       => mb_strlen($desc),
                 'missing_alt'      => $missing_alt,
+                'edit_link'        => get_edit_post_link($p->ID),
+                'permalink'        => get_permalink($p->ID),
             ];
         }
 
@@ -3088,8 +3157,13 @@ Write a single meta description for the article provided. Rules:
                      WHERE p.post_type IN ('post','page')
                      AND p.post_status = 'publish'
                      AND pm.meta_key = %s
-                     AND pm.meta_value != ''",
-                    self::META_DESC
+                     AND pm.meta_value != ''
+                     AND p.ID NOT IN (
+                         SELECT post_id FROM {$wpdb->postmeta}
+                         WHERE meta_key = %s AND meta_value = '1'
+                     )",
+                    self::META_DESC,
+                    self::META_NOINDEX
                 )
             ),
         ]);
@@ -3612,6 +3686,37 @@ Write a single meta description for the article provided. Rules:
     }
 
     public function render_dashboard_widget(): void {
+        // ── SEO Health cache ──────────────────────────────────────────────────
+        $health       = get_option(self::OPT_HEALTH_CACHE, null);
+        $health_valid = is_array($health) && isset($health['total'], $health['seo'], $health['images'], $health['links'], $health['summaries'], $health['built_at']);
+
+        if ($health_valid) {
+            $h_total     = (int) $health['total'];
+            $h_built     = (int) $health['built_at'];
+            $h_date      = gmdate('d M y', $h_built);
+            $h_nonce     = wp_create_nonce('cs_seo_nonce');
+            $h_ajax      = admin_url('admin-ajax.php');
+
+            // Compute colour for each metric pill.
+            // Posts pill is always slate — it is the baseline, not a health signal.
+            // All other pills: green >= 90%, amber >= 60%, red < 60%.
+            $pill_color  = static function(int $count, int $total): string {
+                if ($total === 0) return '#6b7280'; // slate — nothing to measure
+                $pct = $count / $total * 100;
+                if ($pct >= 90) return '#16a34a'; // green
+                if ($pct >= 60) return '#d97706'; // amber
+                return '#dc2626'; // red
+            };
+
+            $pills = [
+                ['label' => 'Posts',     'value' => $h_total,                    'color' => '#475569'], // always slate
+                ['label' => 'SEO',       'value' => (int) $health['seo'],        'color' => $pill_color((int) $health['seo'],        $h_total)],
+                ['label' => 'Images',    'value' => (int) $health['images'],     'color' => $pill_color((int) $health['images'],     $h_total)],
+                ['label' => 'Links',     'value' => (int) $health['links'],      'color' => $pill_color((int) $health['links'],      $h_total)],
+                ['label' => 'Summaries', 'value' => (int) $health['summaries'],  'color' => $pill_color((int) $health['summaries'],  $h_total)],
+            ];
+        }
+
         // ── Batch status line ─────────────────────────────────────────────────
         $ai_opts         = $this->get_ai_opts();
         $schedule_enabled = (int) ($ai_opts['schedule_enabled'] ?? 0);
@@ -3643,6 +3748,82 @@ Write a single meta description for the article provided. Rules:
                 CloudScale SEO AI Optimizer is keeping your site sharp —
                 meta descriptions, ALT text, sitemaps, and render-blocking scripts all handled.
             </p>
+            <?php if ($health_valid): ?>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px">
+                <?php foreach ($pills as $pill): ?>
+                <span style="display:inline-flex;align-items:center;gap:5px;
+                             background:<?php echo esc_attr($pill['color']); ?>;
+                             color:#fff;font-size:11px;font-weight:700;
+                             padding:4px 10px;border-radius:20px;white-space:nowrap">
+                    <?php echo esc_html($pill['value'] . ' ' . $pill['label']); ?>
+                </span>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+            <?php if ($health_valid): ?>
+            <p style="margin:0 0 10px;font-size:11px;color:#9ca3af">
+                Health data from <?php echo esc_html($h_date); ?> &middot;
+                <a href="#" id="cs-health-refresh"
+                   style="color:#6366f1;text-decoration:none;font-weight:600"
+                   onmouseover="this.style.textDecoration='underline'"
+                   onmouseout="this.style.textDecoration='none'">Refresh</a>
+                <span id="cs-health-refresh-status" style="margin-left:6px;color:#9ca3af"></span>
+            </p>
+            <script>
+            document.getElementById('cs-health-refresh').addEventListener('click', function(e) {
+                e.preventDefault();
+                var status = document.getElementById('cs-health-refresh-status');
+                status.textContent = '⟳ Rebuilding…';
+                var params = new URLSearchParams({
+                    action: 'cs_seo_rebuild_health',
+                    nonce:  '<?php echo esc_js($h_nonce); ?>'
+                });
+                fetch('<?php echo esc_js($h_ajax); ?>', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: params
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.success) { location.reload(); }
+                    else { status.textContent = '✗ Failed'; }
+                })
+                .catch(function() { status.textContent = '✗ Error'; });
+            });
+            </script>
+            <?php else: ?>
+            <p style="margin:0 0 10px">
+                <button type="button" id="cs-health-run"
+                        style="background:#6366f1;color:#fff;border:none;border-radius:6px;
+                               font-size:12px;font-weight:700;padding:6px 14px;cursor:pointer">
+                    ▦ Run Health Check
+                </button>
+                <span id="cs-health-run-status" style="margin-left:8px;font-size:11px;color:#9ca3af"></span>
+            </p>
+            <script>
+            document.getElementById('cs-health-run').addEventListener('click', function() {
+                var btn    = this;
+                var status = document.getElementById('cs-health-run-status');
+                btn.disabled = true;
+                status.textContent = '⟳ Building…';
+                var params = new URLSearchParams({
+                    action: 'cs_seo_rebuild_health',
+                    nonce:  '<?php echo esc_js(wp_create_nonce('cs_seo_nonce')); ?>'
+                });
+                fetch('<?php echo esc_js(admin_url('admin-ajax.php')); ?>', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: params
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.success) { location.reload(); }
+                    else { status.textContent = '✗ Failed'; btn.disabled = false; }
+                })
+                .catch(function() { status.textContent = '✗ Error'; btn.disabled = false; });
+            });
+            </script>
+            <?php endif; ?>
             <div style="display:flex;flex-direction:column;gap:10px">
                 <a href="<?php echo esc_url(admin_url('tools.php?page=cs-seo-optimizer&tab=batch')); ?>"
                    style="display:flex;align-items:center;justify-content:center;gap:8px;
@@ -4135,7 +4316,7 @@ Write a single meta description for the article provided. Rules:
                     $messages[] = 'Detected: ' . basename($src);
                     
                     // Download the CSS file
-                    $response = wp_remote_get($src, ['sslverify' => false, 'timeout' => 30]);
+                    $response = wp_remote_get($src, ['timeout' => 30]);
                     
                     if (is_wp_error($response)) {
                         self::debug_log('[CloudScale SEO] Font Download ERROR: ' . $response->get_error_message());
@@ -4509,14 +4690,23 @@ Write a single meta description for the article provided. Rules:
     public function ajax_catfix_load(): void {
         $this->catfix_nonce_check();
 
-        $posts = get_posts([
-            'post_type'      => 'post',
-            'post_status'    => 'publish',
-            'posts_per_page' => -1,
-            'fields'         => 'ids',
-            'orderby'        => 'title',
-            'order'          => 'ASC',
-        ]);
+        $posts = [];
+        $page  = 1;
+        $batch = 500;
+        do {
+            $chunk = get_posts([
+                'post_type'           => 'post',
+                'post_status'         => 'publish',
+                'posts_per_page'      => $batch,
+                'paged'               => $page++,
+                'fields'              => 'ids',
+                'orderby'             => 'title',
+                'order'               => 'ASC',
+                'no_found_rows'       => true,
+                'ignore_sticky_posts' => true,
+            ]);
+            $posts = array_merge($posts, $chunk);
+        } while (count($chunk) === $batch);
 
         $all_cats = get_categories(['hide_empty' => false]);
         $cat_map  = [];
@@ -4896,12 +5086,14 @@ Write a single meta description for the article provided. Rules:
 
             // Fetch ALL posts for the user-facing list
             $all_post_ids = get_posts([
-                'category'       => $cid,
-                'posts_per_page' => -1,
-                'post_status'    => 'publish',
-                'orderby'        => 'date',
-                'order'          => 'DESC',
-                'fields'         => 'ids',
+                'category'            => $cid,
+                'posts_per_page'      => -1,
+                'post_status'         => 'publish',
+                'orderby'             => 'date',
+                'order'               => 'DESC',
+                'fields'              => 'ids',
+                'no_found_rows'       => true,
+                'ignore_sticky_posts' => true,
             ]);
             $post_pairs = array_map(function($pid) {
                 return ['id' => $pid, 'title' => get_the_title($pid)];
@@ -5084,12 +5276,14 @@ Write a single meta description for the article provided. Rules:
 
         // Fetch all posts for this category with their other categories
         $post_ids = get_posts([
-            'category'       => $cat_id,
-            'posts_per_page' => -1,
-            'post_status'    => 'publish',
-            'orderby'        => 'date',
-            'order'          => 'DESC',
-            'fields'         => 'ids',
+            'category'            => $cat_id,
+            'posts_per_page'      => -1,
+            'post_status'         => 'publish',
+            'orderby'             => 'date',
+            'order'               => 'DESC',
+            'fields'              => 'ids',
+            'no_found_rows'       => true,
+            'ignore_sticky_posts' => true,
         ]);
         $titles_with_cats = array_map(function($pid) use ($cat_id) {
             $title      = get_the_title($pid);
@@ -5731,7 +5925,7 @@ Write a single meta description for the article provided. Rules:
             /* ── Zone cards (matching CloudScale Backup style) ── */
             .ab-zone-card {
                 border-radius:8px; overflow:hidden;
-                box-shadow:0 2px 8px rgba(0,0,0,0.10);
+                box-shadow:0 6px 28px rgba(30,100,200,0.55), 0 2px 8px rgba(30,100,200,0.35);
                 margin:24px 0 0;
             }
             .ab-zone-header {
@@ -5742,7 +5936,7 @@ Write a single meta description for the article provided. Rules:
             }
             .ab-zone-header .ab-zone-icon { font-size:17px; }
             .ab-zone-body {
-                background:#fff;
+                background:#f4f5f7;
                 padding:4px 0 8px;
             }
             .ab-zone-body .form-table th { padding-left:20px; }
@@ -5798,7 +5992,7 @@ Write a single meta description for the article provided. Rules:
             }
             .ab-zone-card.ab-card-person .ab-zone-header    { background:#6b3fa0; } /* purple */
             .ab-zone-card.ab-card-ai .ab-zone-header        { background:#c3372b; } /* red    */
-            .ab-zone-card.ab-card-ai .ab-zone-body          { background:#fdf7f7; }
+            .ab-zone-card.ab-card-ai .ab-zone-body          { background:#f5ecec; }
             .ab-zone-card.ab-card-schedule .ab-zone-header  { background:#e67e00; } /* orange */
             .ab-zone-card.ab-card-lastrun  .ab-zone-header  { background:#1a4a7a; } /* dark blue */
             .ab-zone-card.ab-card-alt      .ab-zone-header  { background:#0e6b6b; } /* teal */
@@ -8678,8 +8872,11 @@ Write a single meta description for the article provided. Rules:
                     : '<button class="button ab-row-btn" onclick="abGenOne(' + p.id + ')" ' + (canGen?'':'disabled') + ' id="ab-btn-' + p.id + '">' +
                       (p._processing ? '<span class="ab-spinner">⟳</span>' : '✦') + ' Generate</button>';
 
+                const titleLink = p.edit_link
+                    ? '<a href="' + p.edit_link + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="Edit post">' + abEsc(abDecodeTitle(p.title)) + '</a>'
+                    : abEsc(abDecodeTitle(p.title));
                 return '<tr id="ab-row-' + p.id + '" style="' + rowStyle + '">' +
-                    '<td><strong>' + typeLabel + abEsc(abDecodeTitle(p.title)) + '</strong>' +
+                    '<td><strong>' + typeLabel + titleLink + '</strong>' +
                     (p.date ? '<br><small style="color:#888">' + p.type + ' · ' + p.date + '</small>' : '') +
                     noPostNote + '</td>' +
                     '<td>' + abBadge(p) + existDesc + genDesc + '</td>' +
@@ -8836,6 +9033,7 @@ Write a single meta description for the article provided. Rules:
             abSetProgress(done + skipped, targets.length);
             abSetStatus('Done — ' + done + ' generated, ' + skipped + ' skipped, ' + errors + ' errors');
             abLog('Run complete: ' + done + ' generated, ' + skipped + ' skipped, ' + errors + ' errors', done > 0 ? 'ok' : 'info');
+            if (done > 0) abPost('cs_seo_rebuild_health', {}).catch(() => {});
 
             document.getElementById('ab-ai-gen-missing').disabled = false;
             document.getElementById('ab-ai-gen-all').disabled      = false;
@@ -9183,7 +9381,7 @@ Write a single meta description for the article provided. Rules:
                 return;
             }
 
-            const PAGE_SIZE  = 100;
+            const PAGE_SIZE  = 50;
             const totalPages = Math.ceil(visiblePosts.length / PAGE_SIZE);
             if (altState.page >= totalPages) altState.page = Math.max(0, totalPages - 1);
             const pageStart  = altState.page * PAGE_SIZE;
@@ -9221,9 +9419,12 @@ Write a single meta description for the article provided. Rules:
                 const imgCount = (p.images || []).length;
                 const toggleId = 'ab-alt-toggle-' + p.id;
 
+                const altTitleLink = p.edit_link
+                    ? '<a href="' + p.edit_link + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="Edit post">' + abEsc(abDecodeTitle(p.title)) + '</a>'
+                    : abEsc(abDecodeTitle(p.title));
                 return '<tr id="ab-alt-row-' + p.id + '" style="border-top:2px solid #e0e0e0">' +
                     '<td style="padding:8px 10px;vertical-align:middle">' +
-                        '<strong>' + abEsc(abDecodeTitle(p.title)) + '</strong>' +
+                        '<strong>' + altTitleLink + '</strong>' +
                         '<br><small style="color:#888">' + p.type + ' · ' + p.date + ' · ' + imgCount + ' image(s)</small>' +
                     '</td>' +
                     '<td style="padding:8px 10px;vertical-align:middle">' + statusBadge + '</td>' +
@@ -9255,7 +9456,7 @@ Write a single meta description for the article provided. Rules:
                 const to   = Math.min(pageStart + PAGE_SIZE, visiblePosts.length);
                 altPager = '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:#50575e">' +
                     '<button class="button" onclick="altState.page--;altRenderTable()" ' + (altState.page === 0 ? 'disabled' : '') + '>← Prev</button>' +
-                    '<span>Showing ' + from + '–' + to + ' of ' + visiblePosts.length + '</span>' +
+                    '<span>Page ' + (altState.page + 1) + ' of ' + totalPages + ' &nbsp;·&nbsp; ' + from + '–' + to + ' of ' + visiblePosts.length + '</span>' +
                     '<button class="button" onclick="altState.page++;altRenderTable()" ' + (altState.page >= totalPages - 1 ? 'disabled' : '') + '>Next →</button>' +
                     '</div>';
             }
@@ -9417,6 +9618,7 @@ Write a single meta description for the article provided. Rules:
             altSetProgress(done, postsToProcess.length);
             altSetStatus('Done — ' + totalFixed + ' image(s) updated across ' + done + ' post(s), ' + errors + ' errors');
             altLog('Run complete: ' + totalFixed + ' images updated, ' + errors + ' errors', totalFixed > 0 ? 'ok' : 'info');
+            if (totalFixed > 0) abPost('cs_seo_rebuild_health', {}).catch(() => {});
 
             document.getElementById('ab-alt-gen-all').disabled     = false;
             document.getElementById('ab-alt-force-all').disabled   = false;
@@ -9484,7 +9686,7 @@ Write a single meta description for the article provided. Rules:
                 wrap.innerHTML = '<p style="color:#1a7a34;margin-top:8px">✓ No posts found.</p>';
                 return;
             }
-            const SUM_PAGE_SIZE  = 100;
+            const SUM_PAGE_SIZE  = 50;
             const sumTotalPages  = Math.ceil(posts.length / SUM_PAGE_SIZE);
             if (sumState.page >= sumTotalPages) sumState.page = Math.max(0, sumTotalPages - 1);
             const sumPageStart   = sumState.page * SUM_PAGE_SIZE;
@@ -9497,8 +9699,11 @@ Write a single meta description for the article provided. Rules:
                     : p.has_sum
                         ? '<span class="ab-badge ab-badge-ok">✓ Has Summary</span>'
                         : '<span class="ab-badge ab-badge-none">Missing</span>';
+                const sumTitleLink = p.edit_link
+                    ? '<a href="' + p.edit_link + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="Edit post">' + abEsc(p.title) + '</a>'
+                    : abEsc(p.title);
                 return '<tr>' +
-                    '<td style="padding:6px 10px;font-size:13px;color:#1d2327">' + abEsc(p.title) + '</td>' +
+                    '<td style="padding:6px 10px;font-size:13px;color:#1d2327">' + sumTitleLink + '</td>' +
                     '<td style="padding:6px 10px;text-align:right">' + badge + '</td>' +
                     '</tr>';
             }).join('');
@@ -9509,7 +9714,7 @@ Write a single meta description for the article provided. Rules:
                 const to   = Math.min(sumPageStart + SUM_PAGE_SIZE, posts.length);
                 sumPager = '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:#50575e">' +
                     '<button class="button" onclick="sumState.page--;sumRenderTable()" ' + (sumState.page === 0 ? 'disabled' : '') + '>← Prev</button>' +
-                    '<span>Showing ' + from + '–' + to + ' of ' + posts.length + '</span>' +
+                    '<span>Page ' + (sumState.page + 1) + ' of ' + sumTotalPages + ' &nbsp;·&nbsp; ' + from + '–' + to + ' of ' + posts.length + '</span>' +
                     '<button class="button" onclick="sumState.page++;sumRenderTable()" ' + (sumState.page >= sumTotalPages - 1 ? 'disabled' : '') + '>Next →</button>' +
                     '</div>';
             }
@@ -9582,6 +9787,7 @@ Write a single meta description for the article provided. Rules:
                 sumSetStatus('✓ Done — ' + sumState.done + ' summaries generated');
                 sumLog('✓ Batch complete: ' + sumState.done + ' generated', 'ab-log-ok');
                 document.getElementById('ab-sum-gen-all').disabled = true;
+                if (sumState.done > 0) abPost('cs_seo_rebuild_health', {}).catch(() => {});
             } else {
                 sumSetStatus('Stopped after ' + sumState.done + ' generated');
             }
@@ -10497,6 +10703,7 @@ Write a single meta description for the article provided. Rules:
 
             rcBatchRunning = false;
             document.getElementById('rc-batch-bar').style.display = 'none';
+            if (rcBatchDone > 0) abPost('cs_seo_rebuild_health', {}).catch(() => {});
             await rcLoadTable(rcCurrentPage, rcCurrentFilter);
         }
 
@@ -11151,6 +11358,9 @@ Write a single meta description for the article provided. Rules:
     }
 
     private function build_llms_txt(): string {
+        $cached = get_transient('cs_seo_llms_txt');
+        if ($cached !== false) return $cached;
+
         $site_name  = trim((string)($this->opts['site_name'] ?? '')) ?: get_bloginfo('name');
         $site_desc  = trim((string)($this->opts['home_desc'] ?? ''))
             ?: trim((string)($this->opts['default_desc'] ?? ''))
@@ -11178,12 +11388,14 @@ Write a single meta description for the article provided. Rules:
 
         // All published posts grouped by post type, ordered by date desc.
         $posts = get_posts([
-            'post_type'      => ['post', 'page'],
-            'post_status'    => 'publish',
-            'posts_per_page' => -1,
-            'orderby'        => 'date',
-            'order'          => 'DESC',
-            'fields'         => 'ids',
+            'post_type'           => ['post', 'page'],
+            'post_status'         => 'publish',
+            'posts_per_page'      => -1,
+            'orderby'             => 'date',
+            'order'               => 'DESC',
+            'fields'              => 'ids',
+            'no_found_rows'       => true,
+            'ignore_sticky_posts' => true,
         ]);
 
         $by_type = ['post' => [], 'page' => []];
@@ -11209,7 +11421,9 @@ Write a single meta description for the article provided. Rules:
             $lines[] = '';
         }
 
-        return implode("\n", $lines);
+        $output = implode("\n", $lines);
+        set_transient('cs_seo_llms_txt', $output, HOUR_IN_SECONDS);
+        return $output;
     }
 
     public function ajax_llms_preview(): void {
@@ -11413,6 +11627,158 @@ Write a single meta description for the article provided. Rules:
         $content = preg_replace('/[ \t]+$/m', '', $content);
         return rtrim($content) . "\n";
     }
+
+    // =========================================================================
+    // SEO Health Cache
+    // =========================================================================
+
+    /**
+     * Compute image content hash for a post.
+     *
+     * Combines post_content with all attachment IDs found in that content plus
+     * the featured image ID. If the hash changes between runs it means images
+     * were added or removed, so the ALT-done flag is stale.
+     *
+     * @param int $post_id
+     * @return string MD5 hash string.
+     */
+    public static function compute_alt_content_hash(int $post_id): string {
+        $post = get_post($post_id);
+        if (!$post) return '';
+
+        // Collect all src URLs from post_content.
+        preg_match_all('/<img[^>]+src=["\']([^"\']+)["\']/i', $post->post_content, $matches);
+        $srcs = $matches[1] ?? [];
+        sort($srcs);
+
+        // Include featured image ID so swapping it invalidates the hash.
+        $thumb_id = (int) get_post_thumbnail_id($post_id);
+
+        return md5($post->post_content . implode('|', $srcs) . '|thumb:' . $thumb_id);
+    }
+
+    /**
+     * Rebuild the SEO health cache option.
+     *
+     * Runs five EXISTS-subquery counts against postmeta — no slow meta_query joins.
+     * For the Images metric, validates the stored ALT content hash against the
+     * current post content before counting, clearing stale flags on the fly.
+     *
+     * @return array{total:int, seo:int, images:int, links:int, summaries:int, built_at:int}
+     */
+    public function rebuild_health_cache(): array {
+        global $wpdb;
+
+        // 1. Total published posts and pages.
+        $total = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional; results stored in cs_seo_health_cache option
+            "SELECT COUNT(*) FROM {$wpdb->posts}
+             WHERE post_status = 'publish'
+               AND post_type IN ('post','page')"
+        );
+
+        // 2. Posts/pages with a non-empty meta description.
+        $seo = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional; results stored in cs_seo_health_cache option
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->posts} p
+                 WHERE p.post_status = 'publish'
+                   AND p.post_type IN ('post','page')
+                   AND EXISTS (
+                       SELECT 1 FROM {$wpdb->postmeta} pm
+                       WHERE pm.post_id = p.ID
+                         AND pm.meta_key = %s
+                         AND pm.meta_value != ''
+                   )",
+                self::META_DESC
+            )
+        );
+
+        // 3. Posts/pages with related article links generated (rc_status = 'complete').
+        $links = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional; results stored in cs_seo_health_cache option
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->posts} p
+                 WHERE p.post_status = 'publish'
+                   AND p.post_type IN ('post','page')
+                   AND EXISTS (
+                       SELECT 1 FROM {$wpdb->postmeta} pm
+                       WHERE pm.post_id = p.ID
+                         AND pm.meta_key = %s
+                         AND pm.meta_value = 'complete'
+                   )",
+                self::META_RC_STATUS
+            )
+        );
+
+        // 4. Posts/pages with a complete AI summary box (what field populated).
+        $summaries = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional; results stored in cs_seo_health_cache option
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->posts} p
+                 WHERE p.post_status = 'publish'
+                   AND p.post_type IN ('post','page')
+                   AND EXISTS (
+                       SELECT 1 FROM {$wpdb->postmeta} pm
+                       WHERE pm.post_id = p.ID
+                         AND pm.meta_key = %s
+                         AND pm.meta_value != ''
+                   )",
+                self::META_SUM_WHAT
+            )
+        );
+
+        // 5. Posts/pages where every <img> in post_content has a non-empty alt attribute.
+        //    No AI calls — scans post_content directly. Posts with no images count as
+        //    fully covered (nothing missing). This runs instantly at cache rebuild time.
+        $all_posts = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional; results stored in cs_seo_health_cache option
+            "SELECT ID, post_content FROM {$wpdb->posts}
+             WHERE post_status = 'publish'
+               AND post_type IN ('post','page')"
+        );
+
+        $images = 0;
+        foreach ($all_posts as $p) {
+            $content = (string) $p->post_content;
+            preg_match_all('/<img[^>]+>/i', $content, $img_tags);
+            if (empty($img_tags[0])) {
+                // No images in this post — counts as fully covered.
+                $images++;
+                continue;
+            }
+            $all_have_alt = true;
+            foreach ($img_tags[0] as $tag) {
+                // Check alt attribute exists and is non-empty.
+                if (!preg_match('/alt=["\']([^"\']+)["\']/i', $tag)) {
+                    $all_have_alt = false;
+                    break;
+                }
+            }
+            if ($all_have_alt) $images++;
+        }
+
+        $cache = [
+            'total'     => $total,
+            'seo'       => $seo,
+            'images'    => $images,
+            'links'     => $links,
+            'summaries' => $summaries,
+            'built_at'  => time(),
+        ];
+
+        update_option(self::OPT_HEALTH_CACHE, $cache, false);
+        return $cache;
+    }
+
+    /**
+     * AJAX handler: rebuild health cache and return result as JSON.
+     * Nonce: cs_seo_nonce.
+     */
+    public function ajax_rebuild_health_cache(): void {
+        check_ajax_referer('cs_seo_nonce', 'nonce');
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Forbidden', 403);
+        }
+        $cache = $this->rebuild_health_cache();
+        wp_send_json_success($cache);
+    }
+
 }
 
 // Flush rewrite rules on activation so sitemap URLs work immediately,

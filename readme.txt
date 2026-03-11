@@ -3,7 +3,7 @@ Contributors: andrewbaker007
 Tags: seo, meta description, ai, opengraph, schema
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 4.11.23
+Stable tag: 4.11.38
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -199,6 +199,19 @@ Yes. The Scheduled Batch tab lets you select which days of the week to run autom
 8. Scheduled Batch configuration with day selector and last run status
 
 == Changelog ==
+
+= 4.11.33 =
+* Post titles in AI Image ALT Text Generator and AI Summary Box panels are now clickable links to the post editor
+
+= 4.11.32 =
+* Fix: Noindex posts are now excluded from the Update Posts with AI Descriptions panel and post count stats
+
+= 4.11.26 =
+* Dashboard widget now shows SEO Health pills: Posts, SEO, Images, Links, Summaries with colour coding (green >= 90%, amber >= 60%, red < 60%)
+* Health data timestamp and Refresh link added to widget — rebuilds cache on demand
+* Run Health Check CTA shown when no cache exists yet
+* Health cache auto-rebuilds after SEO meta, ALT text, Summary, and Related Articles bulk runs complete
+* Health cache AJAX endpoint switched to cs_seo_nonce for consistency
 
 = 4.10.68 =
 * Category Fixer colour legend added above table showing Added, Removed, Kept pill meanings
