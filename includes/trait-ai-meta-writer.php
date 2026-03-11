@@ -1,4 +1,5 @@
 <?php
+if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_AI_Meta_Writer {
     private function call_ai_generate_all(int $post_id): array {

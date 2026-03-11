@@ -3,7 +3,7 @@ Contributors: andrewbaker007
 Tags: seo, meta description, ai, opengraph, schema
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 4.12.2
+Stable tag: 4.12.3
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -199,6 +199,18 @@ Yes. The Scheduled Batch tab lets you select which days of the week to run autom
 8. Scheduled Batch configuration with day selector and last run status
 
 == Changelog ==
+
+= 4.12.3 =
+* Refactored monolithic plugin into 23 trait files for maintainability
+* AI SEO scoring per post added to admin panel
+
+= 4.11.38 =
+* Panel UI: bold blue drop shadow, contrast body background
+* Post list pagination set to 50 posts/page with consistent page numbers
+
+= 4.11.23 =
+* PHPCS: disable/enable blocks for multi-column POST warnings and meta_query suppression
+* Save button left padding fix
 
 = 4.11.33 =
 * Post titles in AI Image ALT Text Generator and AI Summary Box panels are now clickable links to the post editor
@@ -548,6 +560,9 @@ Yes. The Scheduled Batch tab lets you select which days of the week to run autom
 * Per post generation from post editor metabox
 
 == Upgrade Notice ==
+
+= 4.12.3 =
+Major refactor: plugin split into 23 trait files. AI SEO scoring added per post. Recommended update for all users.
 
 = 4.10.13 =
 Fixed Last Batch Run always appearing empty. Batch results now persist permanently instead of expiring after 24 hours.
