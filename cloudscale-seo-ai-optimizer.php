@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale SEO AI Optimizer
  * Plugin URI:  https://andrewbaker.ninja/2026/02/24/cloudscale-seo-ai-optimiser-enterprise-grade-wordpress-seo-completely-free/
  * Description: Lightweight SEO with AI meta descriptions via Claude API. Titles, canonicals, OpenGraph, Twitter Cards, JSON-LD schema, sitemaps, robots.txt, and font display optimization.
- * Version:     4.11.38
+ * Version:     4.12.2
  * Author:      Andrew Baker
  * Author URI:  https://andrewbaker.ninja/
  * License:     GPLv2 or later
@@ -56,6 +56,10 @@ final class CloudScale_SEO_AI_Optimizer {
     const META_ALT_CONTENT_HASH = '_cs_alt_content_hash';
     const OPT_HEALTH_CACHE      = 'cs_seo_health_cache';
 
+    // SEO score (AI-generated, stored per post)
+    const META_SEO_SCORE = '_cs_seo_score';
+    const META_SEO_NOTES = '_cs_seo_score_notes';
+
     // Related Articles step constants
     const RC_STEP_LOAD         = 1;
     const RC_STEP_VALIDATE     = 2;
@@ -69,7 +73,7 @@ final class CloudScale_SEO_AI_Optimizer {
     // Related Articles generator version — bump when scoring logic changes
     const RC_VERSION = '1.0';
 
-    const VERSION    = '4.11.38';
+    const VERSION    = '4.12.2';
 
     // Separate option key for AI config — keeps sensitive data isolated.
     const AI_OPT     = 'cs_seo_ai_options';
@@ -111,8 +115,8 @@ final class CloudScale_SEO_AI_Optimizer {
         add_action('wp_dashboard_setup', [$this, 'register_dashboard_widget']);
         add_action('add_meta_boxes', [$this, 'add_metabox']);
         add_action('save_post',      [$this, 'save_metabox'], 10, 2);
-        add_action('save_post',      function() { delete_transient('cs_seo_llms_txt'); });
-        add_action('deleted_post',   function() { delete_transient('cs_seo_llms_txt'); });
+        add_action('save_post',    function() { delete_transient('cs_seo_llms_txt'); delete_transient(self::SITEMAP_URLS_CACHE); });
+        add_action('deleted_post', function() { delete_transient('cs_seo_llms_txt'); delete_transient(self::SITEMAP_URLS_CACHE); });
         add_filter('the_content',    [$this, 'prepend_summary_box']);
         add_filter('the_content',    [$this, 'inject_related_links'], 20);
         // Clear stale custom OG image when the featured image is changed.
@@ -158,6 +162,7 @@ final class CloudScale_SEO_AI_Optimizer {
         // AJAX handlers for AI meta writer — both logged-in admin calls.
         add_action('wp_ajax_cs_seo_ai_generate_one',  [$this, 'ajax_generate_one']);
         add_action('wp_ajax_cs_seo_ai_generate_all',  [$this, 'ajax_generate_all']);
+        add_action('wp_ajax_cs_seo_score_one',        [$this, 'ajax_score_one']);
         add_action('wp_ajax_cs_seo_ai_fix_desc',        [$this, 'ajax_fix_desc']);
         add_action('wp_ajax_cs_seo_ai_fix_title',       [$this, 'ajax_fix_title']);
         add_action('wp_ajax_cs_seo_ai_get_posts',       [$this, 'ajax_get_posts']);
@@ -1512,11 +1517,16 @@ Write a single meta description for the article provided. Rules:
         $today = strtolower(gmdate('D')); // 'mon','tue' etc.
         if (!in_array($today, $days, true)) return;
 
-        $log     = [];
-        $done    = 0;
-        $errors  = 0;
-        $skipped = 0;
-        $start   = time();
+        // Allow up to 30 minutes — prevents silent death from PHP's default execution limit
+        // when processing large initial batches on a slow host.
+        set_time_limit(1800); // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- intentional: cron batch must not be killed mid-run by PHP's default 30s limit
+
+        $log      = [];
+        $done     = 0;
+        $errors   = 0;
+        $skipped  = 0;
+        $start    = time();
+        $deadline = $start + 1740; // 29 min — leave 60 s for the history write
 
         $q = new WP_Query([
             'post_type'           => ['post', 'page'],
@@ -1530,6 +1540,7 @@ Write a single meta description for the article provided. Rules:
 
         // ── Pass 1: generate missing meta descriptions ────────────────────────
         foreach ($q->posts as $p) {
+            if (time() >= $deadline) { $log[] = ['status' => 'timeout', 'title' => 'Pass 1 time limit reached']; break; }
             $existing = trim((string) get_post_meta($p->ID, self::META_DESC, true));
             if ($existing) {
                 $skipped++;
@@ -1566,6 +1577,7 @@ Write a single meta description for the article provided. Rules:
         ]);
 
         foreach ($q2->posts as $p) {
+            if (time() >= $deadline) { $log[] = ['status' => 'timeout', 'title' => 'Pass 2 time limit reached']; break; }
             $images = $this->collect_images_needing_alt($p->ID);
             if (empty($images)) {
                 $alt_skipped_posts++;
@@ -1601,6 +1613,7 @@ Write a single meta description for the article provided. Rules:
         ]);
 
         foreach ($q3->posts as $p) {
+            if (time() >= $deadline) { $log[] = ['status' => 'timeout', 'title' => 'Pass 3 time limit reached']; break; }
             try {
                 $summary = $this->call_ai_generate_summary($p->ID);
                 update_post_meta($p->ID, self::META_SUM_WHAT, $summary['what']);
@@ -1947,7 +1960,7 @@ Write a single meta description for the article provided. Rules:
         $has_images         = !empty($images_needing_alt);
 
         // ── Build unified prompt ──────────────────────────────────────────────
-        $json_shape = '{"description": "...", "title": "..."}';
+        $json_shape = '{"description": "...", "title": "...", "seo_score": 75, "seo_notes": "One sentence."}';
         $title_instruction = '';
         if ($needs_title) {
             $title_instruction = "\n\nSEO TITLE: The current title is {$title_direction} at {$title_len} chars: \"{$current_title}\". "
@@ -1965,7 +1978,7 @@ Write a single meta description for the article provided. Rules:
             foreach ($images_needing_alt as $i => $img) {
                 $image_list .= ($i + 1) . ". filename: \"{$img['filename']}\"\n";
             }
-            $json_shape  = '{"description": "...", "title": "...", "alts": ["alt for image 1", "alt for image 2"]}';
+            $json_shape  = '{"description": "...", "title": "...", "alts": ["alt for image 1", "alt for image 2"], "seo_score": 75, "seo_notes": "One sentence."}';
             $image_instruction = "\n\nALT TEXT: Write concise ALT text (5–15 words, no 'Image of' prefix) for each image listed below.";
         } else {
             $image_list        = '';
@@ -1976,6 +1989,7 @@ Write a single meta description for the article provided. Rules:
             . "\n\nDESCRIPTION: The meta description MUST be between {$min} and {$max} characters including spaces. Count carefully."
             . $title_instruction
             . $image_instruction
+            . "\n\nSEO SCORE: Rate this article's search engine optimisation from 0-100 (integer). Consider: title keyword clarity and length, meta description quality, content depth and specificity, clear search intent alignment, and overall article quality. Set seo_notes to one concise sentence naming the single biggest strength or weakness."
             . "\n\nRespond ONLY with valid JSON in exactly this format, no other text, no markdown fences:\n{$json_shape}";
 
         $user_msg = "Article title: \"{$post->post_title}\"\n\nArticle content:\n{$content}"
@@ -2061,6 +2075,11 @@ Write a single meta description for the article provided. Rules:
             $alts_saved = min(count($json['alts']), count($images_needing_alt));
         }
 
+        // Treat missing or zero as null — 0 means the AI omitted the field, not a real score.
+        $raw_score = isset($json['seo_score']) ? (int) $json['seo_score'] : 0;
+        $seo_score = $raw_score > 0 ? min(100, $raw_score) : null;
+        $seo_notes = sanitize_text_field((string)($json['seo_notes'] ?? ''));
+
         return [
             'description'  => $desc,
             'title'        => $title_fixed ?? $new_title,
@@ -2068,6 +2087,8 @@ Write a single meta description for the article provided. Rules:
             'title_chars'  => $needs_title ? $new_title_len : $title_len,
             'title_status' => $title_status,
             'alts_saved'   => $alts_saved,
+            'seo_score'    => $seo_score,
+            'seo_notes'    => $seo_notes,
         ];
     }
 
@@ -2245,6 +2266,10 @@ Write a single meta description for the article provided. Rules:
         try {
             $result = $this->call_ai_generate_all($post_id);
             update_post_meta($post_id, self::META_DESC, sanitize_textarea_field($result['description']));
+            if ($result['seo_score'] !== null) {
+                update_post_meta($post_id, self::META_SEO_SCORE, $result['seo_score']);
+                update_post_meta($post_id, self::META_SEO_NOTES, $result['seo_notes']);
+            }
             wp_send_json_success([
                 'post_id'      => $post_id,
                 'description'  => $result['description'],
@@ -2254,6 +2279,8 @@ Write a single meta description for the article provided. Rules:
                 'title_was'    => $result['title_was'],
                 'title_chars'  => $result['title_chars'],
                 'title_status' => $result['title_status'],
+                'seo_score'    => $result['seo_score'],
+                'seo_notes'    => $result['seo_notes'],
             ]);
         } catch (\Throwable $e) {
             wp_send_json_error($e->getMessage());
@@ -2491,6 +2518,10 @@ Write a single meta description for the article provided. Rules:
         try {
             $result = $this->call_ai_generate_all($post_id);
             update_post_meta($post_id, self::META_DESC, sanitize_textarea_field($result['description']));
+            if ($result['seo_score'] !== null) {
+                update_post_meta($post_id, self::META_SEO_SCORE, $result['seo_score']);
+                update_post_meta($post_id, self::META_SEO_NOTES, $result['seo_notes']);
+            }
             wp_send_json_success([
                 'post_id'      => $post_id,
                 'status'       => 'generated',
@@ -2502,12 +2533,88 @@ Write a single meta description for the article provided. Rules:
                 'title_chars'  => $result['title_chars'],
                 'title_status' => $result['title_status'],
                 'alts_saved'   => $result['alts_saved'],
+                'seo_score'    => $result['seo_score'],
+                'seo_notes'    => $result['seo_notes'],
             ]);
         } catch (\Throwable $e) {
             wp_send_json_error([
                 'post_id' => $post_id,
                 'message' => $e->getMessage(),
             ]);
+        }
+    }
+
+    // =========================================================================
+    // SEO Scoring
+    // =========================================================================
+
+    /**
+     * Score a single post's SEO effectiveness without touching its description.
+     * Uses a lightweight AI call — sends title, meta description, and a content excerpt.
+     *
+     * @return array{seo_score: int, seo_notes: string}
+     */
+    private function call_ai_score_post(int $post_id): array {
+        $post = get_post($post_id);
+        if (!$post) throw new \RuntimeException("Post {$post_id} not found"); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+
+        $provider = $this->ai_opts['ai_provider'] ?? 'anthropic';
+        $key      = $provider === 'gemini'
+            ? trim((string)($this->ai_opts['gemini_key'] ?? ''))
+            : trim((string) $this->ai_opts['anthropic_key']);
+        $model    = trim((string) $this->ai_opts['model']) ?: ($provider === 'gemini' ? 'gemini-2.0-flash' : 'claude-sonnet-4-20250514');
+
+        if (!$key) throw new \RuntimeException($provider === 'gemini' ? 'No Gemini API key configured' : 'No Anthropic API key configured'); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+
+        $content   = mb_substr($this->text_from_html((string) $post->post_content), 0, 3000);
+        $desc      = trim((string) get_post_meta($post_id, self::META_DESC, true));
+        $custom    = trim((string) get_post_meta($post_id, self::META_TITLE, true));
+        $title     = $custom !== '' ? $custom : get_the_title($post_id);
+        $title_len = mb_strlen($title);
+
+        $system = "You are an SEO expert. Rate an article's search engine optimisation from 0-100 (integer).\n"
+            . "Score based on: title keyword clarity and length (ideal 50-60 chars), "
+            . "meta description quality and length (ideal 140-160 chars), "
+            . "content depth and specificity, clear search intent alignment, and overall quality.\n"
+            . "Respond ONLY with valid JSON, no markdown fences:\n"
+            . "{\"seo_score\": 75, \"seo_notes\": \"One sentence naming the biggest strength or weakness.\"}";
+
+        $user_msg = "Title ({$title_len} chars): \"{$title}\"\n"
+            . ($desc ? "Meta description (" . mb_strlen($desc) . " chars): \"{$desc}\"\n" : "Meta description: none\n")
+            . "Content:\n{$content}";
+
+        $raw  = $this->dispatch_ai($provider, $key, $model, $system, $user_msg, null, 120);
+        $raw  = trim(preg_replace('/^```(?:json)?\s*/i', '', preg_replace('/\s*```$/', '', trim($raw))));
+        $json = json_decode($raw, true);
+
+        $raw_score = isset($json['seo_score']) ? (int) $json['seo_score'] : 0;
+        return [
+            'seo_score' => $raw_score > 0 ? min(100, $raw_score) : null,
+            'seo_notes' => sanitize_text_field((string)($json['seo_notes'] ?? '')),
+        ];
+    }
+
+    /**
+     * AJAX: score a single post and store the result.
+     */
+    public function ajax_score_one(): void {
+        $this->ajax_check();
+        $post_id = (int) sanitize_key(wp_unslash($_POST['post_id'] ?? 0)); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in ajax_check()
+        if (!$post_id) wp_send_json_error('Missing post_id');
+
+        try {
+            $result = $this->call_ai_score_post($post_id);
+            if ($result['seo_score'] !== null) {
+                update_post_meta($post_id, self::META_SEO_SCORE, $result['seo_score']);
+                update_post_meta($post_id, self::META_SEO_NOTES, $result['seo_notes']);
+            }
+            wp_send_json_success([
+                'post_id'   => $post_id,
+                'seo_score' => $result['seo_score'],
+                'seo_notes' => $result['seo_notes'],
+            ]);
+        } catch (\Throwable $e) {
+            wp_send_json_error($e->getMessage());
         }
     }
 
@@ -2925,6 +3032,10 @@ Write a single meta description for the article provided. Rules:
             'ignore_sticky_posts' => true,
         ]);
 
+        // Bulk-prime the post object cache and meta cache in 2 queries instead of N×3.
+        _prime_post_caches($all_ids, false, false);
+        update_meta_cache('post', $all_ids);
+
         $posts = [];
         $has   = 0;
         foreach ($all_ids as $id) {
@@ -3110,6 +3221,9 @@ Write a single meta description for the article provided. Rules:
             ],
         ]);
 
+        // Bulk-prime the meta cache so get_post_meta() hits cache, not DB, for each post.
+        update_meta_cache('post', array_column($q->posts, 'ID'));
+
         $items = [];
         foreach ($q->posts as $p) {
             $desc = trim((string) get_post_meta($p->ID, self::META_DESC, true));
@@ -3122,6 +3236,7 @@ Write a single meta description for the article provided. Rules:
             foreach ($img_tags[0] as $img_tag) {
                 if (preg_match('/alt=["\']([^"\']*)["\']/i', $img_tag, $m) && $m[1] === '') $missing_alt++;
             }
+            $score_raw = get_post_meta($p->ID, self::META_SEO_SCORE, true);
             $items[] = [
                 'id'               => $p->ID,
                 'title'            => get_the_title($p->ID),
@@ -3135,6 +3250,8 @@ Write a single meta description for the article provided. Rules:
                 'missing_alt'      => $missing_alt,
                 'edit_link'        => get_edit_post_link($p->ID),
                 'permalink'        => get_permalink($p->ID),
+                'seo_score'        => $score_raw !== '' ? (int) $score_raw : null,
+                'seo_notes'        => (string) get_post_meta($p->ID, self::META_SEO_NOTES, true),
             ];
         }
 
@@ -5073,6 +5190,8 @@ Write a single meta description for the article provided. Rules:
                 'order'          => 'DESC',
                 'fields'         => 'ids',
             ]);
+            // Prime post object and term caches in bulk to avoid N+1 per-post lookups below.
+            _prime_post_caches($ai_post_ids, true, false);
             // Include other categories each post belongs to so AI doesn't suggest moves already covered
             $titles = array_map(function($pid) use ($cid) {
                 $title      = get_the_title($pid);
@@ -5095,6 +5214,8 @@ Write a single meta description for the article provided. Rules:
                 'no_found_rows'       => true,
                 'ignore_sticky_posts' => true,
             ]);
+            // Prime post object cache so get_the_title() hits cache not DB for each ID.
+            _prime_post_caches($all_post_ids, false, false);
             $post_pairs = array_map(function($pid) {
                 return ['id' => $pid, 'title' => get_the_title($pid)];
             }, $all_post_ids);
@@ -5285,6 +5406,8 @@ Write a single meta description for the article provided. Rules:
             'no_found_rows'       => true,
             'ignore_sticky_posts' => true,
         ]);
+        // Prime post object and term caches in bulk to avoid N+1 lookups in the loop.
+        _prime_post_caches($post_ids, true, false);
         $titles_with_cats = array_map(function($pid) use ($cat_id) {
             $title      = get_the_title($pid);
             $post_cats  = get_the_category($pid);
@@ -5862,8 +5985,9 @@ Write a single meta description for the article provided. Rules:
                 .ab-tab { padding:10px 22px; font-size:13px; }
             }
             .ab-tab:hover:not(.active) { background:#c3c4c7; color:#1d2327; }
-            .ab-tab[data-tab="seo"].active    { background:#2271b1; color:#fff; }
-            .ab-tab[data-tab="sitemap"].active { background:#1a7a34; color:#fff; }
+            .ab-tab[data-tab="seo"].active     { background:#2271b1; color:#fff; }
+            .ab-tab[data-tab="aitools"].active  { background:#6366f1; color:#fff; }
+            .ab-tab[data-tab="sitemap"].active  { background:#1a7a34; color:#fff; }
             .ab-tab[data-tab="batch"].active  { background:#e67e00; color:#fff; }
             .ab-tab[data-tab="catfix"].active { background:#2d6a4f; color:#fff; }
             .ab-tab[data-tab="perf"].active   { background:#d946a6; color:#fff; }
@@ -5897,6 +6021,13 @@ Write a single meta description for the article provided. Rules:
             table.ab-posts td { padding:9px 10px; border-bottom:1px solid #f0f0f1; font-size:13px; vertical-align:top; }
             table.ab-posts tr:hover td { background:#f6f7f7; }
             .ab-badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:11px; font-weight:600; }
+            .ab-score-badge { display:inline-block; padding:3px 9px; border-radius:12px; font-size:11px; font-weight:700; white-space:nowrap; cursor:pointer; transition:opacity 0.15s; }
+            .ab-score-badge:hover { opacity:0.8; }
+            .ab-score-none  { background:#f3f4f6; color:#6b7280; border:1px solid #d1d5db; font-weight:400; font-style:italic; }
+            .ab-score-poor  { background:#fde8e8; color:#9b1c1c; border:1px solid #fca5a5; }
+            .ab-score-fair  { background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
+            .ab-score-good  { background:#d1fae5; color:#064e3b; border:1px solid #6ee7b7; }
+            .ab-score-great { background:#dcfce7; color:#14532d; border:1px solid #86efac; }
             .ab-badge-none   { background:#f0e8fb; color:#4a1a7a; border:1px solid #c4b2e0; }
             .ab-badge-ok     { background:#edfaef; color:#1a7a34; border:1px solid #b2dfc0; }
             .ab-badge-short  { background:#fcf9e8; color:#7a5c00; border:1px solid #f0d676; }
@@ -6095,8 +6226,9 @@ Write a single meta description for the article provided. Rules:
         </style>
 
         <div class="ab-tabs">
-            <button class="ab-tab active" data-tab="seo"     onclick="abTab('seo',this)">📊 Optimise SEO</button>
-            <button class="ab-tab"        data-tab="sitemap" onclick="abTab('sitemap',this)">🗺 Sitemap &amp; Robots</button>
+            <button class="ab-tab active" data-tab="seo"      onclick="abTab('seo',this)">📊 Optimise SEO</button>
+            <button class="ab-tab"        data-tab="aitools"  onclick="abTab('aitools',this)">✨ AI Tools</button>
+            <button class="ab-tab"        data-tab="sitemap"  onclick="abTab('sitemap',this)">🗺 Sitemap &amp; Robots</button>
             <button class="ab-tab"        data-tab="perf"    onclick="abTab('perf',this)">⚡ Performance</button>
             <button class="ab-tab"        data-tab="batch"   onclick="abTab('batch',this)">🔄 Scheduled Batch</button>
             <button class="ab-tab"        data-tab="catfix"  onclick="abTab('catfix',this)">🏷 Categories</button>
@@ -6204,163 +6336,7 @@ Write a single meta description for the article provided. Rules:
                 </div>
                 </div><!-- /ab-card-person -->
 
-                <!-- Related Articles Settings Card -->
-                <div class="ab-zone-card ab-card-rc-settings-card" style="margin-top:24px;">
-                    <div class="ab-zone-header" style="background:#0e7490;display:flex;align-items:center;justify-content:space-between;">
-                        <span>&#128279; Related Articles</span>
-                        <span style="display:flex;align-items:center;gap:8px;">
-                        <button type="button" class="button" onclick="abToggleCard('ab-card-rc-settings-card', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9658; Show Details</button>
-                        <?php $this->explain_btn('rc_settings', '&#128279; Related Articles — Settings', [
-                            ['name'=>'Enable feature',       'rec'=>'ℹ️ Info',      'desc'=>'Enables or disables the Related Articles and You Might Also Like blocks on all posts. Disabling hides the blocks from the front end immediately without deleting any stored data.'],
-                            ['name'=>'Related Articles block','rec'=>'ℹ️ Info',     'desc'=>'The block that appears near the top of each post, directly after the AI summary box. Shows the closest conceptual matches based on shared categories, tags, and keyword overlap. Requires at least 2 links to display.'],
-                            ['name'=>'You Might Also Like',  'rec'=>'ℹ️ Info',      'desc'=>'The block that appears at the bottom of each post before the comments section. Draws from a broader pool of related posts to extend session depth. Requires at least 3 links to display.'],
-                            ['name'=>'Decreasing count',     'rec'=>'✅ Instant',   'desc'=>'If you reduce the number of links to show, the change takes effect immediately on the front end without any regeneration. The extra stored links are simply not displayed.'],
-                            ['name'=>'Increasing count',     'rec'=>'⚠️ Regenerate','desc'=>'If you increase the number of links to show, existing posts may not have enough stored links to fill the new count. Run Refresh Stale in the Related Articles Post Status table below to regenerate all posts with the new count.'],
-                            ['name'=>'Candidate pool size',  'rec'=>'ℹ️ Info',      'desc'=>'Controls how many candidate posts are evaluated per source when scoring. A larger pool improves accuracy but takes slightly longer to process. The default of 20 is suitable for most sites.'],
-                            ['name'=>'Scoring signals',      'rec'=>'ℹ️ Info',      'desc'=>'The signals used to score candidate posts. Categories and tags provide structural signals. AI summary overlap uses the generated summary text to find semantic connections. At least one signal must be enabled.'],
-                            ['name'=>'Exclude categories',   'rec'=>'ℹ️ Info',      'desc'=>'Posts in excluded categories will not appear as related link suggestions on any post. Use this to prevent utility categories, news, or announcements from appearing as related content.'],
-                        ]); ?>
-                        </span>
-                    </div>
-                    <div class="ab-zone-body ab-card-rc-settings" style="padding:20px 24px;display:none;">
-                        <p style="color:#555;margin:0 0 16px;">Controls where and how Related Articles and You Might Also Like link blocks appear on your posts. Links are generated using local signals only &mdash; no AI calls, no timeouts.</p>
-                        <table class="form-table" style="margin:0;">
-                            <tr>
-                                <th style="width:220px;padding:12px 0;">Enable feature</th>
-                                <td style="padding:12px 0;">
-                                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_enable]" value="1" <?php checked((int)($o['rc_enable'] ?? 1), 1); ?>> Enable Related Articles and You Might Also Like on posts</label>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th style="padding:12px 0;">Related Articles block</th>
-                                <td style="padding:12px 0;">
-                                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_top_enabled]" value="1" <?php checked((int)($o['rc_top_enabled'] ?? 1), 1); ?>> Show &ldquo;Related Articles&rdquo; block at the top (after AI summary)</label><br>
-                                    <span style="display:inline-flex;align-items:center;gap:8px;margin-top:6px;">
-                                        Links to show:
-                                        <input type="number" id="rc_top_count_input" name="<?php echo esc_attr(self::OPT); ?>[rc_top_count]" value="<?php echo esc_attr((int)($o['rc_top_count'] ?? 3)); ?>" min="1" max="5" style="width:60px;" data-saved="<?php echo esc_attr((int)($o['rc_top_count'] ?? 3)); ?>" onchange="rcCheckCountWarning(this,'rc-top-warn')">
-                                        <span style="color:#888;font-size:12px;">(min 2, max 5)</span>
-                                    </span>
-                                    <p id="rc-top-warn" style="display:none;margin:6px 0 0;padding:8px 12px;background:#fffbeb;border-left:3px solid #f59e0b;color:#92400e;font-size:12px;">&#9888; You have increased the link count. Existing posts will only show the new amount after you run <strong>Refresh Stale</strong> in the Related Articles table below.</p>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th style="padding:12px 0;">You Might Also Like block</th>
-                                <td style="padding:12px 0;">
-                                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_bottom_enabled]" value="1" <?php checked((int)($o['rc_bottom_enabled'] ?? 1), 1); ?>> Show &ldquo;You Might Also Like&rdquo; block at the bottom (before comments)</label><br>
-                                    <span style="display:inline-flex;align-items:center;gap:8px;margin-top:6px;">
-                                        Links to show:
-                                        <input type="number" id="rc_bottom_count_input" name="<?php echo esc_attr(self::OPT); ?>[rc_bottom_count]" value="<?php echo esc_attr((int)($o['rc_bottom_count'] ?? 5)); ?>" min="1" max="10" style="width:60px;" data-saved="<?php echo esc_attr((int)($o['rc_bottom_count'] ?? 5)); ?>" onchange="rcCheckCountWarning(this,'rc-bottom-warn')">
-                                        <span style="color:#888;font-size:12px;">(min 3, max 10)</span>
-                                    </span>
-                                    <p id="rc-bottom-warn" style="display:none;margin:6px 0 0;padding:8px 12px;background:#fffbeb;border-left:3px solid #f59e0b;color:#92400e;font-size:12px;">&#9888; You have increased the link count. Existing posts will only show the new amount after you run <strong>Refresh Stale</strong> in the Related Articles table below.</p>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th style="padding:12px 0;">Candidate pool size</th>
-                                <td style="padding:12px 0;">
-                                    <input type="number" name="<?php echo esc_attr(self::OPT); ?>[rc_pool_size]" value="<?php echo esc_attr((int)($o['rc_pool_size'] ?? 20)); ?>" min="10" max="50" style="width:70px;">
-                                    <span style="color:#888;font-size:12px;margin-left:6px;">posts evaluated per source (10&ndash;50)</span>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th style="padding:12px 0;">Scoring signals</th>
-                                <td style="padding:12px 0;">
-                                    <label style="margin-right:16px;"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_use_categories]" value="1" <?php checked((int)($o['rc_use_categories'] ?? 1), 1); ?>> Categories</label>
-                                    <label style="margin-right:16px;"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_use_tags]" value="1" <?php checked((int)($o['rc_use_tags'] ?? 1), 1); ?>> Tags</label>
-                                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_use_summary]" value="1" <?php checked((int)($o['rc_use_summary'] ?? 1), 1); ?>> AI summary overlap</label>
-                                    <p class="description" style="margin-top:4px;">These signals are combined to score candidate posts. At least one must be enabled.</p>
-                                </td>
-                            </tr>
-                            <?php
-                            $all_cats      = get_categories(['hide_empty' => false]);
-                            $excluded_cats = (array)($o['rc_exclude_cats'] ?? []);
-                            if (!empty($all_cats)) : ?>
-                            <tr>
-                                <th style="padding:12px 0;">Exclude categories</th>
-                                <td style="padding:12px 0;">
-                                    <div style="display:flex;flex-wrap:wrap;gap:6px 16px;">
-                                    <?php foreach ($all_cats as $cat) : ?>
-                                        <label style="white-space:nowrap;">
-                                            <input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_exclude_cats][]" value="<?php echo esc_attr($cat->term_id); ?>" <?php checked(in_array((int)$cat->term_id, array_map('intval', $excluded_cats))); ?>>
-                                            <?php echo esc_html($cat->name); ?>
-                                        </label>
-                                    <?php endforeach; ?>
-                                    </div>
-                                    <p class="description" style="margin-top:4px;">Posts in these categories will not appear as related link suggestions.</p>
-                                </td>
-                            </tr>
-                            <?php endif; ?>
-                        </table>
-                        <div style="margin-top:16px;"><?php submit_button('Save SEO Settings', 'primary', 'submit', false); ?></div>
-                    </div>
-                </div><!-- /ab-card-rc-settings -->
-
             </form>
-
-            <?php /* ── Related Articles Generation Table ── */ ?>
-            <div class="ab-zone-card ab-card-rc-table" style="margin-top:24px;">
-                <div class="ab-zone-header" style="background:linear-gradient(120deg,#4338ca 0%,#6366f1 60%,#818cf8 100%);display:flex;align-items:center;justify-content:space-between;">
-                    <span>&#128279; Related Articles — Post Status</span>
-                    <span style="display:flex;align-items:center;gap:8px;">
-                        <button type="button" class="button" onclick="abToggleCard('ab-card-rc-table', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9658; Show Details</button>
-                        <?php $this->explain_btn('rc_table', '&#128279; Related Articles — How it works', [
-                            ['name'=>'What it does',       'rec'=>'ℹ️ Info',      'desc'=>'For every published post, Related Articles finds and ranks other posts on your site that are topically related. It surfaces two blocks on the front end: a &ldquo;Related Articles&rdquo; block near the top of the article (closest conceptual matches) and a &ldquo;You Might Also Like&rdquo; block at the bottom (broader related posts).'],
-                            ['name'=>'No AI required',     'rec'=>'✅ Free',       'desc'=>'Generation uses only signals already on your site — shared categories, shared tags, title keyword overlap, and your existing AI summary text. There are zero API calls and no cost. It scores every candidate post locally in PHP and ranks by relevance.'],
-                            ['name'=>'Generate Missing',   'rec'=>'✅ Recommended','desc'=>'Processes all posts that have not yet been generated. Run this once after installing the plugin to populate your full post library. Each post takes under a second and the batch runs with a small delay between posts to avoid overloading the server.'],
-                            ['name'=>'Refresh Stale',      'rec'=>'⬜ Optional',   'desc'=>'Re-runs generation for all posts regardless of status. Use this after making significant changes to your category or tag structure, or after adding AI summaries to posts that previously lacked them.'],
-                            ['name'=>'Retry Failed',       'rec'=>'⬜ Optional',   'desc'=>'Re-runs only posts that errored during a previous batch. Useful if a batch was interrupted or a post had missing data.'],
-                            ['name'=>'Reset All',          'rec'=>'⚠️ Caution',   'desc'=>'Deletes all Related Articles data for every post. The front-end blocks will disappear from all posts immediately. You will need to run Generate Missing again to rebuild. Use this only if you want to start fresh after major structural changes.'],
-                            ['name'=>'Per-row Run button', 'rec'=>'ℹ️ Info',      'desc'=>'Runs the full generation pipeline for a single post. Updates the row in place without reloading the page. Use this to regenerate a specific post after editing its categories, tags, or AI summary.'],
-                        ]); ?>
-                    </span>
-                </div>
-                <div class="ab-zone-body ab-card-rc-table-body" style="padding:20px 24px;display:none;">
-
-                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
-                        <span style="font-weight:600;color:#1d2327;font-size:13px;">Filter:</span>
-                        <button type="button" class="button rc-filter-btn rc-filter-active" data-filter="all"     onclick="rcSetFilter('all',this)">All Posts</button>
-                        <button type="button" class="button rc-filter-btn"                  data-filter="pending"  onclick="rcSetFilter('pending',this)">&#9711; Pending</button>
-                        <button type="button" class="button rc-filter-btn"                  data-filter="complete" onclick="rcSetFilter('complete',this)">&#9989; Complete</button>
-                        <button type="button" class="button rc-filter-btn"                  data-filter="error"    onclick="rcSetFilter('error',this)">&#10060; Error</button>
-                        <span style="flex:1;"></span>
-                        <button type="button" class="button button-primary" id="rc-btn-generate-missing" onclick="rcBatch('missing')">&#9654; Generate Missing</button>
-                        <button type="button" class="button"               id="rc-btn-refresh-stale"    onclick="rcBatch('stale')">&#8635; Refresh Stale</button>
-                        <button type="button" class="button"               id="rc-btn-retry-failed"     onclick="rcBatch('failed')">&#128257; Retry Failed</button>
-                        <button type="button" class="button"               id="rc-btn-reset-all"        onclick="rcResetAll()" style="color:#b91c1c;border-color:#b91c1c;">&#128465; Reset All</button>
-                    </div>
-
-                    <div id="rc-batch-bar" style="display:none;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
-                        <div style="display:flex;align-items:center;gap:12px;">
-                            <div style="flex:1;background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden;">
-                                <div id="rc-batch-progress-bar" style="height:100%;background:#6366f1;border-radius:4px;width:0%;transition:width 0.3s;"></div>
-                            </div>
-                            <span id="rc-batch-label" style="font-size:12px;color:#4338ca;font-weight:600;white-space:nowrap;">0 / 0</span>
-                            <button type="button" class="button" id="rc-btn-stop" onclick="rcStopBatch()" style="color:#b91c1c;border-color:#b91c1c;">&#9646;&#9646; Stop</button>
-                        </div>
-                    </div>
-
-                    <div id="rc-table-wrap" style="overflow-x:auto;">
-                        <table class="widefat fixed striped" id="rc-posts-table" style="min-width:680px;">
-                            <thead>
-                                <tr>
-                                    <th style="width:40%;">Post</th>
-                                    <th style="width:14%;text-align:center;">Status</th>
-                                    <th style="width:9%;text-align:center;">Top</th>
-                                    <th style="width:9%;text-align:center;">Bottom</th>
-                                    <th style="width:14%;text-align:center;">Generated</th>
-                                    <th style="width:14%;text-align:center;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="rc-posts-tbody">
-                                <tr><td colspan="6" style="text-align:center;padding:24px;color:#999;">Loading…</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div id="rc-pagination" style="display:flex;gap:8px;align-items:center;margin-top:12px;"></div>
-
-                </div>
-            </div><!-- /ab-card-rc-table -->
 
             <hr class="ab-zone-divider">
 
@@ -6372,7 +6348,7 @@ Write a single meta description for the article provided. Rules:
                 <div class="ab-zone-header" style="justify-content:space-between">
                     <span><span class="ab-zone-icon">✦</span> AI Meta Writer — Anthropic Claude</span>
                     <span style="display:flex;align-items:center;gap:8px;">
-                        <button type="button" class="button" onclick="abToggleCard('ab-card-ai', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9658; Show Details</button>
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-ai', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
                         <?php $this->explain_btn('ai', '✦ AI Meta Writer — What each setting does', [
                         ['rec'=>'✅ Recommended','name'=>'Anthropic API key','desc'=>'Your secret key from console.anthropic.com. Required to call the Claude AI to generate meta descriptions. Keep this private — anyone with this key can use your Anthropic account. The key is stored securely in your WordPress database.'],
                         ['rec'=>'ℹ️ Info','name'=>'Claude model','desc'=>'Which version of Claude to use for generation. Claude Haiku is fast and cheap — ideal for bulk processing hundreds of posts. Claude Sonnet is slower and costs more but produces higher quality, more nuanced descriptions. For a blog with 100+ posts, Haiku is usually the right choice.'],
@@ -6382,7 +6358,7 @@ Write a single meta description for the article provided. Rules:
                     ]); ?>
                     </span>
                 </div>
-                <div class="ab-zone-body ab-zone-ai" style="display:none;">
+                <div class="ab-zone-body ab-zone-ai">
                 <table class="form-table" role="presentation">
                     <tr>
                         <th>AI Provider:</th>
@@ -6488,7 +6464,10 @@ Write a single meta description for the article provided. Rules:
                 </div><!-- /ab-card-ai -->
             </form>
 
-            <hr class="ab-zone-divider">
+        </div><!-- /ab-pane-seo -->
+
+        <?php /* ══════════════════ AI TOOLS PANE ══════════════════ */ ?>
+        <div class="ab-pane" id="ab-pane-aitools">
 
             <div class="ab-zone-card ab-card-update-posts">
                 <div class="ab-zone-header" style="justify-content:space-between">
@@ -6511,6 +6490,7 @@ Write a single meta description for the article provided. Rules:
                         ['rec'=>'ℹ️ Info','name'=>'Generate (per row)','desc'=>'Rewrites the description for a single post and also generates missing image ALT text for that post in the same API call. Click this next to any post to manually trigger the AI for just that one entry.'],
                         ['rec'=>'ℹ️ Info','name'=>'ALT Images column','desc'=>'Shows how many images in each post are still missing ALT text. ⚠ yellow means images need attention — generating the description will fix them automatically. ✓ green means all images have ALT text.'],
                         ['rec'=>'ℹ️ Info','name'=>'Title column','desc'=>'Shows the character count of each post\'s effective title tag (custom SEO title if set, otherwise the WordPress post title). Green = 50–60 chars (ideal). Amber = 40–69 chars (acceptable). Red = outside that range (too short or too long for Google). Hover the badge to see the full title text. Use Fix Titles to auto-fix all out-of-range titles in one pass.'],
+                        ['rec'=>'✨ New','name'=>'SEO Score column','desc'=>'AI-generated score (0–100%) rating how well each article is optimised for search engine indexing. Considers: title keyword clarity, meta description quality, content depth and specificity, and search intent alignment. Score is generated automatically when you click Generate on a row, or run Score All. Click any badge to re-score that post. Green ≥ 75, Amber 50–74, Red < 50. Run time for Score All depends on your selected model — Haiku scores ~100 posts per minute, Sonnet takes 2–3× longer.'],
                     ]); ?>
                     </span>
                 </div>
@@ -6556,6 +6536,7 @@ Write a single meta description for the article provided. Rules:
                     <button class="button ab-action-btn ab-fix-btn" id="ab-ai-fix" onclick="abFixAll()" disabled>⚑ Fix Long/Short</button>
                     <button class="button ab-action-btn" id="ab-ai-fix-titles" onclick="abFixTitles()" disabled style="background:#7c3aed;color:#fff;border-color:#6d28d9">✎ Fix Titles</button>
                     <button class="button ab-action-btn ab-static-btn" id="ab-ai-static" onclick="abRegenStatic()" disabled>🖼 Regenerate Static</button>
+                    <button class="button ab-action-btn" id="ab-ai-score-all" onclick="abScoreAll()" disabled style="background:#0e6b6b;border-color:#0a5050;color:#fff;font-weight:600">📊 Score All</button>
                     <span id="ab-toolbar-status" style="font-size:12px;color:#50575e;"></span>
                     <button class="button" id="ab-load-posts-again" onclick="abLoadPosts()" style="margin-left:auto">↻ Reload</button>
                     <button class="button" id="ab-posts-hide" onclick="abTogglePosts(this)">↑ Hide Posts</button>
@@ -6729,7 +6710,174 @@ Write a single meta description for the article provided. Rules:
                 </div><!-- /ab-zone-body -->
             </div><!-- /ab-card-summary -->
 
-        </div><!-- /ab-pane-seo -->
+            <div style="margin:44px 0 28px;display:flex;align-items:center;gap:14px;">
+                <div style="flex:1;height:3px;background:linear-gradient(90deg,#6366f1,#c7d2fe);border-radius:2px;"></div>
+                <span style="font-size:12px;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:0.09em;white-space:nowrap;">&#128279; Related Articles</span>
+                <div style="flex:1;height:3px;background:linear-gradient(90deg,#c7d2fe,#6366f1);border-radius:2px;"></div>
+            </div>
+
+            <form method="post" action="options.php">
+                <?php settings_fields('cs_seo_group'); ?>
+
+                <!-- Related Articles Settings Card -->
+                <div class="ab-zone-card ab-card-rc-settings-card" style="margin-top:24px;">
+                    <div class="ab-zone-header" style="background:#0e7490;display:flex;align-items:center;justify-content:space-between;">
+                        <span>&#128279; Related Articles</span>
+                        <span style="display:flex;align-items:center;gap:8px;">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-rc-settings-card', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9658; Show Details</button>
+                        <?php $this->explain_btn('rc_settings', '&#128279; Related Articles — Settings', [
+                            ['name'=>'Enable feature',       'rec'=>'ℹ️ Info',      'desc'=>'Enables or disables the Related Articles and You Might Also Like blocks on all posts. Disabling hides the blocks from the front end immediately without deleting any stored data.'],
+                            ['name'=>'Related Articles block','rec'=>'ℹ️ Info',     'desc'=>'The block that appears near the top of each post, directly after the AI summary box. Shows the closest conceptual matches based on shared categories, tags, and keyword overlap. Requires at least 2 links to display.'],
+                            ['name'=>'You Might Also Like',  'rec'=>'ℹ️ Info',      'desc'=>'The block that appears at the bottom of each post before the comments section. Draws from a broader pool of related posts to extend session depth. Requires at least 3 links to display.'],
+                            ['name'=>'Decreasing count',     'rec'=>'✅ Instant',   'desc'=>'If you reduce the number of links to show, the change takes effect immediately on the front end without any regeneration. The extra stored links are simply not displayed.'],
+                            ['name'=>'Increasing count',     'rec'=>'⚠️ Regenerate','desc'=>'If you increase the number of links to show, existing posts may not have enough stored links to fill the new count. Run Refresh Stale in the Related Articles Post Status table below to regenerate all posts with the new count.'],
+                            ['name'=>'Candidate pool size',  'rec'=>'ℹ️ Info',      'desc'=>'Controls how many candidate posts are evaluated per source when scoring. A larger pool improves accuracy but takes slightly longer to process. The default of 20 is suitable for most sites.'],
+                            ['name'=>'Scoring signals',      'rec'=>'ℹ️ Info',      'desc'=>'The signals used to score candidate posts. Categories and tags provide structural signals. AI summary overlap uses the generated summary text to find semantic connections. At least one signal must be enabled.'],
+                            ['name'=>'Exclude categories',   'rec'=>'ℹ️ Info',      'desc'=>'Posts in excluded categories will not appear as related link suggestions on any post. Use this to prevent utility categories, news, or announcements from appearing as related content.'],
+                        ]); ?>
+                        </span>
+                    </div>
+                    <div class="ab-zone-body ab-card-rc-settings" style="padding:20px 24px;display:none;">
+                        <p style="color:#555;margin:0 0 16px;">Controls where and how Related Articles and You Might Also Like link blocks appear on your posts. Links are generated using local signals only &mdash; no AI calls, no timeouts.</p>
+                        <table class="form-table" style="margin:0;">
+                            <tr>
+                                <th style="width:220px;padding:12px 0;">Enable feature</th>
+                                <td style="padding:12px 0;">
+                                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_enable]" value="1" <?php checked((int)($o['rc_enable'] ?? 1), 1); ?>> Enable Related Articles and You Might Also Like on posts</label>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th style="padding:12px 0;">Related Articles block</th>
+                                <td style="padding:12px 0;">
+                                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_top_enabled]" value="1" <?php checked((int)($o['rc_top_enabled'] ?? 1), 1); ?>> Show &ldquo;Related Articles&rdquo; block at the top (after AI summary)</label><br>
+                                    <span style="display:inline-flex;align-items:center;gap:8px;margin-top:6px;">
+                                        Links to show:
+                                        <input type="number" id="rc_top_count_input" name="<?php echo esc_attr(self::OPT); ?>[rc_top_count]" value="<?php echo esc_attr((int)($o['rc_top_count'] ?? 3)); ?>" min="1" max="5" style="width:60px;" data-saved="<?php echo esc_attr((int)($o['rc_top_count'] ?? 3)); ?>" onchange="rcCheckCountWarning(this,'rc-top-warn')">
+                                        <span style="color:#888;font-size:12px;">(min 2, max 5)</span>
+                                    </span>
+                                    <p id="rc-top-warn" style="display:none;margin:6px 0 0;padding:8px 12px;background:#fffbeb;border-left:3px solid #f59e0b;color:#92400e;font-size:12px;">&#9888; You have increased the link count. Existing posts will only show the new amount after you run <strong>Refresh Stale</strong> in the Related Articles table below.</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th style="padding:12px 0;">You Might Also Like block</th>
+                                <td style="padding:12px 0;">
+                                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_bottom_enabled]" value="1" <?php checked((int)($o['rc_bottom_enabled'] ?? 1), 1); ?>> Show &ldquo;You Might Also Like&rdquo; block at the bottom (before comments)</label><br>
+                                    <span style="display:inline-flex;align-items:center;gap:8px;margin-top:6px;">
+                                        Links to show:
+                                        <input type="number" id="rc_bottom_count_input" name="<?php echo esc_attr(self::OPT); ?>[rc_bottom_count]" value="<?php echo esc_attr((int)($o['rc_bottom_count'] ?? 5)); ?>" min="1" max="10" style="width:60px;" data-saved="<?php echo esc_attr((int)($o['rc_bottom_count'] ?? 5)); ?>" onchange="rcCheckCountWarning(this,'rc-bottom-warn')">
+                                        <span style="color:#888;font-size:12px;">(min 3, max 10)</span>
+                                    </span>
+                                    <p id="rc-bottom-warn" style="display:none;margin:6px 0 0;padding:8px 12px;background:#fffbeb;border-left:3px solid #f59e0b;color:#92400e;font-size:12px;">&#9888; You have increased the link count. Existing posts will only show the new amount after you run <strong>Refresh Stale</strong> in the Related Articles table below.</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th style="padding:12px 0;">Candidate pool size</th>
+                                <td style="padding:12px 0;">
+                                    <input type="number" name="<?php echo esc_attr(self::OPT); ?>[rc_pool_size]" value="<?php echo esc_attr((int)($o['rc_pool_size'] ?? 20)); ?>" min="10" max="50" style="width:70px;">
+                                    <span style="color:#888;font-size:12px;margin-left:6px;">posts evaluated per source (10&ndash;50)</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th style="padding:12px 0;">Scoring signals</th>
+                                <td style="padding:12px 0;">
+                                    <label style="margin-right:16px;"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_use_categories]" value="1" <?php checked((int)($o['rc_use_categories'] ?? 1), 1); ?>> Categories</label>
+                                    <label style="margin-right:16px;"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_use_tags]" value="1" <?php checked((int)($o['rc_use_tags'] ?? 1), 1); ?>> Tags</label>
+                                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_use_summary]" value="1" <?php checked((int)($o['rc_use_summary'] ?? 1), 1); ?>> AI summary overlap</label>
+                                    <p class="description" style="margin-top:4px;">These signals are combined to score candidate posts. At least one must be enabled.</p>
+                                </td>
+                            </tr>
+                            <?php
+                            $all_cats      = get_categories(['hide_empty' => false]);
+                            $excluded_cats = (array)($o['rc_exclude_cats'] ?? []);
+                            if (!empty($all_cats)) : ?>
+                            <tr>
+                                <th style="padding:12px 0;">Exclude categories</th>
+                                <td style="padding:12px 0;">
+                                    <div style="display:flex;flex-wrap:wrap;gap:6px 16px;">
+                                    <?php foreach ($all_cats as $cat) : ?>
+                                        <label style="white-space:nowrap;">
+                                            <input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_exclude_cats][]" value="<?php echo esc_attr($cat->term_id); ?>" <?php checked(in_array((int)$cat->term_id, array_map('intval', $excluded_cats))); ?>>
+                                            <?php echo esc_html($cat->name); ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                    </div>
+                                    <p class="description" style="margin-top:4px;">Posts in these categories will not appear as related link suggestions.</p>
+                                </td>
+                            </tr>
+                            <?php endif; ?>
+                        </table>
+                        <div style="margin-top:16px;"><?php submit_button('Save SEO Settings', 'primary', 'submit', false); ?></div>
+                    </div>
+                </div><!-- /ab-card-rc-settings -->
+
+            </form>
+
+            <?php /* ── Related Articles Generation Table ── */ ?>
+            <div class="ab-zone-card ab-card-rc-table" style="margin-top:24px;">
+                <div class="ab-zone-header" style="background:linear-gradient(120deg,#4338ca 0%,#6366f1 60%,#818cf8 100%);display:flex;align-items:center;justify-content:space-between;">
+                    <span>&#128279; Related Articles — Post Status</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-rc-table', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9658; Show Details</button>
+                        <?php $this->explain_btn('rc_table', '&#128279; Related Articles — How it works', [
+                            ['name'=>'What it does',       'rec'=>'ℹ️ Info',      'desc'=>'For every published post, Related Articles finds and ranks other posts on your site that are topically related. It surfaces two blocks on the front end: a &ldquo;Related Articles&rdquo; block near the top of the article (closest conceptual matches) and a &ldquo;You Might Also Like&rdquo; block at the bottom (broader related posts).'],
+                            ['name'=>'No AI required',     'rec'=>'✅ Free',       'desc'=>'Generation uses only signals already on your site — shared categories, shared tags, title keyword overlap, and your existing AI summary text. There are zero API calls and no cost. It scores every candidate post locally in PHP and ranks by relevance.'],
+                            ['name'=>'Generate Missing',   'rec'=>'✅ Recommended','desc'=>'Processes all posts that have not yet been generated. Run this once after installing the plugin to populate your full post library. Each post takes under a second and the batch runs with a small delay between posts to avoid overloading the server.'],
+                            ['name'=>'Refresh Stale',      'rec'=>'⬜ Optional',   'desc'=>'Re-runs generation for all posts regardless of status. Use this after making significant changes to your category or tag structure, or after adding AI summaries to posts that previously lacked them.'],
+                            ['name'=>'Retry Failed',       'rec'=>'⬜ Optional',   'desc'=>'Re-runs only posts that errored during a previous batch. Useful if a batch was interrupted or a post had missing data.'],
+                            ['name'=>'Reset All',          'rec'=>'⚠️ Caution',   'desc'=>'Deletes all Related Articles data for every post. The front-end blocks will disappear from all posts immediately. You will need to run Generate Missing again to rebuild. Use this only if you want to start fresh after major structural changes.'],
+                            ['name'=>'Per-row Run button', 'rec'=>'ℹ️ Info',      'desc'=>'Runs the full generation pipeline for a single post. Updates the row in place without reloading the page. Use this to regenerate a specific post after editing its categories, tags, or AI summary.'],
+                        ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body ab-card-rc-table-body" style="padding:20px 24px;display:none;">
+
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+                        <span style="font-weight:600;color:#1d2327;font-size:13px;">Filter:</span>
+                        <button type="button" class="button rc-filter-btn rc-filter-active" data-filter="all"     onclick="rcSetFilter('all',this)">All Posts</button>
+                        <button type="button" class="button rc-filter-btn"                  data-filter="pending"  onclick="rcSetFilter('pending',this)">&#9711; Pending</button>
+                        <button type="button" class="button rc-filter-btn"                  data-filter="complete" onclick="rcSetFilter('complete',this)">&#9989; Complete</button>
+                        <button type="button" class="button rc-filter-btn"                  data-filter="error"    onclick="rcSetFilter('error',this)">&#10060; Error</button>
+                        <span style="flex:1;"></span>
+                        <button type="button" class="button button-primary" id="rc-btn-generate-missing" onclick="rcBatch('missing')">&#9654; Generate Missing</button>
+                        <button type="button" class="button"               id="rc-btn-refresh-stale"    onclick="rcBatch('stale')">&#8635; Refresh Stale</button>
+                        <button type="button" class="button"               id="rc-btn-retry-failed"     onclick="rcBatch('failed')">&#128257; Retry Failed</button>
+                        <button type="button" class="button"               id="rc-btn-reset-all"        onclick="rcResetAll()" style="color:#b91c1c;border-color:#b91c1c;">&#128465; Reset All</button>
+                    </div>
+
+                    <div id="rc-batch-bar" style="display:none;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <div style="flex:1;background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden;">
+                                <div id="rc-batch-progress-bar" style="height:100%;background:#6366f1;border-radius:4px;width:0%;transition:width 0.3s;"></div>
+                            </div>
+                            <span id="rc-batch-label" style="font-size:12px;color:#4338ca;font-weight:600;white-space:nowrap;">0 / 0</span>
+                            <button type="button" class="button" id="rc-btn-stop" onclick="rcStopBatch()" style="color:#b91c1c;border-color:#b91c1c;">&#9646;&#9646; Stop</button>
+                        </div>
+                    </div>
+
+                    <div id="rc-table-wrap" style="overflow-x:auto;">
+                        <table class="widefat fixed striped" id="rc-posts-table" style="min-width:680px;">
+                            <thead>
+                                <tr>
+                                    <th style="width:40%;">Post</th>
+                                    <th style="width:14%;text-align:center;">Status</th>
+                                    <th style="width:9%;text-align:center;">Top</th>
+                                    <th style="width:9%;text-align:center;">Bottom</th>
+                                    <th style="width:14%;text-align:center;">Generated</th>
+                                    <th style="width:14%;text-align:center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rc-posts-tbody">
+                                <tr><td colspan="6" style="text-align:center;padding:24px;color:#999;">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="rc-pagination" style="display:flex;gap:8px;align-items:center;margin-top:12px;"></div>
+
+                </div>
+            </div><!-- /ab-card-rc-table -->
+
+        </div><!-- /ab-pane-aitools -->
 
         <?php /* ══════════════════ SITEMAP PANE ══════════════════ */ ?>
         <div class="ab-pane" id="ab-pane-sitemap">
@@ -8779,6 +8927,7 @@ Write a single meta description for the article provided. Rules:
                 document.getElementById('ab-ai-fix').disabled = false;
             document.getElementById('ab-ai-fix-titles').disabled = false;
                 document.getElementById('ab-ai-static').disabled = false;
+                document.getElementById('ab-ai-score-all').disabled = false;
                 // Pager
                 const pager = document.getElementById('ab-pager');
                 pager.style.display = abState.totalPages > 1 ? 'flex' : 'none';
@@ -8797,6 +8946,16 @@ Write a single meta description for the article provided. Rules:
         }
 
         // ── Render table ─────────────────────────────────────────────────────
+        function abScoreBadge(post) {
+            const s = (post._seo_score !== undefined) ? post._seo_score : post.seo_score;
+            const n = (post._seo_notes !== undefined) ? post._seo_notes : (post.seo_notes || '');
+            const click = post.no_post ? '' : ' onclick="abScoreOne(' + post.id + ')"';
+            if (!s) return '<span class="ab-score-badge ab-score-none"' + click + ' title="Click to score">Score</span>';
+            const cls = s >= 90 ? 'ab-score-great' : s >= 75 ? 'ab-score-good' : s >= 50 ? 'ab-score-fair' : 'ab-score-poor';
+            const tip = n ? abEsc(n) + ' — click to re-score' : 'Click to re-score';
+            return '<span class="ab-score-badge ' + cls + '"' + click + ' title="' + tip + '">' + s + '%</span>';
+        }
+
         function abBadge(post) {
             if (!post.has_desc && !post._gen) return '<span class="ab-badge ab-badge-none">No AI description</span>';
             const desc  = post._gen || post.desc;
@@ -8882,16 +9041,18 @@ Write a single meta description for the article provided. Rules:
                     '<td>' + abBadge(p) + existDesc + genDesc + '</td>' +
                     '<td style="text-align:center">' + titleBadge + '</td>' +
                     '<td style="text-align:center">' + altCell + '</td>' +
+                    '<td style="text-align:center" class="ab-score-cell">' + abScoreBadge(p) + '</td>' +
                     '<td>' + actionCell + '</td>' +
                 '</tr>';
             }).join('');
 
-            wrap.innerHTML = '<table class="ab-posts" style="min-width:700px">' +
+            wrap.innerHTML = '<table class="ab-posts" style="min-width:760px">' +
                 '<thead><tr>' +
-                '<th style="width:32%">Post</th>' +
-                '<th style="width:38%">Description</th>' +
-                '<th style="width:9%;text-align:center">Title</th>' +
-                '<th style="width:9%;text-align:center">ALT Images</th>' +
+                '<th style="width:29%">Post</th>' +
+                '<th style="width:34%">Description</th>' +
+                '<th style="width:8%;text-align:center">Title</th>' +
+                '<th style="width:8%;text-align:center">ALT</th>' +
+                '<th style="width:9%;text-align:center">SEO Score</th>' +
                 '<th style="width:12%">Action</th>' +
                 '</tr></thead>' +
                 '<tbody>' + rows + '</tbody></table>';
@@ -8916,8 +9077,10 @@ Write a single meta description for the article provided. Rules:
                     if (d.alts_saved > 0) {
                         post._alts_saved = (post._alts_saved || 0) + d.alts_saved;
                     }
+                    if (d.seo_score !== undefined) { post._seo_score = d.seo_score; post._seo_notes = d.seo_notes || ''; }
                     const altNote = d.alts_saved > 0 ? ' + ' + d.alts_saved + ' ALT(s)' : '';
-                    abLog('✓ Description → ' + d.chars + 'c' + altNote + ': ' + d.description, 'ok');
+                    const scoreNote = d.seo_score !== undefined ? ' · SEO ' + d.seo_score + '%' : '';
+                    abLog('✓ Description → ' + d.chars + 'c' + altNote + scoreNote + ': ' + d.description, 'ok');
 
                     // ── Title ─────────────────────────────────────────────────
                     if (d.title_status === 'fixed' || d.title_status === 'fixed_imperfect') {
@@ -8943,6 +9106,84 @@ Write a single meta description for the article provided. Rules:
                 abLog('✗ Network error: ' + e.message, 'err');
                 abRenderTable();
             });
+        }
+
+        // ── Score one post ────────────────────────────────────────────────────
+        function abScoreOne(postId) {
+            if (!abCheckApiKey()) return;
+            const post = abState.posts.find(p => p.id === postId);
+            if (!post || post.no_post) return;
+            const cell = document.querySelector('#ab-row-' + postId + ' .ab-score-cell');
+            if (cell) cell.innerHTML = '<span style="color:#888;font-size:11px">⟳ Scoring…</span>';
+            abPost('cs_seo_score_one', {post_id: postId}).then(data => {
+                if (data.success) {
+                    post._seo_score = data.data.seo_score;
+                    post._seo_notes = data.data.seo_notes || '';
+                    abLog('📊 SEO score: ' + data.data.seo_score + '% — ' + (data.data.seo_notes || ''), 'info');
+                } else {
+                    post._seo_score = undefined;
+                    abLog('✗ Score error for post ' + postId + ': ' + (data.data || 'Unknown error'), 'err');
+                }
+                if (cell) cell.innerHTML = abScoreBadge(post);
+            }).catch(e => {
+                if (cell) cell.innerHTML = abScoreBadge(post);
+                abLog('✗ Score network error: ' + e.message, 'err');
+            });
+        }
+
+        // ── Score all posts ───────────────────────────────────────────────────
+        async function abScoreAll() {
+            if (!abCheckApiKey()) return;
+            if (!abState.posts.length) { abSetStatus('Load posts first'); return; }
+            if (abState.running) return;
+            abState.running  = true;
+            abState.stopped  = false;
+            document.getElementById('ab-ai-gen-missing').disabled = true;
+            document.getElementById('ab-ai-gen-all').disabled = true;
+            document.getElementById('ab-ai-fix').disabled = true;
+            document.getElementById('ab-ai-fix-titles').disabled = true;
+            document.getElementById('ab-ai-static').disabled = true;
+            document.getElementById('ab-ai-score-all').disabled = true;
+            document.getElementById('ab-ai-stop').style.display = 'inline-block';
+            abLog('Starting SEO scoring run...', 'info');
+
+            let allPosts = [];
+            for (let pg = 1; pg <= abState.totalPages; pg++) {
+                if (abState.stopped) break;
+                try {
+                    const data = await abPost('cs_seo_ai_get_posts', {page: pg});
+                    if (data.success) allPosts = allPosts.concat(data.data.posts);
+                } catch(e) {}
+            }
+            const targets = allPosts.filter(p => !p.no_post);
+            let done = 0, errors = 0;
+            for (const post of targets) {
+                if (abState.stopped) { abLog('Stopped after ' + done + ' posts scored', 'skip'); break; }
+                abSetStatus('Scoring "' + post.title.slice(0,50) + '"…');
+                abSetProgress(done, targets.length);
+                try {
+                    const data = await abPost('cs_seo_score_one', {post_id: post.id});
+                    if (data.success) {
+                        const local = abState.posts.find(p => p.id === post.id);
+                        if (local) { local._seo_score = data.data.seo_score; local._seo_notes = data.data.seo_notes || ''; }
+                        const cell = document.querySelector('#ab-row-' + post.id + ' .ab-score-cell');
+                        if (cell && local) cell.innerHTML = abScoreBadge(local);
+                        done++;
+                    } else { errors++; }
+                } catch(e) { errors++; }
+                await abSleep(300);
+            }
+            abSetProgress(done, targets.length);
+            abSetStatus('✓ Scored ' + done + ' posts' + (errors > 0 ? ', ' + errors + ' errors' : ''));
+            abLog('Score run complete: ' + done + ' scored, ' + errors + ' errors', done > 0 ? 'ok' : 'info');
+            abState.running = false;
+            document.getElementById('ab-ai-gen-missing').disabled = false;
+            document.getElementById('ab-ai-gen-all').disabled = false;
+            document.getElementById('ab-ai-fix').disabled = false;
+            document.getElementById('ab-ai-fix-titles').disabled = false;
+            document.getElementById('ab-ai-static').disabled = false;
+            document.getElementById('ab-ai-score-all').disabled = false;
+            document.getElementById('ab-ai-stop').style.display = 'none';
         }
 
         // ── Generate all ──────────────────────────────────────────────────────
@@ -9011,6 +9252,7 @@ Write a single meta description for the article provided. Rules:
                                     local._new_title       = r.title;
                                     local._new_title_chars = r.title_chars;
                                 }
+                                if (r.seo_score !== undefined) { local._seo_score = r.seo_score; local._seo_notes = r.seo_notes || ''; }
                             }
                         }
                     } else {
@@ -10723,21 +10965,21 @@ Write a single meta description for the article provided. Rules:
         (function() {
             const origAbTab = typeof window.abTab === 'function' ? window.abTab : null;
             window.__rcTabLoaded = false;
-            // Hook into tab switching via MutationObserver on the seo panel
-            const seoPane = document.getElementById('ab-pane-seo');
-            if (seoPane) {
+            // Hook into tab switching via MutationObserver on the AI Tools panel
+            const rcPane = document.getElementById('ab-pane-aitools');
+            if (rcPane) {
                 const obs = new MutationObserver(() => {
-                    if (seoPane.classList.contains('active') && !window.__rcTabLoaded) {
+                    if (rcPane.classList.contains('active') && !window.__rcTabLoaded) {
                         window.__rcTabLoaded = true;
                         rcLoadTable(1, 'all');
                     }
-                    if (!seoPane.classList.contains('active')) {
+                    if (!rcPane.classList.contains('active')) {
                         window.__rcTabLoaded = false;
                     }
                 });
-                obs.observe(seoPane, { attributes: true, attributeFilter: ['class'] });
-                // If already on SEO tab on load
-                if (seoPane.classList.contains('active')) {
+                obs.observe(rcPane, { attributes: true, attributeFilter: ['class'] });
+                // If already on AI Tools tab on load
+                if (rcPane.classList.contains('active')) {
                     window.__rcTabLoaded = true;
                     rcLoadTable(1, 'all');
                 }
@@ -11308,6 +11550,7 @@ Write a single meta description for the article provided. Rules:
 
     const SITEMAP_PER_FILE    = 5000; // URLs per XML sitemap file served to Google
     const SITEMAP_PREVIEW_PER = 200;  // Rows per page in the admin preview table
+    const SITEMAP_URLS_CACHE  = 'cs_seo_sitemap_urls'; // Transient key for the full URL list
 
     public function maybe_register_sitemap(): void {
         if (!(int) $this->opts['enable_sitemap']) return;
@@ -11398,6 +11641,10 @@ Write a single meta description for the article provided. Rules:
             'ignore_sticky_posts' => true,
         ]);
 
+        // Bulk-prime post objects and meta cache — avoids N+1 on cold transient build.
+        _prime_post_caches($posts, false, false);
+        update_meta_cache('post', $posts);
+
         $by_type = ['post' => [], 'page' => []];
         foreach ($posts as $pid) {
             $p    = get_post($pid);
@@ -11433,6 +11680,9 @@ Write a single meta description for the article provided. Rules:
 
 
     private function get_all_sitemap_urls(): array {
+        $cached = get_transient(self::SITEMAP_URLS_CACHE);
+        if ($cached !== false) return $cached;
+
         $post_types  = (array)($this->opts['sitemap_post_types'] ?? ['post', 'page']);
         $inc_tax     = (int)($this->opts['sitemap_taxonomies'] ?? 0);
         $exclude_raw = trim((string)($this->opts['sitemap_exclude'] ?? ''));
@@ -11502,6 +11752,7 @@ Write a single meta description for the article provided. Rules:
             }
         }
 
+        set_transient(self::SITEMAP_URLS_CACHE, $urls, HOUR_IN_SECONDS);
         return $urls;
     }
 
@@ -11726,32 +11977,41 @@ Write a single meta description for the article provided. Rules:
 
         // 5. Posts/pages where every <img> in post_content has a non-empty alt attribute.
         //    No AI calls — scans post_content directly. Posts with no images count as
-        //    fully covered (nothing missing). This runs instantly at cache rebuild time.
-        $all_posts = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional; results stored in cs_seo_health_cache option
-            "SELECT ID, post_content FROM {$wpdb->posts}
-             WHERE post_status = 'publish'
-               AND post_type IN ('post','page')"
-        );
-
-        $images = 0;
-        foreach ($all_posts as $p) {
-            $content = (string) $p->post_content;
-            preg_match_all('/<img[^>]+>/i', $content, $img_tags);
-            if (empty($img_tags[0])) {
-                // No images in this post — counts as fully covered.
-                $images++;
-                continue;
-            }
-            $all_have_alt = true;
-            foreach ($img_tags[0] as $tag) {
-                // Check alt attribute exists and is non-empty.
-                if (!preg_match('/alt=["\']([^"\']+)["\']/i', $tag)) {
-                    $all_have_alt = false;
-                    break;
+        //    fully covered (nothing missing). Processed in batches to avoid loading all
+        //    post_content into memory at once on large sites.
+        $images     = 0;
+        $batch_size = 200;
+        $offset     = 0;
+        do {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional; results stored in cs_seo_health_cache option
+            $batch = $wpdb->get_results($wpdb->prepare(
+                "SELECT ID, post_content FROM {$wpdb->posts}
+                 WHERE post_status = 'publish'
+                   AND post_type IN ('post','page')
+                 LIMIT %d OFFSET %d",
+                $batch_size,
+                $offset
+            ));
+            foreach ($batch as $p) {
+                $content = (string) $p->post_content;
+                preg_match_all('/<img[^>]+>/i', $content, $img_tags);
+                if (empty($img_tags[0])) {
+                    // No images in this post — counts as fully covered.
+                    $images++;
+                    continue;
                 }
+                $all_have_alt = true;
+                foreach ($img_tags[0] as $tag) {
+                    // Check alt attribute exists and is non-empty.
+                    if (!preg_match('/alt=["\']([^"\']+)["\']/i', $tag)) {
+                        $all_have_alt = false;
+                        break;
+                    }
+                }
+                if ($all_have_alt) $images++;
             }
-            if ($all_have_alt) $images++;
-        }
+            $offset += $batch_size;
+        } while (count($batch) === $batch_size);
 
         $cache = [
             'total'     => $total,
