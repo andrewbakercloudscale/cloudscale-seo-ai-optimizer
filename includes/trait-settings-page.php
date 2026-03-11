@@ -1,0 +1,5079 @@
+<?php
+// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
+trait CS_SEO_Settings_Page {
+    // =========================================================================
+    // Settings Page
+    // =========================================================================
+
+    public function settings_page(): void {
+        if (!current_user_can('manage_options')) return;
+        $o     = $this->opts;
+        $ai    = $this->ai_opts;
+        $nonce = wp_create_nonce('cs_seo_nonce');
+        ?>
+        <div class="wrap">
+        <h1>CloudScale SEO AI Optimizer <span style="font-size:13px;font-weight:400;color:#999;margin-left:6px">v<?php echo esc_html(self::VERSION); ?></span></h1>
+        <a href="https://andrewbaker.ninja" target="_blank" rel="noopener" style="
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            background:linear-gradient(135deg, #f953c6 0%, #b91d73 40%, #4f46e5 100%);
+            color:#fff;
+            font-weight:700;
+            font-size:13px;
+            padding:8px 18px;
+            border-radius:20px;
+            text-decoration:none;
+            margin-bottom:18px;
+            box-shadow:0 3px 10px rgba(249,83,198,0.45);
+            letter-spacing:0.03em;
+            transition:filter 0.15s, transform 0.15s;
+        " onmouseover="this.style.filter='brightness(1.15)';this.style.transform='scale(1.03)'"
+           onmouseout="this.style.filter='';this.style.transform=''">
+            <span style="font-size:16px">🥷</span> Totally Free by AndrewBaker.Ninja
+        </a>
+
+        <?php /* ── TAB NAV ── */ ?>
+        <style>
+            .ab-tabs {
+                display:flex; flex-wrap:wrap; gap:6px; margin:20px 0 0; padding:0;
+                border-bottom:3px solid #1d2327;
+            }
+            .ab-tab {
+                padding:8px 14px; cursor:pointer;
+                border:none; border-radius:6px 6px 0 0;
+                font-size:12px; font-weight:600; letter-spacing:0.01em;
+                background:#e0e0e0; color:#50575e;
+                transition:background 0.15s, color 0.15s;
+                margin-bottom:0; position:relative; bottom:-1px;
+                white-space:nowrap;
+            }
+            @media (min-width:783px) {
+                .ab-tab { padding:10px 22px; font-size:13px; }
+            }
+            .ab-tab:hover:not(.active) { background:#c3c4c7; color:#1d2327; }
+            .ab-tab[data-tab="seo"].active     { background:#2271b1; color:#fff; }
+            .ab-tab[data-tab="aitools"].active  { background:#6366f1; color:#fff; }
+            .ab-tab[data-tab="sitemap"].active  { background:#1a7a34; color:#fff; }
+            .ab-tab[data-tab="batch"].active  { background:#e67e00; color:#fff; }
+            .ab-tab[data-tab="catfix"].active { background:#2d6a4f; color:#fff; }
+            .ab-tab[data-tab="perf"].active   { background:#d946a6; color:#fff; }
+            .ab-pane { display:none; padding-top:24px; }
+            .ab-pane.active { display:block; }
+            /* AI Writer styles */
+            #ab-ai-writer { font-family: -apple-system, sans-serif; }
+            .ab-ai-toolbar { display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+            #ab-log { background:#1a1a2e; color:#a8b4c8; font-family:'Courier New',monospace;
+                      font-size:12px; padding:14px; border-radius:6px; max-height:260px;
+                      overflow-y:auto; margin:16px 0; display:none; border:1px solid #2a2a4a; }
+            #ab-log.visible { display:block; }
+            #ab-alt-log { background:#1a1a2e; color:#a8b4c8; font-family:'Courier New',monospace;
+                          font-size:12px; padding:14px; border-radius:6px; max-height:260px;
+                          overflow-y:auto; margin:8px 0; border:1px solid #2a2a4a;
+                          display:none; }
+            .ab-log-line { color:#ffffff; margin-bottom:2px; }
+            .ab-log-ok   { color:#00d084; }
+            .ab-log-err  { color:#ff6b6b; }
+            .ab-log-skip { color:#f0c040; }
+            .ab-log-warn { color:#f0a040; }
+            .ab-log-info { color:#8080b0; }
+            .ab-progress { background:#f0f0f1; border-radius:4px; height:8px; margin:8px 0 4px; overflow:hidden; display:none; }
+            .ab-progress.visible { display:block; }
+            .ab-progress-fill { height:100%; background:#2271b1; border-radius:4px; transition:width 0.3s; width:0%; }
+            .ab-stats { font-size:12px; color:#50575e; margin-bottom:12px; }
+            .ab-stat-val { font-weight:600; color:#1d2327; }
+            table.ab-posts { width:100%; min-width:640px; border-collapse:collapse; margin-top:12px; }
+            table.ab-posts th { text-align:left; padding:8px 10px; border-bottom:2px solid #c3c4c7;
+                                font-size:12px; color:#50575e; font-weight:600; }
+            table.ab-posts td { padding:9px 10px; border-bottom:1px solid #f0f0f1; font-size:13px; vertical-align:top; }
+            table.ab-posts tr:hover td { background:#f6f7f7; }
+            .ab-badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:11px; font-weight:600; }
+            .ab-score-badge { display:inline-block; padding:3px 9px; border-radius:12px; font-size:11px; font-weight:700; white-space:nowrap; cursor:pointer; transition:opacity 0.15s; }
+            .ab-score-badge:hover { opacity:0.8; }
+            .ab-score-none  { background:#f3f4f6; color:#6b7280; border:1px solid #d1d5db; font-weight:400; font-style:italic; }
+            .ab-score-poor  { background:#fde8e8; color:#9b1c1c; border:1px solid #fca5a5; }
+            .ab-score-fair  { background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
+            .ab-score-good  { background:#d1fae5; color:#064e3b; border:1px solid #6ee7b7; }
+            .ab-score-great { background:#dcfce7; color:#14532d; border:1px solid #86efac; }
+            .ab-badge-none   { background:#f0e8fb; color:#4a1a7a; border:1px solid #c4b2e0; }
+            .ab-badge-ok     { background:#edfaef; color:#1a7a34; border:1px solid #b2dfc0; }
+            .ab-badge-short  { background:#fcf9e8; color:#7a5c00; border:1px solid #f0d676; }
+            .ab-badge-long   { background:#fcf0ef; color:#8a2424; border:1px solid #f5bcbb; }
+            .ab-badge-gen    { background:#e8f3fb; color:#1a4a7a; border:1px solid #b2cfe0; }
+            .ab-badge-gen-short { background:#f0e8fb; color:#4a1a7a; border:1px solid #c4b2e0; }
+            .ab-badge-gen-long  { background:#fcf0ef; color:#8a2424; border:1px solid #f5bcbb; }
+            .ab-desc-text { font-size:12px; color:#50575e; margin-top:3px; line-height:1.4; word-wrap:break-word; white-space:normal; }
+            .ab-desc-gen  { font-size:12px; color:#1a4a7a; margin-top:4px; background:#e8f3fb;
+                            border-left:3px solid #2271b1; padding:4px 8px; border-radius:0 3px 3px 0; }
+            .ab-row-btn { font-size:11px; padding:3px 8px; }
+            .ab-key-row { display:flex; gap:8px; align-items:center; }
+            .ab-key-status { font-size:12px; font-weight:600; }
+            .ab-key-ok  { color:#1a7a34; }
+            .ab-key-err { color:#8a2424; }
+            #ab-ai-gen-all { position:relative; }
+            .ab-spinner { display:inline-block; animation:ab-spin 0.8s linear infinite; margin-right:4px; }
+            @keyframes ab-spin { to { transform:rotate(360deg); } }
+            .ab-pager { display:flex; gap:8px; align-items:center; margin-top:12px; }
+            .ab-summary-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:12px 0; }
+            .ab-summary-card { background:#f6f7f7; border:1px solid #c3c4c7; border-radius:6px;
+                               padding:12px; text-align:center; }
+            .ab-summary-num  { font-size:24px; font-weight:700; color:#2271b1; line-height:1; }
+            .ab-summary-lbl  { font-size:11px; color:#50575e; margin-top:4px; }
+            /* Section zone headers */
+            /* ── Zone cards (matching CloudScale Backup style) ── */
+            .ab-zone-card {
+                border-radius:8px; overflow:hidden;
+                box-shadow:0 6px 28px rgba(30,100,200,0.55), 0 2px 8px rgba(30,100,200,0.35);
+                margin:24px 0 0;
+            }
+            .ab-zone-header {
+                display:flex; align-items:center; gap:10px;
+                padding:13px 20px;
+                font-size:15px; font-weight:700; color:#fff;
+                letter-spacing:0.01em;
+            }
+            .ab-zone-header .ab-zone-icon { font-size:17px; }
+            .ab-zone-body {
+                background:#f4f5f7;
+                padding:4px 0 8px;
+            }
+            .ab-zone-body .form-table th { padding-left:20px; }
+            .ab-zone-body .form-table td { padding-right:20px; }
+            @media (max-width:782px) {
+                .ab-zone-body .form-table th { padding-left:16px; }
+                .ab-zone-body .form-table td { padding-left:16px; padding-right:16px; }
+                .ab-zone-body > *:not(.form-table):not(.ab-zone-body) { padding-left:16px; padding-right:16px; }
+                .ab-alt-posts-wrap, #ab-alt-posts-wrap,
+                #ab-alt-log, #ab-alt-prog-label,
+                #ab-alt-toolbar, #ab-alt-summary,
+                #ab-alt-load-cta { padding-left:16px; padding-right:16px; }
+            }
+            /* Colour per section — matches backup plugin palette */
+            .ab-zone-card.ab-card-identity .ab-zone-header  { background:#2271b1; } /* blue   */
+            .ab-zone-card.ab-card-features .ab-zone-header  { background:#1a7a34; } /* green  */
+            .ab-checkbox-grid {
+                display:grid; grid-template-columns:repeat(3,1fr); gap:10px 24px; padding:4px 0 8px;
+            }
+            .ab-checkbox-grid label { display:flex; align-items:flex-start; gap:6px; font-size:13px; cursor:pointer; padding:6px 8px; border-radius:4px; }
+            .ab-checkbox-grid label.ab-rec { background:#edf7ed; border:1px solid #c3e6c3; }
+            .ab-checkbox-grid label:not(.ab-rec) { background:#f9f9f9; border:1px solid #e5e5e5; }
+            /* Slider toggle */
+            .ab-toggle-row {
+                display:flex; align-items:center; justify-content:space-between;
+                padding:12px 0; border-bottom:1px solid #f0f0f0;
+            }
+            .ab-toggle-row:last-child { border-bottom:none; }
+            .ab-toggle-label { font-size:13px; font-weight:600; color:#1d2327; }
+            .ab-toggle-label span { display:block; font-weight:400; color:#666; font-size:12px; margin-top:2px; }
+            .ab-toggle-switch { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
+            .ab-toggle-switch input { opacity:0; width:0; height:0; }
+            .ab-toggle-slider {
+                position:absolute; cursor:pointer; inset:0;
+                background:#ccc; border-radius:24px;
+                transition:background 0.2s;
+            }
+            .ab-toggle-slider:before {
+                content:''; position:absolute;
+                width:18px; height:18px; border-radius:50%;
+                left:3px; bottom:3px; background:#fff;
+                transition:transform 0.2s;
+                box-shadow:0 1px 3px rgba(0,0,0,0.2);
+            }
+            .ab-toggle-switch input:checked + .ab-toggle-slider { background:#1a7a34; }
+            .ab-toggle-switch input:checked + .ab-toggle-slider:before { transform:translateX(20px); }
+            .ab-zone-card.ab-card-robots .ab-zone-header    { background:#b45309; } /* amber  */
+            .ab-physical-robots-warn {
+                display:flex; gap:16px; align-items:flex-start;
+                background:#fff8e1; border:2px solid #f0ad00;
+                border-radius:6px; padding:16px 20px; margin:16px 20px 4px;
+                font-size:13px; line-height:1.6;
+            }
+            .ab-zone-card.ab-card-person .ab-zone-header    { background:#6b3fa0; } /* purple */
+            .ab-zone-card.ab-card-ai .ab-zone-header        { background:#c3372b; } /* red    */
+            .ab-zone-card.ab-card-ai .ab-zone-body          { background:#f5ecec; }
+            .ab-zone-card.ab-card-schedule .ab-zone-header  { background:#e67e00; } /* orange */
+            .ab-zone-card.ab-card-lastrun  .ab-zone-header  { background:#1a4a7a; } /* dark blue */
+            .ab-zone-card.ab-card-alt      .ab-zone-header  { background:#0e6b6b; } /* teal */
+            .ab-zone-card.ab-card-summary  .ab-zone-header  { background:#6b3fa0; } /* purple */
+            .ab-zone-card.ab-card-catfix   .ab-zone-header  { background:#2d6a4f; } /* forest green */
+            .ab-zone-card.ab-card-sitemap-settings .ab-zone-header { background:#1a7a34; }
+            .ab-zone-card.ab-card-sitemap-preview .ab-zone-header  { background:#0e5229; }
+            .ab-zone-card.ab-card-llms .ab-zone-header             { background:#1a4a8a; }
+            .ab-zone-card.ab-card-https .ab-zone-header            { background:#7a1a1a; }
+            /* Sitemap preview table */
+            .ab-sitemap-url { font-size:12px; color:#0a6be0; word-break:break-all; font-weight:500; }
+            .ab-sitemap-type { font-size:11px; font-weight:700; padding:2px 7px; border-radius:3px; white-space:nowrap; }
+            .ab-sitemap-type-home { background:#c8a8f0; color:#2d1060; }
+            .ab-sitemap-type-post { background:#a8cff0; color:#0a2a5a; }
+            .ab-sitemap-type-page { background:#a8f0b8; color:#0a4a1a; }
+            .ab-sitemap-type-tax  { background:#f0e0a8; color:#4a3000; }
+            .ab-sitemap-type-cpt  { background:#f0c0a8; color:#5a1a00; }
+            table.ab-sitemap-tbl { width:100%; border-collapse:collapse; font-size:13px; }
+            table.ab-sitemap-tbl th { text-align:left; padding:8px 12px; border-bottom:2px solid #8c8f94;
+                                      background:#f0f0f1; font-size:12px; color:#1d2327; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; }
+            table.ab-sitemap-tbl td { padding:8px 12px; border-bottom:1px solid #dcdcde; vertical-align:middle; color:#1d2327; }
+            table.ab-sitemap-tbl tr:hover td { background:#e8f0fa; }
+            table.ab-sitemap-tbl tr:nth-child(even) td { background:#fafafa; }
+            table.ab-sitemap-tbl tr:nth-child(even):hover td { background:#e8f0fa; }
+            .ab-sitemap-count { font-size:13px; color:#1d2327; margin:0 0 12px; font-weight:500; }
+            .ab-sitemap-count strong { color:#1d2327; }
+            .ab-zone-card.ab-card-update-posts .ab-zone-header { background:#1d2327; font-size:17px; padding:16px 22px; }
+            .ab-zone-card.ab-card-update-posts .ab-zone-header .ab-zone-icon { color:#f0c040; font-size:20px; }
+            /* Load Posts CTA strip */
+            .ab-load-cta {
+                display:flex; align-items:center; gap:18px;
+                background:linear-gradient(135deg, #1d2327 0%, #2c3338 100%);
+                border-radius:6px; padding:20px 24px; margin-bottom:20px;
+                border-left:5px solid #f0c040;
+            }
+            .ab-load-cta-icon { font-size:32px; line-height:1; flex-shrink:0; }
+            .ab-load-cta-text { flex:1; }
+            .ab-load-cta-text strong { display:block; color:#fff; font-size:15px; margin-bottom:3px; }
+            .ab-load-cta-text span { color:#a7aaad; font-size:13px; }
+            .ab-load-btn {
+                flex-shrink:0;
+                background:#f0c040 !important; border-color:#d4a800 !important;
+                color:#1d2327 !important; font-weight:700 !important;
+                font-size:15px !important; padding:10px 28px !important;
+                border-radius:4px; cursor:pointer; white-space:nowrap;
+                box-shadow:0 2px 6px rgba(0,0,0,0.25);
+            }
+            .ab-load-btn:hover { background:#f5d060 !important; }
+            /* Action buttons in toolbar */
+            .ab-action-btn { font-size:13px !important; padding:6px 14px !important; height:auto !important; }
+            .ab-fix-btn    { background:#e67e00 !important; border-color:#c26900 !important; color:#fff !important; }
+            .ab-regen-btn  { background:#1a7a34 !important; border-color:#155f28 !important; color:#fff !important; }
+            .ab-static-btn { background:#c2185b !important; border-color:#ad1457 !important; color:#fff !important; }
+            .ab-zone-divider {
+                border:none; border-top:2px solid #dcdcde;
+                margin:32px 0 0; opacity:1;
+            }
+            /* Force black text in all plugin textareas — overrides mobile browser defaults */
+            #cs-robots-txt,
+            textarea[name="cs_seo_options[sitemap_exclude]"] {
+                background:#1a1a2e !important;
+                color:#e0e0f0 !important;
+                font-family:'Courier New',monospace !important;
+                font-size:12px !important;
+                line-height:1.6 !important;
+                border:1px solid #2a2a4a !important;
+                border-radius:4px !important;
+            }
+            textarea[name="cs_seo_options[home_desc]"],
+            textarea[name="cs_seo_options[default_desc]"],
+            textarea[name="cs_seo_options[sameas]"] {
+                color:#1d2327 !important;
+            }
+            /* Field hints — italic, muted green */
+            .ab-zone-body p.description,
+            .ab-zone-body .description {
+                color:#2a7a3a !important;
+                font-style:italic !important;
+                font-size:12px !important;
+                padding-left:8px !important;
+                margin-top:4px !important;
+                border-left:3px solid #b8dfc0 !important;
+            }
+            /* Form labels — bold, with colon */
+            .ab-zone-body .form-table th,
+            .ab-zone-body .form-table th label {
+                font-weight:700 !important;
+                color:#1d2327 !important;
+            }
+            .ab-api-key-warning {
+                display:none; align-items:flex-start; gap:12px;
+                background:#fff8e1; border:2px solid #f0ad00;
+                border-radius:6px; padding:14px 18px; margin:0 0 16px;
+            }
+            .ab-api-key-warning.visible { display:flex; }
+            .ab-api-key-warning .ab-warn-icon { font-size:22px; line-height:1; flex-shrink:0; }
+            .ab-api-key-warning .ab-warn-body { font-size:13px; color:#1d2327; }
+            .ab-api-key-warning .ab-warn-body strong { display:block; margin-bottom:4px; font-size:14px; }
+            .ab-api-key-warning .ab-warn-body a { color:#2271b1; font-weight:600; }
+        </style>
+
+        <div class="ab-tabs">
+            <button class="ab-tab active" data-tab="seo"      onclick="abTab('seo',this)">📊 Optimise SEO</button>
+            <button class="ab-tab"        data-tab="aitools"  onclick="abTab('aitools',this)">✨ AI Tools</button>
+            <button class="ab-tab"        data-tab="sitemap"  onclick="abTab('sitemap',this)">🗺 Sitemap &amp; Robots</button>
+            <button class="ab-tab"        data-tab="perf"    onclick="abTab('perf',this)">⚡ Performance</button>
+            <button class="ab-tab"        data-tab="batch"   onclick="abTab('batch',this)">🔄 Scheduled Batch</button>
+            <button class="ab-tab"        data-tab="catfix"  onclick="abTab('catfix',this)">🏷 Categories</button>
+        </div>
+        </div>
+
+        <?php /* ══════════════════ SETTINGS PANE (SEO + AI combined) ══════════════════ */ ?>
+        <div class="ab-pane active" id="ab-pane-seo">
+
+            <?php /* ── SEO Settings form ── */ ?>
+            <form method="post" action="options.php">
+                <?php settings_fields('cs_seo_group'); ?>
+
+                <div class="ab-zone-card ab-card-identity">
+                <div class="ab-zone-header" style="justify-content:space-between">
+                    <span><span class="ab-zone-icon">🌐</span> Site Identity</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-identity', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                        <?php $this->explain_btn('identity', '🌐 Site Identity — What each field does', [
+                        ['rec'=>'✅ Recommended','name'=>'Site name','desc'=>'The name of your site as it appears in search results, browser tabs, and social sharing. Used in JSON-LD schema and OpenGraph tags. e.g. "Andrew Baker" or "Andrew Baker\'s Tech Blog".'],
+                        ['rec'=>'✅ Recommended','name'=>'Title suffix','desc'=>'Appended to every page title in search results. e.g. if your suffix is "| Andrew Baker" then a post titled "AWS Lambda Tips" appears as "AWS Lambda Tips | Andrew Baker". Helps with brand recognition in SERPs.'],
+                        ['rec'=>'✅ Recommended','name'=>'Home title','desc'=>'The SEO title for your homepage specifically. This is what Google shows as the blue link for your homepage in search results. Make it descriptive and keyword-rich — e.g. "Andrew Baker – CIO, Cloud Architect & Technology Leader".'],
+                        ['rec'=>'✅ Recommended','name'=>'Home description','desc'=>'The meta description for your homepage. Shown as the snippet under your homepage title in Google. Aim for 140–155 characters. Write for humans — this is your elevator pitch to someone seeing your site for the first time.'],
+                        ['rec'=>'✅ Recommended','name'=>'Default OG image URL','desc'=>'The fallback image used when a post is shared on social media and has no featured image. Should be 1200×630px. Use a branded image with your name/logo — this appears as the preview card on LinkedIn, Twitter/X, and WhatsApp.'],
+                        ['rec'=>'⬜ Optional','name'=>'Locale','desc'=>'BCP 47 language tag used in OpenGraph metadata. "en-US" is fine for most English sites. Use "en-ZA" if you want to signal a South African audience to Facebook/LinkedIn. Has minimal impact on Google rankings.'],
+                        ['rec'=>'⬜ Optional','name'=>'Twitter handle','desc'=>'Your Twitter/X username including the @ symbol. Added to Twitter Card metadata so when your posts are shared on X, your account gets attributed as the author. Only matters if you actively use Twitter/X.'],
+                    ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body">
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th><label>Site name:</label></th>
+                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[site_name]" value="<?php echo esc_attr((string)($o['site_name'] ?? '')); ?>" placeholder="My Tech Blog">
+                        <p class="description">Used in JSON-LD schema and OG tags. e.g. My Tech Blog</p></td>
+                        <th><label>Locale:</label></th>
+                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[site_lang]" value="<?php echo esc_attr((string)($o['site_lang'] ?? '')); ?>" placeholder="en-US">
+                        <p class="description">BCP 47 language tag. e.g. en-US, en-GB, fr-FR</p></td>
+                    </tr>
+                    <tr>
+                        <th><label>Title suffix:</label></th>
+                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[title_suffix]" value="<?php echo esc_attr((string)($o['title_suffix'] ?? '')); ?>" placeholder=" | My Tech Blog">
+                        <p class="description">Appended to every page title. e.g. " | My Blog"</p></td>
+                        <th><label>Twitter handle:</label></th>
+                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[twitter_handle]" value="<?php echo esc_attr((string)($o['twitter_handle'] ?? '')); ?>" placeholder="@yourhandle">
+                        <p class="description">Your Twitter/X handle including the @ symbol.</p></td>
+                    </tr>
+                    <tr>
+                        <th><label>Home title:</label></th>
+                        <td><input class="regular-text" style="width:100%" name="<?php echo esc_attr(self::OPT); ?>[home_title]" value="<?php echo esc_attr((string)($o['home_title'] ?? '')); ?>" placeholder="My Blog – Tech Writer & Developer">
+                        <p class="description">Full SEO title for your homepage.</p></td>
+                        <th><label>Default OG image URL:</label></th>
+                        <td><input class="regular-text" style="width:100%" name="<?php echo esc_attr(self::OPT); ?>[default_og_image]" value="<?php echo esc_attr($o['default_og_image']); ?>" placeholder="https://yoursite.com/wp-content/uploads/og-default.jpg">
+                        <p class="description">Fallback image for social sharing. 1200×630px ideal.</p></td>
+                    </tr>
+                    <tr><th>Home description:</th>
+                        <td colspan="3">
+                            <textarea class="large-text" rows="3" name="<?php echo esc_attr(self::OPT); ?>[home_desc]" placeholder="A blog about technology, software development, and cloud architecture. Written for engineers and technical leaders."><?php echo esc_textarea($o['home_desc']); ?></textarea>
+                            <p class="description">Meta description for your homepage. Aim for 140–155 characters.</p>
+                        </td></tr>
+                </table>
+                <div style="margin-top:16px;padding:0 20px;"><?php submit_button('Save SEO Settings', 'primary', 'submit', false); ?></div>
+                </div>
+                </div><!-- /ab-card-identity -->
+
+                <div class="ab-zone-card ab-card-person">
+                <div class="ab-zone-header" style="justify-content:space-between">
+                    <span><span class="ab-zone-icon">👤</span> Person Schema</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-person', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                        <?php $this->explain_btn('person', '👤 Person Schema — What each field does', [
+                        ['rec'=>'✅ Recommended','name'=>'Full name','desc'=>'Your name as it appears in Google search results and Knowledge Graph. Use your real name exactly as you want it attributed — this is what Google uses to connect your content to you as an individual author.'],
+                        ['rec'=>'✅ Recommended','name'=>'Profile URL','desc'=>'The canonical URL for your personal profile — usually your homepage (https://yoursite.com/). Google uses this as the authoritative identifier for you as a person in its Knowledge Graph.'],
+                        ['rec'=>'✅ Recommended','name'=>'Job title','desc'=>'Your current job title, e.g. "Chief Information Officer". Included in your Person JSON-LD schema and helps Google understand your professional authority in your subject area.'],
+                        ['rec'=>'✅ Recommended','name'=>'Person image URL','desc'=>'URL to your headshot or profile photo. Used in Person schema so Google can associate a face with your content. Ideally a square image of at least 400×400px already uploaded to your media library.'],
+                        ['rec'=>'✅ Recommended','name'=>'Social profiles (sameAs)','desc'=>'One URL per line — your LinkedIn, Twitter/X, GitHub, Google Scholar etc. Google uses these to verify your identity and connect your various online presences. The more authoritative profiles you link, the stronger your author entity signal.'],
+                    ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body">
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th><label>Name:</label></th>
+                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[person_name]" value="<?php echo esc_attr((string)($o['person_name'] ?? '')); ?>" placeholder="Jane Smith">
+                        <p class="description">Your full name as it appears in Google.</p></td>
+                        <th><label>Job title:</label></th>
+                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[person_job_title]" value="<?php echo esc_attr((string)($o['person_job_title'] ?? '')); ?>" placeholder="Software Engineer">
+                        <p class="description">Your current job title.</p></td>
+                    </tr>
+                    <tr>
+                        <th><label>URL:</label></th>
+                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[person_url]" value="<?php echo esc_attr((string)($o['person_url'] ?? '')); ?>" placeholder="https://yoursite.com">
+                        <p class="description">Canonical URL for your personal profile.</p></td>
+                        <th><label>Person image URL:</label></th>
+                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[person_image]" value="<?php echo esc_attr($o['person_image']); ?>" placeholder="https://yoursite.com/wp-content/uploads/headshot.jpg">
+                        <p class="description">URL of your profile photo for Person JSON-LD schema.</p></td>
+                    </tr>
+                    <tr><th>SameAs URLs (one per line):</th>
+                        <td colspan="3">
+                            <textarea class="large-text" rows="4" name="<?php echo esc_attr(self::OPT); ?>[sameas]" placeholder="https://www.linkedin.com/in/yourname&#10;https://twitter.com/yourhandle&#10;https://github.com/yourname"><?php echo esc_textarea($o['sameas']); ?></textarea>
+                            <p class="description">Your profiles on other platforms — one URL per line. Helps Google connect your identity across the web.</p>
+                        </td></tr>
+                </table>
+                <div style="margin-top:16px;padding:0 20px;"><?php submit_button('Save SEO Settings', 'primary', 'submit', false); ?></div>
+                </div>
+                </div><!-- /ab-card-person -->
+
+            </form>
+
+            <hr class="ab-zone-divider">
+
+            <?php /* ── AI Meta Writer config form ── */ ?>
+            <form method="post" action="options.php" id="ab-ai-config-form">
+                <?php settings_fields('cs_seo_ai_group'); ?>
+
+                <div class="ab-zone-card ab-card-ai">
+                <div class="ab-zone-header" style="justify-content:space-between">
+                    <span><span class="ab-zone-icon">✦</span> AI Meta Writer — Anthropic Claude</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-ai', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                        <?php $this->explain_btn('ai', '✦ AI Meta Writer — What each setting does', [
+                        ['rec'=>'✅ Recommended','name'=>'Anthropic API key','desc'=>'Your secret key from console.anthropic.com. Required to call the Claude AI to generate meta descriptions. Keep this private — anyone with this key can use your Anthropic account. The key is stored securely in your WordPress database.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Claude model','desc'=>'Which version of Claude to use for generation. Claude Haiku is fast and cheap — ideal for bulk processing hundreds of posts. Claude Sonnet is slower and costs more but produces higher quality, more nuanced descriptions. For a blog with 100+ posts, Haiku is usually the right choice.'],
+                        ['rec'=>'⬜ Optional','name'=>'Overwrite existing','desc'=>'When enabled, the AI will regenerate descriptions for posts that already have one. Leave OFF to only fill in missing descriptions — this protects any manually written descriptions you\'ve already crafted.'],
+                        ['rec'=>'⬜ Optional','name'=>'Min / Max characters','desc'=>'Target character range for generated descriptions. Google typically shows 140–160 characters in search results before truncating. Descriptions shorter than 120 characters look thin; longer than 165 get cut off with an ellipsis.'],
+                        ['rec'=>'⬜ Optional','name'=>'Custom prompt','desc'=>'Advanced: override the default instructions sent to Claude. The default prompt is tuned for technical blog posts. Only change this if you want a different tone, language, or specific instructions about what to include or exclude in descriptions.'],
+                    ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body ab-zone-ai">
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th>AI Provider:</th>
+                        <td>
+                            <select name="<?php echo esc_attr(self::AI_OPT); ?>[ai_provider]" id="ab-ai-provider" onchange="abProviderChanged()">
+                                <option value="anthropic" <?php selected($ai['ai_provider'] ?? 'anthropic', 'anthropic'); ?>>Anthropic Claude</option>
+                                <option value="gemini"    <?php selected($ai['ai_provider'] ?? 'anthropic', 'gemini'); ?>>Google Gemini</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>API Key:</th>
+                        <td>
+                            <div class="ab-key-row">
+                                <input type="password" class="regular-text"
+                                    name="<?php echo esc_attr(self::AI_OPT); ?>[anthropic_key]"
+                                    id="ab-anthropic-key-field"
+                                    value="<?php echo esc_attr($ai['anthropic_key']); ?>"
+                                    placeholder="sk-ant-api03-..."
+                                    style="<?php echo ($ai['ai_provider'] ?? 'anthropic') === 'gemini' ? 'display:none' : ''; ?>">
+                                <input type="password" class="regular-text"
+                                    name="<?php echo esc_attr(self::AI_OPT); ?>[gemini_key]"
+                                    id="ab-gemini-key-field"
+                                    value="<?php echo esc_attr($ai['gemini_key'] ?? ''); ?>"
+                                    placeholder="AIza..."
+                                    style="<?php echo ($ai['ai_provider'] ?? 'anthropic') !== 'gemini' ? 'display:none' : ''; ?>">
+                                <button type="button" class="button" onclick="abTestKey()">Test Key</button>
+                                <span id="ab-key-status" class="ab-key-status"></span>
+                            </div>
+                            <p class="description" id="ab-key-hint-anthropic" style="<?php echo ($ai['ai_provider'] ?? 'anthropic') === 'gemini' ? 'display:none' : ''; ?>">
+                                Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>. Stored in wp_options — never output to frontend.
+                            </p>
+                            <p class="description" id="ab-key-hint-gemini" style="<?php echo ($ai['ai_provider'] ?? 'anthropic') !== 'gemini' ? 'display:none' : ''; ?>">
+                                Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>. Stored in wp_options — never output to frontend.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Model:</th>
+                        <td>
+                            <select name="<?php echo esc_attr(self::AI_OPT); ?>[model]" id="ab-model-select">
+                                <?php
+                                $provider = $ai['ai_provider'] ?? 'anthropic';
+                                $anthropic_models = [
+                                    'claude-sonnet-4-20250514'  => 'Claude Sonnet 4 (recommended — best quality)',
+                                    'claude-haiku-4-5-20251001' => 'Claude Haiku 4.5 (faster, cheaper)',
+                                ];
+                                $gemini_models = [
+                                    'gemini-2.0-flash'          => 'Gemini 2.0 Flash (recommended — fast and cheap)',
+                                    'gemini-2.0-flash-lite'     => 'Gemini 2.0 Flash Lite (fastest, cheapest)',
+                                    'gemini-2.0-pro-exp'        => 'Gemini 2.0 Pro Experimental (high quality)',
+                                    'gemini-2.5-pro-preview-03-25' => 'Gemini 2.5 Pro Preview (best quality)',
+                                    'gemini-1.5-pro'            => 'Gemini 1.5 Pro',
+                                ];
+                                $all_models = array_merge($anthropic_models, $gemini_models);
+                                foreach ($all_models as $v => $l):
+                                    $is_anthropic = array_key_exists($v, $anthropic_models);
+                                    $group = $is_anthropic ? 'anthropic' : 'gemini';
+                                    $hidden = ($provider !== $group) ? 'style="display:none"' : '';
+                                ?>
+                                    <option value="<?php echo esc_attr($v); ?>"
+                                        data-provider="<?php echo esc_attr($group); ?>"
+                                        <?php selected($ai['model'], $v); ?>
+                                        <?php echo $hidden; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+                                        ><?php echo esc_html($l); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Target length:</th>
+                        <td>
+                            <input type="number" style="width:70px" name="<?php echo esc_attr(self::AI_OPT); ?>[min_chars]" value="<?php echo esc_attr($ai['min_chars']); ?>" min="100" max="160"> min &nbsp;
+                            <input type="number" style="width:70px" name="<?php echo esc_attr(self::AI_OPT); ?>[max_chars]" value="<?php echo esc_attr($ai['max_chars']); ?>" min="100" max="200"> max characters
+                            <p class="description">Google shows 120–160 chars. The range you set here is automatically injected into the prompt — you do not need to mention it in the system prompt above.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>ALT text article excerpt:</th>
+                        <td>
+                            <input type="number" style="width:80px" name="<?php echo esc_attr(self::AI_OPT); ?>[alt_excerpt_chars]" value="<?php echo esc_attr((string)($ai['alt_excerpt_chars'] ?? 600)); ?>" min="100" max="2000"> characters
+                            <p class="description">How much of the article text to send alongside each image when generating ALT text. More context produces better results for images with generic filenames, but increases API token usage. 600 is a good balance — enough to cover the intro and first heading. Increase to 1200+ for dense technical posts where images appear mid-article. Range: 100–2000.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>System prompt:</th>
+                        <td>
+                            <textarea class="large-text" rows="10"
+                                id="ab-prompt-field"
+                                name="<?php echo esc_attr(self::AI_OPT); ?>[prompt]"><?php echo esc_textarea($ai['prompt']); ?></textarea>
+                            <div style="display:flex;gap:6px;margin-top:4px">
+                                <button type="button" class="button" id="ab-copy-prompt" onclick="abCopyPrompt()">⎘ Copy</button>
+                                <button type="button" class="button" id="ab-reset-prompt">
+                                    Reset to default
+                                </button>
+                            </div>
+                            <?php /* reset-prompt listener moved to admin_enqueue_assets() */ ?>
+                        </td>
+                    </tr>
+                </table>
+                <div style="margin-top:16px;padding:0 20px;"><?php submit_button('Save AI Settings', 'primary', 'submit', false); ?></div>
+                </div><!-- /ab-zone-body -->
+                </div><!-- /ab-card-ai -->
+            </form>
+
+        </div><!-- /ab-pane-seo -->
+
+        <?php /* ══════════════════ AI TOOLS PANE ══════════════════ */ ?>
+        <div class="ab-pane" id="ab-pane-aitools">
+
+            <div class="ab-zone-card ab-card-update-posts">
+                <div class="ab-zone-header" style="justify-content:space-between">
+                    <span><span class="ab-zone-icon">✦</span> Update Posts with AI Descriptions</span>
+                    <span style="display:flex;align-items:center;gap:8px;margin-left:auto">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-update-posts', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9658; Show Details</button>
+                        <button class="button" id="ab-posts-hide-hdr" onclick="abTogglePosts(document.getElementById('ab-posts-hide-hdr'))" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↑ Hide Posts</button>
+                        <button class="button" id="ab-reload-hdr" onclick="abLoadPosts()" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↻ Reload</button>
+                        <?php $this->explain_btn('updateposts', '✦ Update Posts — How this works', [
+                        ['rec'=>'ℹ️ Summary','name'=>'What this panel does','desc'=>'Writes the short text snippet that appears under your page title in Google search results — using AI to craft a compelling 140–155 character summary for each post.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Total Posts','desc'=>'The total number of published posts and pages on your site that are eligible for meta description generation.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Have Description','desc'=>'Posts that already have a meta description saved — either written manually or previously generated by the AI.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Unprocessed','desc'=>'Posts with no meta description yet. These are the ones Google is currently generating its own snippet for — which is often not the best representation of your content.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Generated This Session','desc'=>'How many descriptions have been written by the AI since you opened this page. Resets each time you load the page.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Generate Missing','desc'=>'Runs the AI on every post that has no meta description yet. For each post, the AI also automatically generates ALT text for any images that are missing it — both tasks happen in a single API call, saving cost. Will never overwrite descriptions you\'ve already written.'],
+                        ['rec'=>'⬜ Optional','name'=>'Regenerate All','desc'=>'Forces the AI to rewrite descriptions for every post, including ones that already have descriptions. Also generates missing ALT text for images in each post in the same call. Use this if you\'ve changed your prompt or want a fresh pass. Note: this will overwrite any manually written descriptions.'],
+                        ['rec'=>'⬜ Optional','name'=>'Fix Long/Short','desc'=>'Finds descriptions that fall outside your target character range and rewrites only those. Does not touch ALT text — use the ALT Text Generator panel for that.'],
+                        ['rec'=>'⬜ Optional','name'=>'Fix Titles','desc'=>'Scans all posts for title tags that fall outside the ideal 50–60 character range and AI-rewrites them to fit. The rewritten title is saved as a custom SEO title — your original WordPress post title is never changed. Skips the homepage (fix that manually) and any titles already in range.'],
+                        ['rec'=>'⬜ Optional','name'=>'Regenerate Static','desc'=>'Fixes stale static data for every post — specifically, clears any custom OG image URL that has been overridden, so the post falls back to its current featured image. Run this if you have updated featured images on posts and LinkedIn, Twitter/X, or other platforms are still showing the old image. It does not touch AI descriptions or ALT text.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Generate (per row)','desc'=>'Rewrites the description for a single post and also generates missing image ALT text for that post in the same API call. Click this next to any post to manually trigger the AI for just that one entry.'],
+                        ['rec'=>'ℹ️ Info','name'=>'ALT Images column','desc'=>'Shows how many images in each post are still missing ALT text. ⚠ yellow means images need attention — generating the description will fix them automatically. ✓ green means all images have ALT text.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Title column','desc'=>'Shows the character count of each post\'s effective title tag (custom SEO title if set, otherwise the WordPress post title). Green = 50–60 chars (ideal). Amber = 40–69 chars (acceptable). Red = outside that range (too short or too long for Google). Hover the badge to see the full title text. Use Fix Titles to auto-fix all out-of-range titles in one pass.'],
+                        ['rec'=>'✨ New','name'=>'SEO Score column','desc'=>'AI-generated score (0–100%) rating how well each article is optimised for search engine indexing. Considers: title keyword clarity, meta description quality, content depth and specificity, and search intent alignment. Score is generated automatically when you click Generate on a row, or run Score All. Click any badge to re-score that post. Green ≥ 75, Amber 50–74, Red < 50. Run time for Score All depends on your selected model — Haiku scores ~100 posts per minute, Sonnet takes 2–3× longer.'],
+                    ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body" style="padding:20px 24px 24px;display:none;">
+
+                <?php /* ── API key warning banner ── */ ?>
+                <div class="ab-api-key-warning" id="ab-api-warn">
+                    <div class="ab-warn-icon">⚠️</div>
+                    <div class="ab-warn-body">
+                        <strong>No Anthropic API key saved — AI generation is disabled.</strong>
+                        To use the AI buttons you need to:
+                        <ol style="margin:6px 0 0 16px;padding:0">
+                            <li>Get a free API key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></li>
+                            <li>Paste it into the <strong>API Key</strong> field in the <strong>✦ AI Meta Writer</strong> section above</li>
+                            <li>Click <strong>Save AI Settings</strong></li>
+                            <li>Return here and reload the page</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <?php /* ── Load Posts CTA ── */ ?>
+                <div class="ab-load-cta" id="ab-load-cta">
+                    <div class="ab-load-cta-icon">⬇</div>
+                    <div class="ab-load-cta-text">
+                        <strong>Load your posts to get started</strong>
+                        <span>Fetch all published posts and pages so you can generate or fix their meta descriptions</span>
+                    </div>
+                    <button class="ab-load-btn" id="ab-load-posts" onclick="abLoadPosts()">Load Posts</button>
+                </div>
+
+                <?php /* ── Summary cards ── */ ?>
+                <div class="ab-summary-row" id="ab-summary" style="display:none">
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-total">0</div><div class="ab-summary-lbl">Total Posts</div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-has" style="color:#1a7a34">0</div><div class="ab-summary-lbl">Have Description</div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-missing" style="color:#6b3fa0">0</div><div class="ab-summary-lbl">Unprocessed</div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-generated" style="color:#2271b1">0</div><div class="ab-summary-lbl">Generated This Session</div></div>
+                </div>
+
+                <?php /* ── Toolbar ── */ ?>
+                <div class="ab-ai-toolbar" id="ab-ai-toolbar" style="display:none">
+                    <button class="button button-primary ab-action-btn" id="ab-ai-gen-missing" onclick="abGenAll(0)" disabled>✦ Generate Missing</button>
+                    <button class="button ab-action-btn ab-regen-btn" id="ab-ai-gen-all" onclick="abGenAll(1)" disabled>↺ Regenerate All</button>
+                    <button class="button ab-action-btn ab-fix-btn" id="ab-ai-fix" onclick="abFixAll()" disabled>⚑ Fix Long/Short</button>
+                    <button class="button ab-action-btn" id="ab-ai-fix-titles" onclick="abFixTitles()" disabled style="background:#7c3aed;color:#fff;border-color:#6d28d9">✎ Fix Titles</button>
+                    <button class="button ab-action-btn ab-static-btn" id="ab-ai-static" onclick="abRegenStatic()" disabled>🖼 Regenerate Static</button>
+                    <button class="button ab-action-btn" id="ab-ai-score-all" onclick="abScoreAll()" disabled style="background:#0e6b6b;border-color:#0a5050;color:#fff;font-weight:600">📊 Score All</button>
+                    <span id="ab-toolbar-status" style="font-size:12px;color:#50575e;"></span>
+                    <button class="button" id="ab-load-posts-again" onclick="abLoadPosts()" style="margin-left:auto">↻ Reload</button>
+                    <button class="button" id="ab-posts-hide" onclick="abTogglePosts(this)">↑ Hide Posts</button>
+                    <button class="button" id="ab-ai-stop" onclick="abStop()" style="display:none">◻ Stop</button>
+                </div>
+
+                <?php /* ── Progress bar ── */ ?>
+                <div class="ab-progress" id="ab-progress">
+                    <div class="ab-progress-fill" id="ab-progress-fill"></div>
+                </div>
+                <div class="ab-stats" id="ab-prog-label"></div>
+
+                <?php /* ── Log ── */ ?>
+                <div id="ab-log-wrap" style="display:none">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                        <span style="background:linear-gradient(135deg,#f953c6 0%,#4f46e5 100%);color:#fff;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:3px 10px;border-radius:20px">⚡ Activity Log</span>
+                    </div>
+                    <div id="ab-log"></div>
+                </div>
+
+                <?php /* ── Post table ── */ ?>
+                <div id="ab-posts-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;"></div>
+                <div class="ab-pager" id="ab-pager" style="display:none">
+                    <button class="button" id="ab-prev" onclick="abPage(-1)">← Prev</button>
+                    <span id="ab-page-info" style="font-size:12px;color:#50575e;"></span>
+                    <button class="button" id="ab-next" onclick="abPage(1)">Next →</button>
+                </div>
+
+                </div><!-- /ab-zone-body -->
+            </div><!-- /ab-card-update-posts -->
+
+            <div class="ab-zone-card ab-card-alt">
+                <div class="ab-zone-header" style="justify-content:space-between">
+                    <span><span class="ab-zone-icon">🖼</span> AI Image ALT Text Generator</span>
+                    <span style="display:flex;align-items:center;gap:8px;margin-left:auto">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-alt', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9658; Show Details</button>
+                        <button class="button" id="ab-alt-hide-hdr" onclick="altTogglePosts(document.getElementById('ab-alt-hide-hdr'))" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↑ Hide Posts</button>
+                        <button class="button" id="ab-alt-reload-hdr" onclick="altLoad()" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↻ Reload</button>
+                        <?php $this->explain_btn('alttext', '🖼 ALT Text — How this works', [
+                        ['rec'=>'ℹ️ Summary','name'=>'What this panel does','desc'=>'Adds descriptive labels to every image on your site — used by screen readers for accessibility and by Google to understand image content for search ranking.'],
+                        ['rec'=>'✅ Recommended','name'=>'Why ALT text matters','desc'=>'ALT (alternative) text describes images to screen readers and search engines. Missing ALT text is an accessibility failure and an SEO missed opportunity — Google uses ALT text to understand image content and rank your images in Google Images search.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Posts with missing ALT','desc'=>'Shows how many posts have at least one image with an empty ALT attribute. Click Load to scan your site.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Images missing ALT','desc'=>'The total count of individual image tags across all posts that have empty ALT attributes.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Generate All Missing','desc'=>'Runs the AI on every post that has images with missing ALT text. For each image, Claude reads the post title and image filename to write a concise, contextually appropriate ALT description (5 to 15 words). If the AI returns text outside that range, it automatically retries once. The post content is updated in place and the attachment media library entry is also updated.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Force Regenerate All','desc'=>'Overwrites ALL existing ALT text across every post, not just missing ones. Useful if you want to improve previously generated ALT text or standardise quality across your site. A confirmation prompt appears before running. The same 5 to 15 word validation with retry applies.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Generate (per row)','desc'=>'Process a single post — useful to check results before running the full batch. All images in that post with empty ALT will be processed.'],
+                    ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body" style="padding:20px 24px 24px;display:none;">
+
+                <div class="ab-api-key-warning" id="ab-alt-api-warn" style="<?php
+                    $provider = $this->ai_opts['ai_provider'] ?? 'anthropic';
+                    $alt_has_key = $provider === 'gemini'
+                        ? !empty(trim((string)($this->ai_opts['gemini_key'] ?? '')))
+                        : !empty(trim((string)($this->ai_opts['anthropic_key'] ?? '')));
+                    echo $alt_has_key ? 'display:none' : '';
+                ?>">
+                    <div class="ab-warn-icon">⚠️</div>
+                    <div class="ab-warn-body">
+                        <strong>No AI API key saved — ALT text generation is disabled.</strong>
+                        Add an Anthropic API key in the <strong>✦ AI Meta Writer</strong> section above and save.
+                    </div>
+                </div>
+
+                <div class="ab-load-cta" id="ab-alt-load-cta">
+                    <div class="ab-load-cta-icon">🔍</div>
+                    <div class="ab-load-cta-text">
+                        <strong>Scan your posts for images missing ALT text</strong>
+                        <span>Finds all images in published posts and pages that have an empty ALT attribute</span>
+                    </div>
+                    <button class="ab-load-btn" id="ab-alt-load-btn" onclick="altLoad()">Scan Posts</button>
+                </div>
+
+                <div class="ab-summary-row" id="ab-alt-summary" style="display:none">
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="alt-sum-posts">0</div><div class="ab-summary-lbl">Posts with Missing ALT</div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="alt-sum-images" style="color:#c3372b">0</div><div class="ab-summary-lbl">Images Missing ALT</div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="alt-sum-done" style="color:#1a7a34">0</div><div class="ab-summary-lbl">Fixed This Session</div></div>
+                </div>
+
+                <div class="ab-ai-toolbar" id="ab-alt-toolbar" style="display:none">
+                    <button class="button button-primary ab-action-btn" id="ab-alt-gen-all" onclick="altGenAll(false)" <?php echo ($alt_has_key ? '' : 'disabled'); ?>>✦ Generate All Missing</button>
+                    <button class="button ab-action-btn" id="ab-alt-force-all" onclick="altGenAll(true)" style="background:#b45309;border-color:#92400e;color:#fff;font-weight:600" <?php echo ($alt_has_key ? '' : 'disabled'); ?>>🔄 Force Regenerate All</button>
+                    <span id="ab-alt-status" style="font-size:12px;color:#50575e;"></span>
+                    <button class="button" id="ab-alt-stop" onclick="altStop()" style="display:none">◻ Stop</button>
+                    <button class="button" id="ab-alt-reload" onclick="altLoad()" style="margin-left:auto">↻ Reload</button>
+                    <button class="button" id="ab-alt-hide" onclick="altTogglePosts(this)">↑ Hide Posts</button>
+                    <label id="ab-alt-show-all-wrap" style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                        <input type="checkbox" id="ab-alt-show-all" onchange="altState.showAll=this.checked;altRenderTable()"> Show all
+                    </label>
+                </div>
+
+                <div class="ab-progress" id="ab-alt-progress">
+                    <div class="ab-progress-fill" id="ab-alt-progress-fill"></div>
+                </div>
+                <div class="ab-stats" id="ab-alt-prog-label"></div>
+                <div id="ab-alt-log-wrap" style="display:none">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                        <span style="background:linear-gradient(135deg,#f953c6 0%,#4f46e5 100%);color:#fff;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:3px 10px;border-radius:20px">⚡ Activity Log</span>
+                    </div>
+                    <div id="ab-alt-log"></div>
+                </div>
+                <div id="ab-alt-posts-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;"></div>
+
+                </div><!-- /ab-zone-body -->
+            </div><!-- /ab-card-alt -->
+
+            <div class="ab-zone-card ab-card-summary">
+                <div class="ab-zone-header" style="justify-content:space-between">
+                    <span><span class="ab-zone-icon">📋</span> AI Summary Box Generator</span>
+                    <span style="display:flex;align-items:center;gap:8px;margin-left:auto">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-summary', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9658; Show Details</button>
+                        <button class="button" id="ab-sum-hide-hdr" onclick="sumTogglePosts(document.getElementById('ab-sum-hide-hdr'))" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↑ Hide Posts</button>
+                        <button class="button" id="ab-sum-reload-hdr" onclick="sumLoad()" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↻ Reload</button>
+                        <?php $this->explain_btn('summary', '📋 AI Summary Box — How this works', [
+                        ['rec'=>'ℹ️ Summary','name'=>'What this panel does','desc'=>'Generates the three-field AI Summary Box shown at the top of each post — What it is, Why it matters, and Key takeaway. These are displayed to readers and used by AI search engines to understand your content.'],
+                        ['rec'=>'✅ Recommended','name'=>'Why it matters','desc'=>'AI-powered search engines like Perplexity and SearchGPT use structured summaries to decide whether to cite your content. A well-written summary box increases the chance your post appears as a source in AI-generated answers.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Generate Missing','desc'=>'Processes every published post that has no existing AI summary. Runs one post at a time and shows progress. Safe to stop and restart at any time.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Force Regenerate All','desc'=>'Overwrites all existing AI summaries across every post. Use this to refresh summaries after changing your AI provider or if you want to improve older generated content.'],
+                    ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body" style="padding:20px 24px 24px;display:none;">
+
+                <div class="ab-api-key-warning" id="ab-sum-api-warn" style="<?php echo $alt_has_key ? 'display:none' : ''; ?>">
+                    <div class="ab-warn-icon">⚠️</div>
+                    <div class="ab-warn-body">
+                        <strong>No AI API key saved — summary generation is disabled.</strong>
+                        Add an Anthropic API key in the <strong>✦ AI Meta Writer</strong> section above and save.
+                    </div>
+                </div>
+
+                <div class="ab-load-cta" id="ab-sum-load-cta">
+                    <div class="ab-load-cta-icon">📋</div>
+                    <div class="ab-load-cta-text">
+                        <strong>Load your posts to get started</strong>
+                        <span>Counts how many published posts are missing their AI Summary Box fields</span>
+                    </div>
+                    <button class="ab-load-btn" id="ab-sum-load-btn" onclick="sumLoad()">Load Posts</button>
+                </div>
+
+                <div class="ab-summary-row" id="ab-sum-summary" style="display:none">
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-s-total">0</div><div class="ab-summary-lbl">Total Posts</div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-s-has" style="color:#1a7a34">0</div><div class="ab-summary-lbl">Have Summary</div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-s-missing" style="color:#6b3fa0">0</div><div class="ab-summary-lbl">Missing Summary</div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-s-done" style="color:#2271b1">0</div><div class="ab-summary-lbl">Generated This Session</div></div>
+                </div>
+
+                <div class="ab-ai-toolbar" id="ab-sum-toolbar" style="display:none">
+                    <button class="button button-primary ab-action-btn" id="ab-sum-gen-all" onclick="sumGenAll(false)" <?php echo $alt_has_key ? '' : 'disabled'; ?>>✦ Generate Missing</button>
+                    <button class="button ab-action-btn" id="ab-sum-force-all" onclick="sumGenAll(true)" style="background:#b45309;border-color:#92400e;color:#fff;font-weight:600" <?php echo $alt_has_key ? '' : 'disabled'; ?>>🔄 Force Regenerate All</button>
+                    <span id="ab-sum-status" style="font-size:12px;color:#50575e;"></span>
+                    <button class="button" id="ab-sum-stop" onclick="sumStop()" style="display:none">◻ Stop</button>
+                    <button class="button" id="ab-sum-reload" onclick="sumLoad()" style="margin-left:auto">↻ Reload</button>
+                    <button class="button" id="ab-sum-hide" onclick="sumTogglePosts(this)">↑ Hide Posts</button>
+                </div>
+
+                <div class="ab-progress" id="ab-sum-progress">
+                    <div class="ab-progress-fill" id="ab-sum-progress-fill"></div>
+                </div>
+                <div class="ab-stats" id="ab-sum-prog-label"></div>
+                <div id="ab-sum-posts-wrap" style="margin-top:12px;overflow-x:auto;-webkit-overflow-scrolling:touch;"></div>
+
+                <div id="ab-sum-log-wrap" style="display:none">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                        <span style="background:linear-gradient(135deg,#f953c6 0%,#4f46e5 100%);color:#fff;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:3px 10px;border-radius:20px">⚡ Activity Log</span>
+                    </div>
+                    <div id="ab-sum-log"></div>
+                </div>
+
+                </div><!-- /ab-zone-body -->
+            </div><!-- /ab-card-summary -->
+
+            <div style="margin:44px 0 28px;display:flex;align-items:center;gap:14px;">
+                <div style="flex:1;height:3px;background:linear-gradient(90deg,#6366f1,#c7d2fe);border-radius:2px;"></div>
+                <span style="font-size:12px;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:0.09em;white-space:nowrap;">&#128279; Related Articles</span>
+                <div style="flex:1;height:3px;background:linear-gradient(90deg,#c7d2fe,#6366f1);border-radius:2px;"></div>
+            </div>
+
+            <form method="post" action="options.php">
+                <?php settings_fields('cs_seo_group'); ?>
+
+                <!-- Related Articles Settings Card -->
+                <div class="ab-zone-card ab-card-rc-settings-card" style="margin-top:24px;">
+                    <div class="ab-zone-header" style="background:#0e7490;display:flex;align-items:center;justify-content:space-between;">
+                        <span>&#128279; Related Articles</span>
+                        <span style="display:flex;align-items:center;gap:8px;">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-rc-settings-card', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9658; Show Details</button>
+                        <?php $this->explain_btn('rc_settings', '&#128279; Related Articles — Settings', [
+                            ['name'=>'Enable feature',       'rec'=>'ℹ️ Info',      'desc'=>'Enables or disables the Related Articles and You Might Also Like blocks on all posts. Disabling hides the blocks from the front end immediately without deleting any stored data.'],
+                            ['name'=>'Related Articles block','rec'=>'ℹ️ Info',     'desc'=>'The block that appears near the top of each post, directly after the AI summary box. Shows the closest conceptual matches based on shared categories, tags, and keyword overlap. Requires at least 2 links to display.'],
+                            ['name'=>'You Might Also Like',  'rec'=>'ℹ️ Info',      'desc'=>'The block that appears at the bottom of each post before the comments section. Draws from a broader pool of related posts to extend session depth. Requires at least 3 links to display.'],
+                            ['name'=>'Decreasing count',     'rec'=>'✅ Instant',   'desc'=>'If you reduce the number of links to show, the change takes effect immediately on the front end without any regeneration. The extra stored links are simply not displayed.'],
+                            ['name'=>'Increasing count',     'rec'=>'⚠️ Regenerate','desc'=>'If you increase the number of links to show, existing posts may not have enough stored links to fill the new count. Run Refresh Stale in the Related Articles Post Status table below to regenerate all posts with the new count.'],
+                            ['name'=>'Candidate pool size',  'rec'=>'ℹ️ Info',      'desc'=>'Controls how many candidate posts are evaluated per source when scoring. A larger pool improves accuracy but takes slightly longer to process. The default of 20 is suitable for most sites.'],
+                            ['name'=>'Scoring signals',      'rec'=>'ℹ️ Info',      'desc'=>'The signals used to score candidate posts. Categories and tags provide structural signals. AI summary overlap uses the generated summary text to find semantic connections. At least one signal must be enabled.'],
+                            ['name'=>'Exclude categories',   'rec'=>'ℹ️ Info',      'desc'=>'Posts in excluded categories will not appear as related link suggestions on any post. Use this to prevent utility categories, news, or announcements from appearing as related content.'],
+                        ]); ?>
+                        </span>
+                    </div>
+                    <div class="ab-zone-body ab-card-rc-settings" style="padding:20px 24px;display:none;">
+                        <p style="color:#555;margin:0 0 16px;">Controls where and how Related Articles and You Might Also Like link blocks appear on your posts. Links are generated using local signals only &mdash; no AI calls, no timeouts.</p>
+                        <table class="form-table" style="margin:0;">
+                            <tr>
+                                <th style="width:220px;padding:12px 0;">Enable feature</th>
+                                <td style="padding:12px 0;">
+                                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_enable]" value="1" <?php checked((int)($o['rc_enable'] ?? 1), 1); ?>> Enable Related Articles and You Might Also Like on posts</label>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th style="padding:12px 0;">Related Articles block</th>
+                                <td style="padding:12px 0;">
+                                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_top_enabled]" value="1" <?php checked((int)($o['rc_top_enabled'] ?? 1), 1); ?>> Show &ldquo;Related Articles&rdquo; block at the top (after AI summary)</label><br>
+                                    <span style="display:inline-flex;align-items:center;gap:8px;margin-top:6px;">
+                                        Links to show:
+                                        <input type="number" id="rc_top_count_input" name="<?php echo esc_attr(self::OPT); ?>[rc_top_count]" value="<?php echo esc_attr((int)($o['rc_top_count'] ?? 3)); ?>" min="1" max="5" style="width:60px;" data-saved="<?php echo esc_attr((int)($o['rc_top_count'] ?? 3)); ?>" onchange="rcCheckCountWarning(this,'rc-top-warn')">
+                                        <span style="color:#888;font-size:12px;">(min 2, max 5)</span>
+                                    </span>
+                                    <p id="rc-top-warn" style="display:none;margin:6px 0 0;padding:8px 12px;background:#fffbeb;border-left:3px solid #f59e0b;color:#92400e;font-size:12px;">&#9888; You have increased the link count. Existing posts will only show the new amount after you run <strong>Refresh Stale</strong> in the Related Articles table below.</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th style="padding:12px 0;">You Might Also Like block</th>
+                                <td style="padding:12px 0;">
+                                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_bottom_enabled]" value="1" <?php checked((int)($o['rc_bottom_enabled'] ?? 1), 1); ?>> Show &ldquo;You Might Also Like&rdquo; block at the bottom (before comments)</label><br>
+                                    <span style="display:inline-flex;align-items:center;gap:8px;margin-top:6px;">
+                                        Links to show:
+                                        <input type="number" id="rc_bottom_count_input" name="<?php echo esc_attr(self::OPT); ?>[rc_bottom_count]" value="<?php echo esc_attr((int)($o['rc_bottom_count'] ?? 5)); ?>" min="1" max="10" style="width:60px;" data-saved="<?php echo esc_attr((int)($o['rc_bottom_count'] ?? 5)); ?>" onchange="rcCheckCountWarning(this,'rc-bottom-warn')">
+                                        <span style="color:#888;font-size:12px;">(min 3, max 10)</span>
+                                    </span>
+                                    <p id="rc-bottom-warn" style="display:none;margin:6px 0 0;padding:8px 12px;background:#fffbeb;border-left:3px solid #f59e0b;color:#92400e;font-size:12px;">&#9888; You have increased the link count. Existing posts will only show the new amount after you run <strong>Refresh Stale</strong> in the Related Articles table below.</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th style="padding:12px 0;">Candidate pool size</th>
+                                <td style="padding:12px 0;">
+                                    <input type="number" name="<?php echo esc_attr(self::OPT); ?>[rc_pool_size]" value="<?php echo esc_attr((int)($o['rc_pool_size'] ?? 20)); ?>" min="10" max="50" style="width:70px;">
+                                    <span style="color:#888;font-size:12px;margin-left:6px;">posts evaluated per source (10&ndash;50)</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th style="padding:12px 0;">Scoring signals</th>
+                                <td style="padding:12px 0;">
+                                    <label style="margin-right:16px;"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_use_categories]" value="1" <?php checked((int)($o['rc_use_categories'] ?? 1), 1); ?>> Categories</label>
+                                    <label style="margin-right:16px;"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_use_tags]" value="1" <?php checked((int)($o['rc_use_tags'] ?? 1), 1); ?>> Tags</label>
+                                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_use_summary]" value="1" <?php checked((int)($o['rc_use_summary'] ?? 1), 1); ?>> AI summary overlap</label>
+                                    <p class="description" style="margin-top:4px;">These signals are combined to score candidate posts. At least one must be enabled.</p>
+                                </td>
+                            </tr>
+                            <?php
+                            $all_cats      = get_categories(['hide_empty' => false]);
+                            $excluded_cats = (array)($o['rc_exclude_cats'] ?? []);
+                            if (!empty($all_cats)) : ?>
+                            <tr>
+                                <th style="padding:12px 0;">Exclude categories</th>
+                                <td style="padding:12px 0;">
+                                    <div style="display:flex;flex-wrap:wrap;gap:6px 16px;">
+                                    <?php foreach ($all_cats as $cat) : ?>
+                                        <label style="white-space:nowrap;">
+                                            <input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_exclude_cats][]" value="<?php echo esc_attr($cat->term_id); ?>" <?php checked(in_array((int)$cat->term_id, array_map('intval', $excluded_cats))); ?>>
+                                            <?php echo esc_html($cat->name); ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                    </div>
+                                    <p class="description" style="margin-top:4px;">Posts in these categories will not appear as related link suggestions.</p>
+                                </td>
+                            </tr>
+                            <?php endif; ?>
+                        </table>
+                        <div style="margin-top:16px;"><?php submit_button('Save SEO Settings', 'primary', 'submit', false); ?></div>
+                    </div>
+                </div><!-- /ab-card-rc-settings -->
+
+            </form>
+
+            <?php /* ── Related Articles Generation Table ── */ ?>
+            <div class="ab-zone-card ab-card-rc-table" style="margin-top:24px;">
+                <div class="ab-zone-header" style="background:linear-gradient(120deg,#4338ca 0%,#6366f1 60%,#818cf8 100%);display:flex;align-items:center;justify-content:space-between;">
+                    <span>&#128279; Related Articles — Post Status</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-rc-table', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9658; Show Details</button>
+                        <?php $this->explain_btn('rc_table', '&#128279; Related Articles — How it works', [
+                            ['name'=>'What it does',       'rec'=>'ℹ️ Info',      'desc'=>'For every published post, Related Articles finds and ranks other posts on your site that are topically related. It surfaces two blocks on the front end: a &ldquo;Related Articles&rdquo; block near the top of the article (closest conceptual matches) and a &ldquo;You Might Also Like&rdquo; block at the bottom (broader related posts).'],
+                            ['name'=>'No AI required',     'rec'=>'✅ Free',       'desc'=>'Generation uses only signals already on your site — shared categories, shared tags, title keyword overlap, and your existing AI summary text. There are zero API calls and no cost. It scores every candidate post locally in PHP and ranks by relevance.'],
+                            ['name'=>'Generate Missing',   'rec'=>'✅ Recommended','desc'=>'Processes all posts that have not yet been generated. Run this once after installing the plugin to populate your full post library. Each post takes under a second and the batch runs with a small delay between posts to avoid overloading the server.'],
+                            ['name'=>'Refresh Stale',      'rec'=>'⬜ Optional',   'desc'=>'Re-runs generation for all posts regardless of status. Use this after making significant changes to your category or tag structure, or after adding AI summaries to posts that previously lacked them.'],
+                            ['name'=>'Retry Failed',       'rec'=>'⬜ Optional',   'desc'=>'Re-runs only posts that errored during a previous batch. Useful if a batch was interrupted or a post had missing data.'],
+                            ['name'=>'Reset All',          'rec'=>'⚠️ Caution',   'desc'=>'Deletes all Related Articles data for every post. The front-end blocks will disappear from all posts immediately. You will need to run Generate Missing again to rebuild. Use this only if you want to start fresh after major structural changes.'],
+                            ['name'=>'Per-row Run button', 'rec'=>'ℹ️ Info',      'desc'=>'Runs the full generation pipeline for a single post. Updates the row in place without reloading the page. Use this to regenerate a specific post after editing its categories, tags, or AI summary.'],
+                        ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body ab-card-rc-table-body" style="padding:20px 24px;display:none;">
+
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+                        <span style="font-weight:600;color:#1d2327;font-size:13px;">Filter:</span>
+                        <button type="button" class="button rc-filter-btn rc-filter-active" data-filter="all"     onclick="rcSetFilter('all',this)">All Posts</button>
+                        <button type="button" class="button rc-filter-btn"                  data-filter="pending"  onclick="rcSetFilter('pending',this)">&#9711; Pending</button>
+                        <button type="button" class="button rc-filter-btn"                  data-filter="complete" onclick="rcSetFilter('complete',this)">&#9989; Complete</button>
+                        <button type="button" class="button rc-filter-btn"                  data-filter="error"    onclick="rcSetFilter('error',this)">&#10060; Error</button>
+                        <span style="flex:1;"></span>
+                        <button type="button" class="button button-primary" id="rc-btn-generate-missing" onclick="rcBatch('missing')">&#9654; Generate Missing</button>
+                        <button type="button" class="button"               id="rc-btn-refresh-stale"    onclick="rcBatch('stale')">&#8635; Refresh Stale</button>
+                        <button type="button" class="button"               id="rc-btn-retry-failed"     onclick="rcBatch('failed')">&#128257; Retry Failed</button>
+                        <button type="button" class="button"               id="rc-btn-reset-all"        onclick="rcResetAll()" style="color:#b91c1c;border-color:#b91c1c;">&#128465; Reset All</button>
+                    </div>
+
+                    <div id="rc-batch-bar" style="display:none;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <div style="flex:1;background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden;">
+                                <div id="rc-batch-progress-bar" style="height:100%;background:#6366f1;border-radius:4px;width:0%;transition:width 0.3s;"></div>
+                            </div>
+                            <span id="rc-batch-label" style="font-size:12px;color:#4338ca;font-weight:600;white-space:nowrap;">0 / 0</span>
+                            <button type="button" class="button" id="rc-btn-stop" onclick="rcStopBatch()" style="color:#b91c1c;border-color:#b91c1c;">&#9646;&#9646; Stop</button>
+                        </div>
+                    </div>
+
+                    <div id="rc-table-wrap" style="overflow-x:auto;">
+                        <table class="widefat fixed striped" id="rc-posts-table" style="min-width:680px;">
+                            <thead>
+                                <tr>
+                                    <th style="width:40%;">Post</th>
+                                    <th style="width:14%;text-align:center;">Status</th>
+                                    <th style="width:9%;text-align:center;">Top</th>
+                                    <th style="width:9%;text-align:center;">Bottom</th>
+                                    <th style="width:14%;text-align:center;">Generated</th>
+                                    <th style="width:14%;text-align:center;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rc-posts-tbody">
+                                <tr><td colspan="6" style="text-align:center;padding:24px;color:#999;">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="rc-pagination" style="display:flex;gap:8px;align-items:center;margin-top:12px;"></div>
+
+                </div>
+            </div><!-- /ab-card-rc-table -->
+
+        </div><!-- /ab-pane-aitools -->
+
+        <?php /* ══════════════════ SITEMAP PANE ══════════════════ */ ?>
+        <div class="ab-pane" id="ab-pane-sitemap">
+            <form method="post" action="options.php">
+                <?php settings_fields('cs_seo_group'); ?>
+
+                <?php
+                $pub_types = get_post_types(['public' => true], 'objects');
+                $sel_types = (array)($o['sitemap_post_types'] ?? ['post', 'page']);
+                ?>
+
+                <div class="ab-zone-card ab-card-features">
+                <div class="ab-zone-header" style="justify-content:space-between">
+                    <span><span class="ab-zone-icon">⚙</span> Features &amp; Robots</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-features', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                        <?php $this->explain_btn('features', '⚙ Features & Robots — What each option does', [
+                        ['rec'=>'✅ Recommended','name'=>'OpenGraph + Twitter Cards','desc'=>'Adds structured metadata so your posts display with a title, description and image when shared on LinkedIn, Twitter/X, WhatsApp or any other platform. Without this, shared links look blank or use random images.'],
+                        ['rec'=>'✅ Recommended','name'=>'WebSite JSON-LD (front page)','desc'=>'Tells Google the name and URL of your site in structured data format. Helps Google display your site name correctly in search results and can unlock sitelinks beneath your homepage listing.'],
+                        ['rec'=>'✅ Recommended','name'=>'Person JSON-LD schema','desc'=>'Embeds your name, job title, photo, and social profiles into your site so Google can connect your content to you as an individual. Important for personal brand and author authority signals.'],
+                        ['rec'=>'✅ Recommended','name'=>'BlogPosting JSON-LD schema','desc'=>'Marks up each post as an article with author, publish date, and headline. Google uses this for rich results and to better understand your content type. Can improve click-through rates in search.'],
+                        ['rec'=>'⬜ Optional','name'=>'Breadcrumb JSON-LD schema','desc'=>'Adds breadcrumb trail markup to posts. Most useful on large sites with deep category hierarchies. For a flat personal blog this adds little value — Google will figure out your structure without it.'],
+                        ['rec'=>'⬜ Optional','name'=>'Strip UTM params in canonical URLs','desc'=>'If you use UTM tracking parameters on your own internal links (e.g. ?utm_source=newsletter), this stops them creating duplicate pages in Google\'s index. Only needed if you track internal clicks with UTM.'],
+                        ['rec'=>'✅ Recommended','name'=>'Enable /sitemap.xml','desc'=>'Generates a sitemap listing all your posts and pages. Submit this URL to Google Search Console so Google knows exactly what to crawl. Also automatically added to your robots.txt.'],
+                        ['rec'=>'✅ Recommended','name'=>'noindex search results','desc'=>'Prevents Google from indexing your WordPress search result pages (e.g. /?s=keyword). These pages have no unique value and waste Google\'s crawl budget — always block them.'],
+                        ['rec'=>'✅ Recommended','name'=>'noindex 404 pages','desc'=>'Stops Google indexing error pages. A 404 page has no content worth ranking — keeping these out of the index keeps your crawl budget focused on real content.'],
+                        ['rec'=>'✅ Recommended','name'=>'noindex attachment pages','desc'=>'WordPress creates a separate page for every uploaded image or file. These pages are near-empty and often outrank your actual posts for image searches. Always block them.'],
+                        ['rec'=>'✅ Recommended','name'=>'noindex author archives','desc'=>'On a single-author blog, your author archive page (/author/yourname/) is essentially a duplicate of your homepage. Blocking it prevents a duplicate content penalty.'],
+                        ['rec'=>'✅ Recommended','name'=>'noindex tag archives','desc'=>'Tag archive pages (/tag/aws/) often duplicate post content and can dilute your rankings. Unless your tag pages have unique introductory text and real editorial value, block them.'],
+                    ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body" style="padding:16px 20px">
+                <div class="ab-checkbox-grid">
+                    <label class="ab-rec"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[enable_og]" value="1" <?php checked((int)($o['enable_og'] ?? 0), 1); ?>> OpenGraph + Twitter Cards</label>
+                    <label class="ab-rec"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[enable_schema_website]" value="1" <?php checked((int)($o['enable_schema_website'] ?? 0), 1); ?>> WebSite JSON-LD (front page)</label>
+                    <label class="ab-rec"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[enable_schema_person]" value="1" <?php checked((int)($o['enable_schema_person'] ?? 0), 1); ?>> Person JSON-LD schema</label>
+                    <label class="ab-rec"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[enable_schema_article]" value="1" <?php checked((int)($o['enable_schema_article'] ?? 0), 1); ?>> BlogPosting JSON-LD schema</label>
+                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[enable_schema_breadcrumbs]" value="1" <?php checked((int)($o['enable_schema_breadcrumbs'] ?? 0), 1); ?>> Breadcrumb JSON-LD schema</label>
+                    <label class="ab-rec"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[show_summary_box]" value="1" <?php checked((int)($o['show_summary_box'] ?? 1), 1); ?>> Show AI summary box on posts</label>
+                    <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[strip_tracking_params]" value="1" <?php checked((int)($o['strip_tracking_params'] ?? 0), 1); ?>> Strip UTM params in canonical URLs</label>
+                    <label class="ab-rec"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[enable_sitemap]" value="1" <?php checked((int)($o['enable_sitemap'] ?? 0), 1); ?>> Enable /sitemap.xml</label>
+                    <label class="ab-rec"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[noindex_search]" value="1" <?php checked((int)($o['noindex_search'] ?? 0), 1); ?>> noindex search results</label>
+                    <label class="ab-rec"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[noindex_404]" value="1" <?php checked((int)($o['noindex_404'] ?? 0), 1); ?>> noindex 404 pages</label>
+                    <label class="ab-rec"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[noindex_attachment]" value="1" <?php checked((int)($o['noindex_attachment'] ?? 0), 1); ?>> noindex attachment pages</label>
+                    <label class="ab-rec"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[noindex_author_archives]" value="1" <?php checked((int)($o['noindex_author_archives'] ?? 0), 1); ?>> noindex author archives</label>
+                    <label class="ab-rec"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[noindex_tag_archives]" value="1" <?php checked((int)($o['noindex_tag_archives'] ?? 0), 1); ?>> noindex tag archives</label>
+                </div>
+                <div style="margin-top:16px;"><?php submit_button('Save Features &amp; Robots Settings', 'primary', 'submit', false); ?></div>
+                </div>
+                </div><!-- /ab-card-features -->
+
+
+                <div class="ab-zone-card ab-card-sitemap-settings">
+                <div class="ab-zone-header" style="justify-content:space-between">
+                    <span><span class="ab-zone-icon">⚙</span> Sitemap Settings</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-sitemap-settings', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                        <?php $this->explain_btn('sitemap', '⚙ Sitemap Settings — What each option does', [
+                        ['rec'=>'✅ Recommended','name'=>'Enable /sitemap.xml','desc'=>'Generates a sitemap at yoursite.com/sitemap.xml listing all your published content. Submit this URL to Google Search Console so Google knows exactly what pages to crawl. Also automatically appends the sitemap URL to your robots.txt.'],
+                        ['rec'=>'✅ Recommended','name'=>'Include Posts','desc'=>'Adds all your published blog posts to the sitemap. This should always be on — posts are your primary content and the main thing you want Google to discover and index.'],
+                        ['rec'=>'✅ Recommended','name'=>'Include Pages','desc'=>'Adds your WordPress pages (About, Contact etc.) to the sitemap. Keep this on — pages like your About and Contact pages should be indexed.'],
+                        ['rec'=>'⬜ Optional','name'=>'Taxonomy archives','desc'=>'Includes category, tag, and custom taxonomy archive pages in the sitemap. Turn this on only if your archive pages have unique introductory content and genuine value for visitors. For most blogs, leave it off — archive pages often duplicate post content.'],
+                        ['rec'=>'⬜ Optional','name'=>'Exclude URLs or IDs','desc'=>'Enter specific URLs or post IDs to omit from the sitemap — one per line. Use this for thank-you pages, landing pages, privacy policy pages, or any content you don\'t want Google to prioritise. Numeric IDs (e.g. 42) refer to the WordPress post/page ID shown in the edit URL.'],
+                    ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body">
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th>Enable sitemap:</th>
+                        <td>
+                            <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[enable_sitemap]" value="1" <?php checked((int)($o['enable_sitemap'] ?? 0), 1); ?>>
+                            Generate sitemap at <a href="<?php echo esc_url(home_url('/sitemap.xml')); ?>" target="_blank"><?php echo esc_html(home_url('/sitemap.xml')); ?></a></label>
+                            <p class="description">When enabled the Sitemap URL is also appended to your robots.txt automatically.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Include post types:</th>
+                        <td>
+                            <div style="display:flex;gap:16px;flex-wrap:wrap">
+                            <?php foreach ($pub_types as $pt): ?>
+                                <?php if (in_array($pt->name, ['attachment'], true)) continue; ?>
+                                <label>
+                                    <input type="checkbox"
+                                        name="<?php echo esc_attr(self::OPT); ?>[sitemap_post_types][]"
+                                        value="<?php echo esc_attr($pt->name); ?>"
+                                        <?php checked(in_array($pt->name, $sel_types, true), true); ?>>
+                                    <?php echo esc_html($pt->labels->name); ?>
+                                    <span style="color:#888;font-size:11px">(<?php echo esc_html($pt->name); ?>)</span>
+                                </label>
+                            <?php endforeach; ?>
+                            </div>
+                            <p class="description">Select which post types to include. Uncheck types that are not meaningful for search engines (e.g. WooCommerce order pages).</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Taxonomy archives:</th>
+                        <td>
+                            <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[sitemap_taxonomies]" value="1" <?php checked((int)($o['sitemap_taxonomies'] ?? 0), 1); ?>>
+                            Include category, tag, and custom taxonomy archive pages</label>
+                            <p class="description">Off by default. Enable if your category or tag archive pages have unique, valuable content worth indexing.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Exclude URLs or IDs:</th>
+                        <td>
+                            <textarea name="<?php echo esc_attr(self::OPT); ?>[sitemap_exclude]"
+                                rows="6" style="width:100%"
+                                placeholder="e.g. https://yoursite.com/thank-you/<?php echo "\n"; ?>e.g. https://yoursite.com/privacy-policy/<?php echo "\n"; ?>e.g. 42<?php echo "\n"; ?>e.g. 156"><?php echo esc_textarea((string)($o['sitemap_exclude'] ?? '')); ?></textarea>
+                            <p class="description">One entry per line. Enter full URLs or numeric post/page IDs. These will be omitted from the sitemap.</p>
+                        </td>
+                    </tr>
+                </table>
+                <div style="margin-top:16px;"><?php submit_button('Save Sitemap Settings', 'primary', 'submit', false); ?></div>
+                </div>
+                </div><!-- /ab-card-sitemap-settings -->
+
+            </form>
+
+            <hr class="ab-zone-divider">
+
+            <form method="post" action="options.php">
+                <?php settings_fields('cs_seo_group'); ?>
+
+                <div class="ab-zone-card ab-card-robots">
+                <div class="ab-zone-header" style="justify-content:space-between">
+                    <span><span class="ab-zone-icon">🤖</span> Robots.txt</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-robots', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                        <?php $this->explain_btn('robots', '🤖 Robots.txt — What this all means', [
+                        ['rec'=>'ℹ️ Info','name'=>'What is robots.txt?','desc'=>'A plain text file at yoursite.com/robots.txt that tells search engine crawlers which pages they are and aren\'t allowed to visit. It doesn\'t prevent indexing — it prevents crawling. Google respects it; malicious bots ignore it entirely.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Physical file warning','desc'=>'If a robots.txt file exists on disk, the web server serves it directly — bypassing WordPress and this plugin completely. You must rename or delete it to let the plugin take control. The plugin offers a one-click rename to robots.txt.bak.'],
+                        ['rec'=>'⬜ Optional','name'=>'Block AI training bots','desc'=>'Adds Disallow: / rules for GPTBot, CCBot, Claude-Web, anthropic-ai and other AI training crawlers. Turn this ON if you don\'t want AI companies training their models on your content. Leave OFF if you want AI assistants to surface your content when users ask relevant questions.'],
+                        ['rec'=>'✅ Recommended','name'=>'Custom robots.txt rules','desc'=>'The full content of your robots.txt file. The plugin automatically appends your sitemap URL and the AI bot blocklist (if enabled) — do not add those here manually. Changes take effect immediately on every request — there is no caching.'],
+                        ['rec'=>'ℹ️ Info','name'=>'User-agent: Googlebot','desc'=>'Rules that apply specifically to Google\'s crawler. Googlebot respects these rules more strictly than other crawlers. Disallowing /wp-admin/, /wp-login.php and search pages stops Google wasting crawl budget on admin and junk pages.'],
+                        ['rec'=>'ℹ️ Info','name'=>'User-agent: *','desc'=>'Rules that apply to all other crawlers not specifically named above. This is the catch-all for Bing, DuckDuckGo, and any other well-behaved search engine crawler.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Live preview','desc'=>'Shows exactly what search engines see when they fetch yoursite.com/robots.txt right now. If the sitemap URL appears at the bottom, everything is working correctly.'],
+                    ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body">
+
+                <?php
+                $physical_exists   = file_exists(ABSPATH . 'robots.txt');
+                $physical_writable = $physical_exists && wp_is_writable(ABSPATH . 'robots.txt');
+                $physical_contents = $physical_exists ? file_get_contents(ABSPATH . 'robots.txt') : ''; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+
+                // Also check one level up in case WordPress is in a subdirectory
+                $alt_path          = dirname(rtrim(ABSPATH, '/')) . '/robots.txt';
+                $alt_exists        = file_exists($alt_path);
+                ?>
+                <div style="background:#f0f6fc;border:1px solid #c2d9f0;border-radius:4px;padding:10px 14px;margin:12px 20px;font-size:12px;font-family:monospace">
+                    <strong>File detection:</strong><br>
+                    ABSPATH: <code><?php echo esc_html(ABSPATH); ?></code><br>
+                    Looking for: <code><?php echo esc_html(ABSPATH . 'robots.txt'); ?></code> → <?php echo $physical_exists ? '<span style="color:#1a7a34">found</span>' : '<span style="color:#1a7a34">not found</span>'; ?><br>
+                    <?php if (!$physical_exists): ?>
+                    Also checking: <code><?php echo esc_html($alt_path); ?></code> → <?php echo $alt_exists ? '<span style="color:#e67e00">found here!</span>' : '<span style="color:#1a7a34">not found</span>'; ?>
+                    <?php endif; ?>
+                </div>
+
+                <?php
+                // If file not at ABSPATH, try one level up (WordPress in subdirectory)
+                $robots_path = ABSPATH . 'robots.txt';
+                if (!$physical_exists && $alt_exists) {
+                    $robots_path     = $alt_path;
+                    $physical_exists = true;
+                    $physical_writable = wp_is_writable($alt_path);
+                    $physical_contents = file_get_contents($alt_path); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+                }
+                ?>
+                <?php if ($physical_exists): ?>
+                <div class="ab-physical-robots-warn" id="ab-physical-robots-warn">
+                    <div style="font-size:22px;flex-shrink:0">⚠️</div>
+                    <div style="flex:1">
+                        <strong>A physical robots.txt file exists on your server</strong><br>
+                        WordPress (and this plugin) cannot control your robots.txt while a real file exists on disk — the web server serves the file directly, bypassing WordPress entirely. To let the plugin manage your robots.txt, the file needs to be renamed.<br><br>
+                        <strong>Current file location:</strong> <code><?php echo esc_html($robots_path); ?></code>
+                        &nbsp;·&nbsp; <strong>Writable:</strong> <?php echo $physical_writable ? '<span style="color:#1a7a34">Yes</span>' : '<span style="color:#c3372b">No</span>'; ?><br><br>
+                        <?php if ($physical_contents): ?>
+                        <strong>Current file contents:</strong><br>
+                        <pre style="background:#f6f7f7;border:1px solid #c3c4c7;border-radius:4px;padding:10px;font-size:12px;line-height:1.6;max-height:200px;overflow-y:auto;margin:6px 0 12px"><?php echo esc_html($physical_contents); ?></pre>
+                        <?php endif; ?>
+                        <strong>What happens when you click Rename:</strong> The file is renamed to <code>robots.txt.bak</code> in the same directory. WordPress then takes over and this plugin generates robots.txt dynamically on every request.<br><br>
+                        <?php if ($physical_writable): ?>
+                        <button type="button" class="button button-primary" id="ab-rename-robots-btn" onclick="abRenameRobots()">
+                            ✎ Rename robots.txt → robots.txt.bak
+                        </button>
+                        <span id="ab-rename-robots-status" style="margin-left:10px;font-size:13px"></span>
+                        <?php else: ?>
+                        <div style="background:#fef0f0;border:1px solid #f5bcbb;border-radius:4px;padding:10px;margin-top:4px">
+                            <strong style="color:#c3372b">File is not writable</strong> — the web server does not have permission to rename this file.<br>
+                            Fix via FTP or your host's file manager: right-click <code>robots.txt</code> → set permissions to <strong>644</strong>, then reload this page.<br><br>
+                            Alternatively, rename the file manually via FTP: rename <code>robots.txt</code> to <code>robots.txt.bak</code> in your WordPress root.
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php else: ?>
+                <div style="display:flex;gap:12px;align-items:flex-start;background:#edfaef;border:1px solid #1a7a34;border-radius:6px;padding:14px 18px;margin:12px 20px">
+                    <div style="font-size:22px;flex-shrink:0">✅</div>
+                    <div style="font-size:13px">
+                        <strong>No physical robots.txt file detected</strong> — this plugin is managing your robots.txt dynamically. Search engines will see the content shown in the Live robots.txt preview below.<br><br>
+                        <span style="color:#50575e">If you recently deleted or renamed the file manually, this is correct. The Live preview below shows exactly what Google will see.</span>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <?php /* Live robots.txt preview */ ?>
+                <div style="padding:16px 20px 4px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                        <div>
+                            <strong style="font-size:13px">Live robots.txt</strong>
+                            &nbsp;<a href="<?php echo esc_url(home_url('/robots.txt')); ?>" target="_blank" style="font-size:12px">↗ view in browser</a>
+                        </div>
+                        <div style="display:flex;gap:6px">
+                            <button type="button" class="button" style="font-size:11px;padding:2px 10px" id="ab-robots-live-copy" onclick="abCopyRobotsLive()">⎘ Copy</button>
+                            <button type="button" class="button" style="font-size:11px;padding:2px 10px" onclick="abRefreshRobotsPreview()">↻ Refresh</button>
+                        </div>
+                    </div>
+                    <pre id="ab-robots-live-preview" style="background:#1a1a2e;color:#e0e0f0;font-family:'Courier New',monospace;font-size:12px;line-height:1.6;padding:14px;border-radius:6px;max-height:320px;overflow-y:auto;margin:0;white-space:pre-wrap;word-break:break-word">Loading…</pre>
+                </div>
+
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th>Block AI training bots:</th>
+                        <td>
+                            <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[block_ai_bots]" value="1" <?php checked((int)($o['block_ai_bots'] ?? 1), 1); ?>>
+                            Block GPTBot, ChatGPT-User, CCBot, anthropic-ai, Claude-Web, FacebookBot, Bytespider, Applebot-Extended</label>
+                            <p class="description">Adds <code>Disallow: /</code> for each AI training crawler. Appended automatically after your custom rules below.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="cs-robots-txt">Custom robots.txt rules</label></th>
+                        <td>
+                            <textarea id="cs-robots-txt" name="<?php echo esc_attr(self::OPT); ?>[robots_txt]"
+                                rows="16" style="width:100%"><?php echo esc_textarea((string)($o['robots_txt'] ?? self::default_robots_txt())); ?></textarea>
+                            <p class="description">Full robots.txt content. The AI bot blocklist (if enabled) and your sitemap URL are appended automatically — do not add them here. Changes take effect immediately at <a href="<?php echo esc_url(home_url('/robots.txt')); ?>" target="_blank"><?php echo esc_html(home_url('/robots.txt')); ?></a></p>
+                            <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px">
+                                <button type="button" class="button" id="ab-robots-copy" onclick="abCopyRobots()">⎘ Copy</button>
+                                <button type="button" class="button" onclick="document.getElementById('cs-robots-txt').value=<?php echo wp_json_encode(self::default_robots_txt()); ?>">Reset to default</button>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+                <div style="margin-top:16px;"><?php submit_button('Save Robots Settings', 'primary', 'submit', false); ?></div>
+                </div>
+                </div><!-- /ab-card-robots -->
+
+            </form>
+
+            <hr class="ab-zone-divider">
+
+            <div class="ab-zone-card ab-card-sitemap-preview">
+            <div class="ab-zone-header" style="justify-content:space-between;align-items:center">
+                <span><span class="ab-zone-icon">🔍</span> Sitemap Preview</span>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <?php $this->explain_btn('sitemappreview', '🔍 Sitemap Preview — How to use this', [
+                        ['rec'=>'ℹ️ Info','name'=>'What this shows','desc'=>'A table of every URL that will appear in your sitemap.xml when Google crawls it. This is the live data — if a post appears here, it is in your sitemap. If it doesn\'t appear, Google won\'t find it via the sitemap.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Type badges','desc'=>'Each row shows the content type: Post (blog post), Page (WordPress page), Home (your homepage), Taxonomy (category/tag archive). Use this to verify the right content types are being included based on your Sitemap Settings.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Last Modified','desc'=>'The date the post was last updated. Google uses this to decide how often to re-crawl a page. Recently updated posts get re-crawled sooner. If a post shows an old date, consider updating it to signal freshness.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Pagination','desc'=>'Results are shown 200 at a time. Use Prev/Next to browse all your URLs. The count at the bottom right shows which URLs you\'re viewing out of the total.'],
+                        ['rec'=>'ℹ️ Info','name'=>'View live sitemap','desc'=>'The link opens your actual sitemap.xml in a new tab — this is what Google sees. The index file lists all your sub-sitemaps (one per post type). Click through to see the raw XML.'],
+                    ]); ?>
+                    <button id="ab-sitemap-load" onclick="abLoadSitemap();return false;"
+                        style="background:#f0b429;border:none;border-radius:6px;color:#1d2327;font-size:13px;font-weight:700;padding:7px 18px;cursor:pointer;letter-spacing:0.02em;box-shadow:0 2px 6px rgba(0,0,0,0.25);transition:background 0.15s">
+                        ⬇ Load Preview
+                    </button>
+                    <button id="ab-sitemap-copy" onclick="abCopySitemap()" class="button"
+                        style="font-size:11px;padding:2px 10px;margin-left:6px">
+                        ⎘ Copy URLs
+                    </button>
+                </div>
+            </div>
+            <div class="ab-zone-body" style="padding:16px 20px">
+                <p style="color:#50575e;margin:0 0 14px;font-size:13px">Shows all URLs that will appear in your sitemap. Paginated at 200 rows — use Prev/Next to browse. Save settings before previewing.</p>
+                <div id="ab-sitemap-preview-wrap">
+                    <p style="color:#a7aaad;font-size:13px">Click <strong>Load Preview</strong> to fetch the current sitemap contents.</p>
+                </div>
+            </div>
+            </div><!-- /ab-card-sitemap-preview -->
+
+            <?php /* ── llms.txt Card ── */ ?>
+            <div class="ab-zone-card ab-card-llms">
+            <div class="ab-zone-header" style="justify-content:space-between">
+                <span><span class="ab-zone-icon">🤖</span> llms.txt — LLM Crawler Guidance</span>
+                <span style="display:flex;align-items:center;gap:8px;">
+                    <button type="button" class="button" onclick="abToggleCard('ab-card-llms', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                    <?php $this->explain_btn('llms', '🤖 llms.txt — What this does', [
+                    ['rec'=>'✅ Recommended','name'=>'What is llms.txt','desc'=>'llms.txt is an emerging standard (proposed 2024) that helps large language model crawlers like ChatGPT, Claude, and Perplexity understand your site\'s content structure. It\'s a plain-text markdown file served at yoursite.com/llms.txt listing your posts, pages, and descriptions — similar to what sitemap.xml does for traditional search engines, but optimised for AI indexing.'],
+                    ['rec'=>'✅ Recommended','name'=>'Enable /llms.txt','desc'=>'Serves a dynamically generated llms.txt at yoursite.com/llms.txt. The file is built from your published posts and pages, using your AI-generated meta descriptions as the per-post summaries. Enable this if you want AI assistants and LLM-powered search engines to have an accurate, structured view of your site content.'],
+                    ['rec'=>'ℹ️ Info','name'=>'What it contains','desc'=>'The file includes your site name, site description, author name and title, and a structured list of all published posts and pages with their URLs and meta descriptions. Posts with no meta description are listed without a summary — another reason to run Generate Missing first.'],
+                    ['rec'=>'ℹ️ Info','name'=>'Preview','desc'=>'Click Load Preview to see exactly what the file currently contains. The preview reflects live data — if you generate new meta descriptions, reload the preview to see the updated content.'],
+                ]); ?>
+                    </span>
+            </div>
+            <div class="ab-zone-body" style="padding:20px 24px 24px">
+                <form method="post" action="options.php">
+                    <?php settings_fields('cs_seo_group'); ?>
+                    <input type="hidden" name="<?php echo esc_attr(self::OPT); ?>[_partial]" value="1">
+                    <table class="form-table" role="presentation" style="margin-top:0">
+                        <tr>
+                            <th style="width:200px">Enable /llms.txt:</th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[enable_llms_txt]" value="1" <?php checked((int)($o['enable_llms_txt'] ?? 0), 1); ?>>
+                                    Serve <code>llms.txt</code> at <a href="<?php echo esc_url(home_url('/llms.txt')); ?>" target="_blank"><?php echo esc_html(home_url('/llms.txt')); ?></a>
+                                </label>
+                            </td>
+                        </tr>
+                    </table>
+                    <?php submit_button('Save llms.txt Settings'); ?>
+                </form>
+
+                <div style="margin-top:8px;border-top:1px solid #f0f0f0;padding-top:16px">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                        <button id="ab-llms-load" class="button" style="background:#1a4a8a;color:#fff;border-color:#143a6e">🔍 Load Preview</button>
+                        <button id="ab-llms-copy" class="button" style="font-size:11px;padding:2px 10px" onclick="abCopyLlms()">⎘ Copy</button>
+                        <?php if ((int)($o['enable_llms_txt'] ?? 0)): ?>
+                        <a href="<?php echo esc_url(home_url('/llms.txt')); ?>" target="_blank" class="button">↗ View Live File</a>
+                        <?php endif; ?>
+                    </div>
+                    <div id="ab-llms-preview-wrap">
+                        <p style="color:#a7aaad;font-size:13px">Click <strong>Load Preview</strong> to see what LLM crawlers will receive.</p>
+                    </div>
+                </div>
+            </div>
+            </div><!-- /ab-card-llms -->
+            <script>
+            (function() {
+                var _ajax  = <?php echo wp_json_encode(admin_url('admin-ajax.php')); ?>;
+                var _nonce = <?php echo wp_json_encode(wp_create_nonce('cs_seo_nonce')); ?>;
+                document.addEventListener('DOMContentLoaded', function() {
+                    var btn  = document.getElementById('ab-llms-load');
+                    var wrap = document.getElementById('ab-llms-preview-wrap');
+                    if (!btn || !wrap) return;
+                    btn.addEventListener('click', function() {
+                        btn.disabled = true;
+                        btn.textContent = '⟳ Loading...';
+                        wrap.innerHTML = '<p style="color:#666;font-size:13px">Fetching llms.txt content…</p>';
+                        fetch(_ajax, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                            body: 'action=cs_seo_llms_preview&nonce=' + encodeURIComponent(_nonce)
+                        })
+                        .then(function(r){ return r.json(); })
+                        .then(function(data) {
+                            btn.disabled = false;
+                            btn.textContent = '↻ Reload Preview';
+                            if (data.success && data.data.content) {
+                                var lines = data.data.content.split('\n').length;
+                                // Store raw content for copy button
+                                wrap.dataset.raw = data.data.content;
+                                // Syntax-highlight the markdown
+                                var highlighted = data.data.content
+                                    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                                    .replace(/^(# .+)$/gm, '<span style="color:#e2c97e;font-size:14px;font-weight:700">$1</span>')
+                                    .replace(/^(## .+)$/gm, '<span style="color:#7eb8e2;font-weight:600">$1</span>')
+                                    .replace(/^(&gt; .+)$/gm, '<span style="color:#a8d8a8;font-style:italic">$1</span>')
+                                    .replace(/^(Author:.+)$/gm, '<span style="color:#c9a8e2">$1</span>')
+                                    .replace(/(\[([^\]]+)\]\([^)]+\))/g, function(m) {
+                                        return m.replace(/\[([^\]]+)\]/, '<span style="color:#7eb8e2">[$1]</span>');
+                                    });
+                                wrap.innerHTML =
+                                    '<div style="margin-bottom:8px;font-size:12px;color:#50575e">' + lines + ' lines — ' + data.data.content.length + ' characters</div>' +
+                                    '<pre id="ab-llms-pre" style="background:#1a1a2e;color:#d0d8e8;font-family:Courier New,monospace;font-size:12px;line-height:1.7;padding:16px;border-radius:6px;max-height:400px;overflow:auto;white-space:pre-wrap;word-break:break-word;border:1px solid #2a2a4a">' +
+                                    highlighted +
+                                    '</pre>';
+                            } else {
+                                wrap.innerHTML = '<div style="color:#c3372b;background:#fef0f0;border:1px solid #f5bcbb;padding:12px;border-radius:4px">Failed to load preview.</div>';
+                            }
+                        })
+                        .catch(function(e) {
+                            btn.disabled = false;
+                            btn.textContent = '↻ Reload Preview';
+                            wrap.innerHTML = '<div style="color:#c3372b;background:#fef0f0;border:1px solid #f5bcbb;padding:12px;border-radius:4px">Network error: ' + e.message + '</div>';
+                        });
+                    });
+                });
+            })();
+            </script>
+            <script>
+            (function() {
+                var _ajax  = <?php echo wp_json_encode(admin_url('admin-ajax.php')); ?>;
+                var _nonce = <?php echo wp_json_encode(wp_create_nonce('cs_seo_nonce')); ?>;
+
+                function loadSitemapPreview(pg) {
+                    var wrap = document.getElementById('ab-sitemap-preview-wrap');
+                    var btn  = document.getElementById('ab-sitemap-load');
+                    if (!wrap || !btn) return;
+                    btn.disabled = true;
+                    btn.textContent = '⟳ Loading...';
+                    btn.style.background = '#c0882a';
+                    wrap.innerHTML = '<p style="color:#666;font-size:13px">Fetching sitemap entries…</p>';
+                    if (!(pg > 1)) window._abSitemapUrls = [];
+
+                    var body = 'action=cs_seo_sitemap_preview&nonce='+encodeURIComponent(_nonce)+'&sitemap_pg='+(pg||1);
+                    fetch(_ajax, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:body})
+                        .then(function(r){ return r.text(); })
+                        .then(function(txt) {
+                            btn.disabled = false;
+                            btn.textContent = '↻ Reload';
+                            btn.style.background = '#f0b429';
+                            var data;
+                            try { data = JSON.parse(txt); } catch(e) {
+                                wrap.innerHTML = '<div style="color:#c3372b;background:#fef0f0;border:1px solid #f5bcbb;padding:12px;border-radius:4px">Response was not JSON. Check for PHP errors.</div>';
+                                return;
+                            }
+                            if (!data.success) {
+                                wrap.innerHTML = '<div style="color:#c3372b;background:#fef0f0;border:1px solid #f5bcbb;padding:12px;border-radius:4px">Error: '+(data.data||'unknown')+'</div>';
+                                return;
+                            }
+                            var d=data.data, entries=d.entries, total=d.total, page=d.page, pages=d.pages, per=d.per_page;
+                            window._abSitemapUrls = (window._abSitemapUrls || []).concat(entries.map(function(e){ return e.loc; }));
+                            var cols={home:'#6b3fa0',post:'#1a4a7a',page:'#1a7a34',tax:'#7a5c00',cpt:'#8a3a00'};
+                            var labels={home:'Home',post:'Post',page:'Page',tax:'Taxonomy',cpt:'CPT'};
+                            var rows=entries.map(function(e){
+                                return '<tr style="border-bottom:1px solid #f0f0f0">'+
+                                    '<td style="padding:6px 8px"><a href="'+e.loc+'" target="_blank" style="font-size:12px;color:#2271b1">'+e.loc+'</a>'+(e.title?'<br><small style="color:#888;font-size:11px">'+e.title+'</small>':'')+'</td>'+
+                                    '<td style="padding:6px 8px"><span style="background:'+(cols[e.type]||'#444')+';color:#fff;border-radius:3px;padding:2px 8px;font-size:11px;white-space:nowrap">'+(labels[e.type]||e.type)+'</span></td>'+
+                                    '<td style="padding:6px 8px;color:#888;font-size:12px;white-space:nowrap">'+(e.lastmod||'—')+'</td></tr>';
+                            }).join('');
+                            var pager='';
+                            if(pages>1){
+                                pager='<div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap">'+
+                                    '<button class="button" '+(page<=1?'disabled':'onclick="window._abSitemapLoad('+(page-1)+')"')+'>← Prev</button>'+
+                                    '<span style="font-size:13px;color:#50575e">Page <strong>'+page+'</strong> of <strong>'+pages+'</strong></span>'+
+                                    '<button class="button button-primary" '+(page>=pages?'disabled':'onclick="window._abSitemapLoad('+(page+1)+')"')+'>Next →</button>'+
+                                    '<span style="font-size:12px;margin-left:auto;color:#888">'+((page-1)*per+1)+'–'+Math.min(page*per,total)+' of '+total+' URLs</span>'+
+                                    '</div>';
+                            }
+                            wrap.innerHTML=
+                                '<p style="font-size:13px;margin:0 0 12px;color:#1d2327"><strong>'+total+'</strong> total URLs across <strong>'+pages+'</strong> sitemap file'+(pages>1?'s':'')+
+                                ' &nbsp;·&nbsp; <a href="<?php echo esc_url(home_url('/sitemap.xml')); ?>" target="_blank" style="color:#2271b1">View live sitemap ↗</a></p>'+
+                                '<table style="width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid #e0e0e0;border-radius:4px;overflow:hidden">'+
+                                '<thead><tr style="background:#f6f7f7;border-bottom:2px solid #e0e0e0">'+
+                                '<th style="text-align:left;padding:8px 8px;font-size:12px;color:#50575e;font-weight:600">URL</th>'+
+                                '<th style="text-align:left;padding:8px 8px;font-size:12px;color:#50575e;font-weight:600">Type</th>'+
+                                '<th style="text-align:left;padding:8px 8px;font-size:12px;color:#50575e;font-weight:600">Last Modified</th></tr></thead>'+
+                                '<tbody>'+rows+'</tbody></table>'+pager;
+                        })
+                        .catch(function(e){
+                            btn.disabled=false; btn.textContent='↻ Reload'; btn.style.background='#f0b429';
+                            wrap.innerHTML='<div style="color:#c3372b;background:#fef0f0;border:1px solid #f5bcbb;padding:12px;border-radius:4px">Network error: '+e.message+'</div>';
+                        });
+                }
+                window.abLoadSitemap  = loadSitemapPreview;
+                window._abSitemapLoad = loadSitemapPreview;
+                document.addEventListener('DOMContentLoaded', function() {
+                    var b = document.getElementById('ab-sitemap-load');
+                    if (b) b.addEventListener('click', function(e){ e.preventDefault(); loadSitemapPreview(1); });
+                });
+            })();
+            </script>
+
+            <?php /* ── HTTPS Fix Card ── */ ?>
+            <div class="ab-zone-card ab-card-https">
+            <div class="ab-zone-header" style="justify-content:space-between">
+                <span><span class="ab-zone-icon">🔒</span> Mixed Content Fix — HTTP → HTTPS</span>
+                <button type="button" class="button" onclick="abToggleCard('ab-card-https', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+            </div>
+            <div class="ab-zone-body" style="padding:20px 24px 24px">
+                <p style="color:#50575e;font-size:13px;margin:0 0 16px">Scans your database for assets and links still using <code>http://</code> and replaces them with <code>https://</code>. Fixes posts, pages, metadata, options, and comments in one operation.</p>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+                    <button type="button" class="button" id="ab-https-scan-btn" style="background:#b45309;color:#fff;border-color:#92400e;font-weight:600">
+                        🔍 Scan for HTTP references
+                    </button>
+                    <button type="button" class="button" id="ab-https-fix-btn" style="display:none;background:#7a1a1a;color:#fff;border-color:#5a0e0e;font-weight:600">
+                        🔧 Fix all HTTP → HTTPS
+                    </button>
+                    <span id="ab-https-status" style="font-size:13px;color:#50575e"></span>
+                </div>
+                <div id="ab-https-results"></div>
+            </div>
+            </div><!-- /ab-card-https -->
+            <script>
+            (function() {
+                var _ajax  = <?php echo wp_json_encode(admin_url('admin-ajax.php')); ?>;
+                var _nonce = <?php echo wp_json_encode(wp_create_nonce('cs_seo_nonce')); ?>;
+                var scanBtn   = document.getElementById('ab-https-scan-btn');
+                var fixBtn    = document.getElementById('ab-https-fix-btn');
+                var statusEl  = document.getElementById('ab-https-status');
+                var resultsEl = document.getElementById('ab-https-results');
+
+                var th  = 'padding:6px 12px;border-bottom:2px solid #8c8f94;background:#f0f0f1;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:#1d2327;font-weight:700;position:sticky;top:0';
+                var td  = 'padding:6px 10px;border-bottom:1px solid #dcdcde;font-family:monospace;font-size:11px;color:#1d2327;word-break:break-all';
+
+                function setStatus(msg, color) {
+                    statusEl.textContent = msg;
+                    statusEl.style.color = color || '#50575e';
+                }
+                function esc(s) {
+                    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                }
+                function getCheckedDomains() {
+                    return Array.from(document.querySelectorAll('.ab-https-domain-cb:checked')).map(function(cb){ return cb.value; });
+                }
+
+                // Safe fetch wrapper — always reads raw text first so a PHP fatal
+                // (which returns HTML, not JSON) shows the actual error message
+                // rather than a useless "Unexpected token '<'" SyntaxError.
+                function safeFetch(url, opts) {
+                    return fetch(url, opts).then(function(r) {
+                        return r.text().then(function(text) {
+                            try {
+                                return JSON.parse(text);
+                            } catch (e) {
+                                // Strip HTML tags to surface the plain-text PHP message
+                                var plain = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400);
+                                throw new Error('Server returned non-JSON response:\n' + plain);
+                            }
+                        });
+                    });
+                }
+
+                if (scanBtn) scanBtn.addEventListener('click', function() {
+                    scanBtn.disabled = true;
+                    fixBtn.style.display = 'none';
+                    setStatus('Scanning…', '#50575e');
+                    resultsEl.innerHTML = '';
+                    safeFetch(_ajax, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: 'action=cs_seo_https_scan&nonce=' + encodeURIComponent(_nonce)
+                    })
+                    .then(function(data) {
+                        scanBtn.disabled = false;
+
+                        if (!data.success) {
+                            var msg = typeof data.data === 'string' ? data.data : (data.data && data.data.message) ? data.data.message : JSON.stringify(data.data);
+                            setStatus('Scan failed: ' + msg, '#c3372b');
+                            return;
+                        }
+
+                        var d = data.data;
+                        if (d.total === 0) {
+                            setStatus('\u2705 No HTTP references found \u2014 your site is clean!', '#1a7a34');
+                            return;
+                        }
+                        setStatus('', '');
+
+                        // Summary by table/column
+                        var summaryRows = d.counts.map(function(c) {
+                            return '<tr><td style="' + td + '">' + esc(c.table) + '</td>' +
+                                '<td style="' + td + '">' + esc(c.column) + '</td>' +
+                                '<td style="' + td + ';font-weight:700;color:#b45309;text-align:right">' + c.count + '</td></tr>';
+                        }).join('');
+
+                        // Per-domain rows — behaviour differs by domain type
+                        var domainRows = Object.entries(d.domain_meta).map(function(entry) {
+                            var domain = entry[0], meta = entry[1];
+                            var uid = 'ab-https-urls-' + domain.replace(/[^a-z0-9]/gi, '-');
+
+                            // Build collapsible URL sample list
+                            var urls = meta.urls || [];
+                            var sampleHtml = '';
+                            if (urls.length > 0) {
+                                var initialShow = 3;
+                                var makeUrlDiv = function(u) {
+                                    return '<div style="color:#555;font-size:10px;margin-left:22px;margin-top:1px;word-break:break-all;font-family:monospace">' + esc(u.url) +
+                                        ' <span style="color:#8080b0;font-size:9px">(' + esc(u.table) + '.' + esc(u.column) + ')</span></div>';
+                                };
+                                var visibleUrls = urls.slice(0, initialShow).map(makeUrlDiv).join('');
+                                var hiddenUrls  = urls.length > initialShow ? urls.slice(initialShow).map(makeUrlDiv).join('') : '';
+                                var showMoreBtn = hiddenUrls
+                                    ? '<button type="button" onclick="var h=document.getElementById(\'' + uid + '\');h.style.display=h.style.display===\'none\'?\'block\':\'none\';this.textContent=h.style.display===\'none\'?\'\u25b6 Show all ' + urls.length + ' URLs\':\'\u25b2 Hide\'" style="background:none;border:none;color:#2271b1;font-size:10px;cursor:pointer;padding:2px 0 0 22px;margin:0">\u25b6 Show all ' + urls.length + ' URLs</button>'
+                                    : '';
+                                sampleHtml = visibleUrls +
+                                    (hiddenUrls ? '<div id="' + uid + '" style="display:none">' + hiddenUrls + '</div>' + showMoreBtn : '');
+                                if (meta.count > urls.length) {
+                                    sampleHtml += '<div style="color:#8080b0;font-size:10px;margin-left:22px;margin-top:2px">\u2026 and ' + (meta.count - urls.length) + ' more rows in the database (showing first ' + urls.length + ' samples)</div>';
+                                }
+                            }
+
+                            var domainBadge = '<code style="background:#f0f0f1;padding:1px 5px;border-radius:3px;font-size:12px">' + esc(domain) + '</code>' +
+                                '<span style="color:#888;font-size:11px;margin-left:6px">' + meta.count + ' row' + (meta.count !== 1 ? 's' : '') + ' in DB</span>';
+
+                            // --- IP address: cannot be fixed, offer Remove action ---
+                            if (meta.is_ip) {
+                                return '<div style="padding:8px 0;border-bottom:1px solid #f0f0f1" id="ab-domain-row-' + uid + '">' +
+                                    '<div style="display:flex;align-items:flex-start;gap:8px">' +
+                                    '<span style="margin-top:2px;font-size:14px">\u26d4</span>' +
+                                    '<div style="flex:1">' +
+                                    domainBadge +
+                                    '<span style="color:#c3372b;font-size:10px;margin-left:6px">\u26a0 IP address \u2014 cannot have an SSL cert. These URLs must be removed or replaced, not flipped to HTTPS.</span>' +
+                                    '<br><button type="button" data-domain="' + esc(domain) + '" class="ab-https-remove-ip button button-small" style="margin-top:5px;background:#c3372b;color:#fff;border-color:#c3372b;font-size:11px">\u{1F5D1} Remove these ' + meta.count + ' row' + (meta.count !== 1 ? 's' : '') + '</button>' +
+                                    '</div></div>' +
+                                    sampleHtml + '</div>';
+                            }
+
+                            // --- Spam (comment-only domain): offer Delete comments action ---
+                            if (meta.is_spam) {
+                                return '<div style="padding:8px 0;border-bottom:1px solid #f0f0f1" id="ab-domain-row-' + uid + '">' +
+                                    '<div style="display:flex;align-items:flex-start;gap:8px">' +
+                                    '<span style="margin-top:2px;font-size:14px">\u{1F6AB}</span>' +
+                                    '<div style="flex:1">' +
+                                    domainBadge +
+                                    '<span style="color:#c3372b;font-size:10px;margin-left:6px">\u26a0 spam comment domain \u2014 delete the comments rather than fixing the URL</span>' +
+                                    '<br><button type="button" data-domain="' + esc(domain) + '" class="ab-https-delete-spam button button-small" style="margin-top:5px;background:#c3372b;color:#fff;border-color:#c3372b;font-size:11px">\u{1F5D1} Delete comments from ' + esc(domain) + '</button>' +
+                                    '</div></div>' +
+                                    sampleHtml + '</div>';
+                            }
+
+                            // --- Normal fixable domain ---
+                            var checked = ' checked';
+                            if (domain.match(/example\.|yoursite\.|placeholder/i)) {
+                                checked = '';  // placeholder — opt-out by default
+                            }
+                            var ownBadge = meta.is_own ? '<span style="color:#1a7a34;font-size:10px;margin-left:6px">\u2713 your domain</span>' : '';
+
+                            // Core URL options (siteurl / home) that appear in wp_options
+                            var coreOpts = meta.core_url_options || [];
+                            var overridden = meta.overridden_by_wpconfig || [];
+                            var coreWarn = '';
+                            if (overridden.length > 0) {
+                                // wp-config.php has WP_HOME/WP_SITEURL defined as http://
+                                // Fixing the DB row is pointless — the constant overwrites it on every request
+                                coreWarn = '<div style="margin-top:6px;padding:8px 10px;background:#fff8e1;border:1px solid #f0c040;border-radius:3px;font-size:11px;color:#5a4000">' +
+                                    '\u26a0 <strong>This row keeps reverting because <code>WP_' + overridden.map(function(o){return o.toUpperCase();}).join('</code> / <code>WP_') + '</code> ' +
+                                    (overridden.length === 1 ? 'is' : 'are') + ' hardcoded in <code>wp-config.php</code>.</strong><br>' +
+                                    'Database fixes are overwritten every time WordPress loads. To permanently fix this, edit <code>wp-config.php</code> and change the constant' +
+                                    (overridden.length > 1 ? 's' : '') + ' to use <code>https://</code>:<br>' +
+                                    '<code style="display:block;margin-top:4px;background:#f5f5f5;padding:4px 6px;border-radius:2px">' +
+                                    overridden.map(function(o) {
+                                        return "define( 'WP_" + o.toUpperCase() + "', 'https://" + esc(domain) + "' );";
+                                    }).join('<br>') + '</code></div>';
+                                checked = '';  // don't offer the DB fix when it won't stick
+                            } else if (coreOpts.length > 0) {
+                                // In wp_options but no wp-config override — DB fix will work,
+                                // but warn that this is the core site URL
+                                coreWarn = '<div style="margin-top:5px;font-size:11px;color:#5a4000">' +
+                                    '\u2139 This appears in the core WordPress <code>' + coreOpts.join('</code> / <code>') + '</code> option' +
+                                    (coreOpts.length > 1 ? 's' : '') + '. Fixing it here will work, but also update <code>wp-config.php</code> if those constants are defined there.</div>';
+                            }
+
+                            return '<div style="padding:8px 0;border-bottom:1px solid #f0f0f1">' +
+                                '<label style="display:flex;align-items:flex-start;gap:6px;cursor:pointer">' +
+                                '<input type="checkbox" class="ab-https-domain-cb" value="' + esc(domain) + '"' + checked + ' style="margin-top:3px;flex-shrink:0">' +
+                                '<span>' + domainBadge + ownBadge + '</span></label>' +
+                                coreWarn +
+                                sampleHtml + '</div>';
+                        }).join('');
+
+                        resultsEl.innerHTML =
+                            '<p style="font-size:13px;font-weight:600;color:#b45309;margin:0 0 10px">Found ' + d.total + ' row' + (d.total!==1?'s':'') + ' with HTTP references</p>' +
+                            '<table style="width:100%;border-collapse:collapse;margin-bottom:14px">' +
+                            '<thead><tr><th style="' + th + '">Table</th><th style="' + th + '">Column</th><th style="' + th + ';text-align:right">Rows</th></tr></thead>' +
+                            '<tbody>' + summaryRows + '</tbody></table>' +
+                            '<p style="font-size:12px;font-weight:600;color:#1d2327;margin:0 0 6px">Select domains to fix:</p>' +
+                            '<div style="background:#fafafa;border:1px solid #dcdcde;border-radius:4px;padding:8px 12px;margin-bottom:10px">' + domainRows + '</div>' +
+                            '<p style="font-size:11px;color:#888;margin:0">Serialized data (theme settings, widget options) will be re-serialized safely to preserve byte counts.</p>';
+
+                        // Wire up Delete spam buttons
+                        resultsEl.querySelectorAll('.ab-https-delete-spam').forEach(function(btn) {
+                            btn.addEventListener('click', function() {
+                                var domain = btn.dataset.domain;
+                                if (!confirm('Permanently delete all comments from ' + domain + '?\n\nThis cannot be undone.')) return;
+                                btn.disabled = true;
+                                btn.textContent = 'Deleting\u2026';
+                                safeFetch(_ajax, {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                                    body: 'action=cs_seo_https_delete&nonce=' + encodeURIComponent(_nonce) + '&domain=' + encodeURIComponent(domain)
+                                }).then(function(r) {
+                                    if (r.success) {
+                                        var row = document.getElementById('ab-domain-row-ab-https-urls-' + domain.replace(/[^a-z0-9]/gi, '-'));
+                                        if (row) {
+                                            row.innerHTML = '<div style="color:#1a7a34;font-size:12px;padding:4px 0">\u2705 Deleted ' + r.data.deleted + ' comment' + (r.data.deleted !== 1 ? 's' : '') + ' from ' + esc(domain) + '</div>';
+                                        }
+                                    } else {
+                                        btn.disabled = false;
+                                        btn.textContent = '\u{1F5D1} Delete comments from ' + domain;
+                                        alert('Delete failed: ' + (r.data || 'unknown error'));
+                                    }
+                                }).catch(function(e) {
+                                    btn.disabled = false;
+                                    alert('Delete error: ' + e.message);
+                                });
+                            });
+                        });
+
+                        // Wire up Remove IP buttons
+                        resultsEl.querySelectorAll('.ab-https-remove-ip').forEach(function(btn) {
+                            btn.addEventListener('click', function() {
+                                var domain = btn.dataset.domain;
+                                if (!confirm('Permanently delete all database rows containing ' + domain + '?\n\nThis cannot be undone. Ensure you have a backup.')) return;
+                                btn.disabled = true;
+                                btn.textContent = 'Deleting\u2026';
+                                safeFetch(_ajax, {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                                    body: 'action=cs_seo_https_delete&nonce=' + encodeURIComponent(_nonce) + '&domain=' + encodeURIComponent(domain)
+                                }).then(function(r) {
+                                    if (r.success) {
+                                        var row = document.getElementById('ab-domain-row-ab-https-urls-' + domain.replace(/[^a-z0-9]/gi, '-'));
+                                        if (row) {
+                                            row.innerHTML = '<div style="color:#1a7a34;font-size:12px;padding:4px 0">\u2705 Deleted ' + r.data.deleted + ' item' + (r.data.deleted !== 1 ? 's' : '') + ' containing ' + esc(domain) + '</div>';
+                                        }
+                                    } else {
+                                        btn.disabled = false;
+                                        btn.textContent = '\u{1F5D1} Remove these rows';
+                                        alert('Delete failed: ' + (r.data || 'unknown error'));
+                                    }
+                                }).catch(function(e) {
+                                    btn.disabled = false;
+                                    alert('Delete error: ' + e.message);
+                                });
+                            });
+                        });
+
+                        fixBtn.style.display = '';
+                    })
+                    .catch(function(e) {
+                        scanBtn.disabled = false;
+                        setStatus('', '');
+                        resultsEl.innerHTML = '<div style="color:#c3372b;background:#fef0f0;border:1px solid #f5bcbb;padding:12px 14px;border-radius:4px;font-size:12px;font-family:monospace;white-space:pre-wrap">Scan error:\n' + esc(e.message) + '</div>';
+                    });
+                });
+
+                if (fixBtn) fixBtn.addEventListener('click', function() {
+                    var domains = getCheckedDomains();
+                    if (!domains.length) { setStatus('Select at least one domain to fix.', '#c3372b'); return; }
+                    if (!confirm('Replace http:// with https:// for ' + domains.length + ' selected domain' + (domains.length !== 1 ? 's' : '') + '.\n\nEnsure you have a recent database backup before proceeding.')) return;
+                    fixBtn.disabled = true;
+                    scanBtn.disabled = true;
+                    setStatus('Fixing — this may take a moment…', '#50575e');
+                    resultsEl.innerHTML = '';
+                    safeFetch(_ajax, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: 'action=cs_seo_https_fix&nonce=' + encodeURIComponent(_nonce) + '&domains=' + encodeURIComponent(domains.join(','))
+                    })
+                    .then(function(data) {
+                        fixBtn.disabled = false;
+                        scanBtn.disabled = false;
+                        if (!data.success) {
+                            setStatus('', '');
+                            resultsEl.innerHTML = '<div style="color:#c3372b;background:#fef0f0;border:1px solid #f5bcbb;padding:12px 14px;border-radius:4px;font-size:12px;font-family:monospace;white-space:pre-wrap">Fix error:\n' + esc(data.data) + '</div>';
+                            return;
+                        }
+                        var d = data.data;
+                        fixBtn.style.display = 'none';
+                        setStatus('✅ Fixed ' + d.fixed + ' row' + (d.fixed!==1?'s':''), '#1a7a34');
+
+                        if (!d.changes || d.changes.length === 0) {
+                            resultsEl.innerHTML = '<p style="color:#50575e;font-size:13px">No changes recorded.</p>';
+                            return;
+                        }
+                        var changeRows = d.changes.map(function(c) {
+                            return '<tr>' +
+                                '<td style="' + td + '">' + esc(c.table) + '</td>' +
+                                '<td style="' + td + '">' + esc(c.column) + '</td>' +
+                                '<td style="' + td + '">' + esc(c.id) + '</td>' +
+                                '<td style="' + td + ';color:#c3372b">' + esc(c.from) + '</td>' +
+                                '<td style="' + td + ';color:#1a7a34">' + esc(c.to) + '</td>' +
+                                '</tr>';
+                        }).join('');
+                        resultsEl.innerHTML =
+                            '<p style="font-size:13px;font-weight:600;color:#1a7a34;margin:0 0 8px">✅ ' + d.changes.length + ' URL' + (d.changes.length!==1?'s':'') + ' updated across ' + d.fixed + ' row' + (d.fixed!==1?'s':'') + ':</p>' +
+                            '<div style="max-height:320px;overflow-y:auto;border:1px solid #dcdcde;border-radius:4px">' +
+                            '<table style="width:100%;border-collapse:collapse">' +
+                            '<thead><tr>' +
+                            '<th style="' + th + '">Table</th>' +
+                            '<th style="' + th + '">Column</th>' +
+                            '<th style="' + th + '">ID</th>' +
+                            '<th style="' + th + '">From</th>' +
+                            '<th style="' + th + '">To</th>' +
+                            '</tr></thead><tbody>' + changeRows + '</tbody></table></div>';
+                    })
+                    .catch(function(e) {
+                        fixBtn.disabled = false;
+                        scanBtn.disabled = false;
+                        setStatus('', '');
+                        resultsEl.innerHTML = '<div style="color:#c3372b;background:#fef0f0;border:1px solid #f5bcbb;padding:12px 14px;border-radius:4px;font-size:12px;font-family:monospace;white-space:pre-wrap">Fix error:\n' + esc(e.message) + '</div>';
+                    });
+                });
+            })();
+            </script>
+
+        </div><!-- /ab-pane-sitemap -->
+
+        <div class="ab-pane" id="ab-pane-perf">
+
+            <div class="ab-zone-card ab-card-fonts" style="margin-top:0">
+                <div class="ab-zone-header" style="background:#0066cc;justify-content:space-between">
+                    <span><span class="ab-zone-icon">🔤</span> Font-Display Optimization</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-fonts', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                        <?php $this->explain_btn('perf', '⚡ Performance Tab — What each feature does', [
+                        ['rec'=>'✅ Recommended','name'=>'Font-Display: Swap','desc'=>'Adds font-display: swap to your @font-face rules. This tells browsers to show text immediately using a fallback font, then swap in the custom font once loaded. Eliminates the "Flash of Invisible Text" (FOIT) and dramatically improves Largest Contentful Paint (LCP) scores. Typical savings: 500ms–2s.'],
+                        ['rec'=>'✅ Recommended','name'=>'Font Metric Overrides','desc'=>'Adds size-adjust, ascent-override, and descent-override properties to match your web font metrics to the fallback font. This prevents layout shift (CLS) when the custom font loads. Without this, text may jump or reflow as fonts swap.'],
+                        ['rec'=>'⬜ Optional','name'=>'Defer Font CSS Loading','desc'=>'Changes font stylesheets to load with media="print" and swap to media="all" after page load. This prevents font CSS from blocking initial render. Enable this for maximum LCP improvement, but test thoroughly — some themes may show a brief flash of unstyled text.'],
+                        ['rec'=>'⬜ Optional','name'=>'Auto-Download CDN Fonts','desc'=>'Detects Google Fonts loaded from CDN (fonts.googleapis.com) and downloads them to your local server. Local fonts load faster and eliminate third-party requests. Also improves privacy compliance (GDPR) by keeping font requests on your domain.'],
+                        ['rec'=>'✅ Recommended','name'=>'Defer Render-Blocking JavaScript','desc'=>'Adds the defer attribute to JavaScript files, allowing them to download in parallel and execute after HTML parsing. This prevents scripts from blocking page rendering. Some scripts (jQuery, payment widgets) should be excluded — use the exclusions field.'],
+                        ['rec'=>'⬜ Optional','name'=>'HTML/CSS/JS Minification','desc'=>'Removes whitespace, comments, and unnecessary characters from your HTML output. Reduces page size by 5–15% with zero visual change. Safe and conservative — protects pre-formatted content, JSON-LD, and textareas.'],
+                        ['rec'=>'✅ Recommended','name'=>'HTTPS Mixed Content Scanner','desc'=>'Scans your database for http:// references to your own domain that should be https://. Mixed content triggers browser warnings and hurts SEO. One-click fix replaces all instances across posts, pages, meta, options, and comments.'],
+                    ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body">
+                    <p style="padding:0 20px; margin-top:12px; font-size:13px; color:#555; line-height:1.6;">
+                        <strong>font-display: swap</strong> ensures text is visible while web fonts load. This eliminates the "Flash of Invisible Text" (FOIT) and improves perceived performance.
+                    </p>
+                    
+                    <div style="padding:0 20px; margin:8px 0 0 0; font-size:13px; color:#666; border-top:1px solid #e5e5e5; padding-top:12px;">
+                        <strong>ℹ How font optimization works:</strong><br>
+                        1. Click "Scan CSS Files" to analyze your fonts<br>
+                        2. Click "Auto-Fix All" to apply optimizations:<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;• Adds <code>font-display: swap</code> to missing fonts<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;• Adds metric overrides to prevent layout shift<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;• If defer is enabled: defers CSS loading (media="print")<br>
+                        3. Creates backup (you can undo anytime)<br>
+                        <strong>No changes happen until you click "Auto-Fix All"</strong>
+                    </div>
+                    
+                    <div style="padding:0 20px; margin:16px 0; display:flex; gap:10px; flex-wrap:wrap;">
+                        <button type="button" class="button" id="ab-font-scan-btn" onclick="abFontScan(this)" style="background:#0066cc;border-color:#004d99;color:#fff;font-weight:600">
+                            🔍 Scan CSS Files
+                        </button>
+                        <button type="button" class="button" id="ab-font-download-btn" onclick="abFontDownload(this)" style="background:#1a7a34;border-color:#145a27;color:#fff;font-weight:600">
+                            ⬇️ Auto-Download CDN Fonts
+                        </button>
+                        <button type="button" class="button" id="ab-font-fix-btn" onclick="abFontFix(this)" style="background:#7c3aed;border-color:#5b21b6;color:#fff;font-weight:600">
+                            ✨ Auto-Fix All
+                        </button>
+                        <button type="button" class="button" id="ab-font-clear-btn" onclick="abFontClearConsole()" style="background:#d946a6;border-color:#b5348a;color:#fff;font-weight:600">
+                            🧹 Clear Console
+                        </button>
+                    </div>
+                    
+                    <div id="ab-font-console" class="ab-log" style="margin:16px 20px; min-height:120px; max-height:250px; overflow-y:auto; background:#1a1a2e; border:1px solid #333; border-radius:4px; padding:12px; font-family:monospace; font-size:13px; line-height:1.6; color:#e0e0e0; display:block;">
+                        <div style="text-align:center; color:#888; padding:12px;">Click "Scan CSS Files" to analyze your fonts...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ab-zone-card ab-card-render" style="margin-top:16px">
+                <form method="post" action="options.php">
+                <?php settings_fields('cs_seo_group'); ?>
+                <input type="hidden" name="<?php echo esc_attr(self::OPT); ?>[defer_js]" value="0">
+                <input type="hidden" name="<?php echo esc_attr(self::OPT); ?>[minify_html]" value="0">
+                <input type="hidden" name="<?php echo esc_attr(self::OPT); ?>[defer_fonts]" value="0">
+                <div class="ab-zone-header" style="background:#7c3aed;justify-content:space-between">
+                    <span><span class="ab-zone-icon">🚀</span> Render &amp; Minification</span>
+                    <button type="button" class="button" onclick="abToggleCard('ab-card-render', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                </div>
+                <div class="ab-zone-body" style="padding:16px 20px">
+
+                    <div class="ab-toggle-row">
+                        <div class="ab-toggle-label">
+                            Defer Font CSS Loading
+                            <span>Loads font stylesheets as print, swaps to all after page load. Prevents render-blocking.</span>
+                        </div>
+                        <label class="ab-toggle-switch">
+                            <input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[defer_fonts]" value="1" <?php checked((int)($o['defer_fonts'] ?? 0), 1); ?>>
+                            <span class="ab-toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div style="margin-top:16px;border-top:1px solid #e5e5e5;padding-top:16px">
+                    <div class="ab-toggle-row">
+                        <div class="ab-toggle-label">
+                            Defer render-blocking JavaScript
+                            <span>Downloads JS in parallel, executes after HTML parsing. Fast PageSpeed win.</span>
+                        </div>
+                        <label class="ab-toggle-switch">
+                            <input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[defer_js]" value="1" id="ab-defer-toggle" <?php checked((int)($o['defer_js'] ?? 0), 1); ?>>
+                            <span class="ab-toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="ab-defer-excludes-wrap" style="margin-top:12px;<?php echo (int)($o['defer_js'] ?? 0) ? '' : 'display:none'; ?>">
+                        <label style="font-weight:600;display:block;margin-bottom:4px">Defer exclusions (one handle or URL substring per line):</label>
+                        <textarea class="large-text" rows="4"
+                            name="<?php echo esc_attr(self::OPT); ?>[defer_js_excludes]"
+                            placeholder="jquery&#10;woocommerce&#10;my-critical-script"><?php echo esc_textarea((string)($o['defer_js_excludes'] ?? '')); ?></textarea>
+                        <p class="description">Scripts whose handle name or URL contains any of these strings will be excluded from deferring. jQuery and a set of other commonly problematic scripts are excluded automatically — you only need to add scripts that are still breaking your site after enabling defer.</p>
+                    </div>
+                    <?php /* defer-toggle listener moved to admin_enqueue_assets() */ ?>
+                    </div>
+
+                    <div style="margin-top:16px;border-top:1px solid #e5e5e5;padding-top:16px">
+                    <div class="ab-toggle-row">
+                        <div class="ab-toggle-label">
+                            Minify HTML output
+                            <span>Strips whitespace &amp; comments. Minifies inline CSS and JS. 5–15% size reduction.</span>
+                        </div>
+                        <label class="ab-toggle-switch">
+                            <input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[minify_html]" value="1" <?php checked((int)($o['minify_html'] ?? 0), 1); ?>>
+                            <span class="ab-toggle-slider"></span>
+                        </label>
+                    </div>
+                    </div>
+
+                    <?php submit_button('Save Performance Settings'); ?>
+                </div>
+                </form>
+            </div>
+
+        </div><!-- /ab-pane-perf -->
+
+        <?php /* ══════════════════ SCHEDULED BATCH PANE ══════════════════ */ ?>
+        <div class="ab-pane" id="ab-pane-batch">
+            <form method="post" action="options.php">
+                <?php settings_fields('cs_seo_ai_group'); ?>
+
+                <div class="ab-zone-card ab-card-schedule">
+                <div class="ab-zone-header" style="justify-content:space-between">
+                    <span><span class="ab-zone-icon">⏱</span> Scheduled Batch Generation</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-schedule', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                        <?php $this->explain_btn('schedule', '⏱ Scheduled Batch — How this works', [
+                        ['rec'=>'ℹ️ Info','name'=>'What this does','desc'=>'Automatically runs the AI meta description generator on a schedule — no need to manually click Generate Missing. The batch only processes posts that don\'t yet have a description, so it never overwrites existing ones.'],
+                        ['rec'=>'⬜ Optional','name'=>'Enable schedule','desc'=>'Turns the scheduled batch on or off. When enabled, the batch runs automatically at midnight (server time) on the days you select. When disabled, no automatic generation happens — you can still run it manually from the Optimise SEO tab.'],
+                        ['rec'=>'⬜ Optional','name'=>'Days of the week','desc'=>'Choose which days the batch runs. For a high-volume blog that publishes daily, tick every day. For a weekly blog, once or twice a week is sufficient. The batch only does work if there are unprocessed posts — if everything is up to date, it completes instantly.'],
+                        ['rec'=>'ℹ️ Info','name'=>'Midnight server time','desc'=>'The batch runs at midnight based on your server\'s timezone, not your local time. Check your WordPress timezone setting under Settings → General if the timing seems off.'],
+                        ['rec'=>'ℹ️ Info','name'=>'API costs','desc'=>'Each description generated makes one API call to Anthropic Claude. At typical blog post lengths, Claude Haiku costs roughly $0.001–$0.003 per post. A full run across 100 unprocessed posts costs around $0.10–$0.30.'],
+                    ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body">
+                <p style="padding:12px 20px 0;color:#50575e;margin:0">The batch runs automatically on selected days at midnight (server time). <strong style="color:#6b3fa0">It only processes posts that do not yet have a meta description</strong> — it never overwrites existing ones.</p>
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th>Enable schedule:</th>
+                        <td>
+                            <label>
+                                <input type="checkbox"
+                                    id="cs-sched-enabled"
+                                    name="<?php echo esc_attr(self::AI_OPT); ?>[schedule_enabled]"
+                                    value="1" <?php checked((int)($ai['schedule_enabled'] ?? 0), 1); ?>
+                                    onchange="csToggleSchedDays(this.checked)">
+                                Enable automatic scheduled batch
+                            </label>
+                            <p class="description">Requires an Anthropic API key saved in the Optimise SEO tab → AI Meta Writer section.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Run on these days:</th>
+                        <td>
+                            <div style="display:flex;gap:16px;flex-wrap:wrap" id="cs-sched-days">
+                            <?php
+                            $day_labels  = ['mon'=>'Monday','tue'=>'Tuesday','wed'=>'Wednesday','thu'=>'Thursday','fri'=>'Friday','sat'=>'Saturday','sun'=>'Sunday'];
+                            $sched_days  = (array)($ai['schedule_days'] ?? []);
+                            $sched_on    = (int)($ai['schedule_enabled'] ?? 0);
+                            foreach ($day_labels as $val => $label): ?>
+                                <label style="<?php echo $sched_on ? '' : 'opacity:0.4'; ?>">
+                                    <input type="checkbox"
+                                        class="cs-sched-day"
+                                        name="<?php echo esc_attr(self::AI_OPT); ?>[schedule_days][]"
+                                        value="<?php echo esc_attr($val); ?>"
+                                        <?php checked(in_array($val, $sched_days, true), true); ?>
+                                        <?php echo $sched_on ? '' : 'disabled'; ?>>
+                                    <?php echo esc_html($label); ?>
+                                </label>
+                            <?php endforeach; ?>
+                            </div>
+                            <?php /* csToggleSchedDays moved to admin_enqueue_assets() */ ?>
+                            <p class="description" style="margin-top:10px">
+                                <?php
+                                $cron_next = wp_next_scheduled('cs_seo_daily_batch');
+                                if ($cron_next && !empty($sched_days)) {
+                                    $day_map = ['mon'=>1,'tue'=>2,'wed'=>3,'thu'=>4,'fri'=>5,'sat'=>6,'sun'=>0];
+                                    $target_dow = array_map(fn($d) => $day_map[$d] ?? -1, $sched_days);
+                                    $found = null;
+                                    for ($i = 0; $i <= 7; $i++) {
+                                        $ts  = strtotime("midnight +{$i} days");
+                                        $dow = (int) gmdate('w', $ts);
+                                        if (in_array($dow, $target_dow, true)) {
+                                            $found = $ts;
+                                            break;
+                                        }
+                                    }
+                                    if ($found) {
+                                        echo 'Next scheduled run: <strong>' . esc_html(gmdate('D d M Y H:i:s', $found)) . '</strong> (server time)';
+                                    } else {
+                                        echo 'No matching days selected.';
+                                    }
+                                } elseif ($cron_next && (int)($ai['schedule_enabled'] ?? 0)) {
+                                    echo '<span style="color:#c3372b">No days selected — tick at least one day above.</span>';
+                                } elseif ((int)($ai['schedule_enabled'] ?? 0)) {
+                                    echo '<span style="color:#c3372b">No cron event found — try saving settings again.</span>';
+                                } else {
+                                    echo 'Schedule is disabled.';
+                                } ?>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <div style="margin-top:16px;"><?php submit_button('Save Schedule Settings', 'primary', 'submit', false); ?></div>
+                </div><!-- /ab-zone-body -->
+                </div><!-- /ab-card-schedule -->
+            </form>
+
+            <hr class="ab-zone-divider">
+
+            <div class="ab-zone-card ab-card-lastrun">
+            <div class="ab-zone-header" style="justify-content:space-between">
+                <span><span class="ab-zone-icon">📋</span> Batch Run History (28 days)</span>
+                <span style="display:flex;align-items:center;gap:8px;">
+                    <button type="button" class="button" onclick="abToggleCard('ab-card-lastrun', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                    <?php $this->explain_btn('lastrun', '📋 Batch Run History — Reading the results', [
+                    ['rec'=>'ℹ️ Info','name'=>'Run history','desc'=>'Shows all batch runs from the last 28 days, newest first. Each entry shows when the batch ran, how many posts were processed, and any errors. Entries older than 28 days are automatically pruned.'],
+                    ['rec'=>'ℹ️ Info','name'=>'Processed','desc'=>'How many posts the batch attempted to generate descriptions for in each run. Posts that already had descriptions are skipped and not counted here.'],
+                    ['rec'=>'ℹ️ Info','name'=>'Succeeded','desc'=>'Posts that were successfully updated with a new AI-generated description. These posts now have meta descriptions and will be skipped in future batch runs.'],
+                    ['rec'=>'ℹ️ Info','name'=>'Errors','desc'=>'Posts where generation failed — usually due to an API error, rate limit, or the post having no readable content. The batch will retry these on the next scheduled run. Check your API key if errors are consistently high.'],
+                    ['rec'=>'ℹ️ Info','name'=>'Next scheduled run','desc'=>'When the batch will next execute automatically. If this shows "Not scheduled" but the schedule is enabled, try saving your schedule settings again — this re-registers the WordPress cron event.'],
+                ]); ?>
+                    </span>
+            </div>
+            <div class="ab-zone-body">
+            <?php
+                $history = get_option('cs_seo_batch_history', []);
+                // Migrate legacy single-run option if present.
+                if (empty($history)) {
+                    $legacy = get_option('cs_seo_last_batch', null);
+                    if ($legacy) {
+                        $history = [$legacy];
+                        update_option('cs_seo_batch_history', $history, false);
+                        delete_option('cs_seo_last_batch');
+                    }
+                }
+                if (!empty($history) && is_array($history)):
+                    // Show newest first.
+                    $history = array_reverse($history);
+            ?>
+                <div style="padding:16px 20px;max-height:500px;overflow-y:auto">
+                <?php foreach ($history as $idx => $batch): ?>
+                    <div style="<?php echo $idx > 0 ? 'margin-top:12px;padding-top:12px;border-top:1px solid #e5e5e5;' : ''; ?>">
+                        <p style="margin:0 0 4px">
+                            <strong><?php echo esc_html($batch['day'] ?? ''); ?> <?php echo esc_html($batch['date'] ?? ''); ?></strong> —
+                            <span style="color:#1a7a34"><?php echo (int)($batch['done'] ?? 0); ?> generated</span>,
+                            <?php echo (int)($batch['skipped'] ?? 0); ?> skipped<?php if (($batch['errors'] ?? 0) > 0): ?>,
+                                <span style="color:#c3372b"><?php echo (int)$batch['errors']; ?> errors</span><?php endif; ?>,
+                            <?php echo esc_html($batch['elapsed'] ?? '0'); ?> minutes total
+                        </p>
+                        <?php if (!empty($batch['log'])): ?>
+                        <details style="margin-top:4px">
+                            <summary style="cursor:pointer;font-size:12px;color:#50575e">Show post log (<?php echo count($batch['log']); ?> entries)</summary>
+                            <div style="background:#1a1a2e;color:#e0e0f0;font-family:'Courier New',monospace;font-size:11px;padding:10px;border-radius:4px;margin-top:8px;max-height:200px;overflow-y:auto">
+                            <?php foreach ($batch['log'] as $entry): ?>
+                                <?php if ($entry['status'] === 'ok'): ?>
+                                    <div style="color:#00d084">✓ <?php echo esc_html($entry['title']); ?> → <?php echo (int)$entry['chars']; ?> chars</div>
+                                <?php else: ?>
+                                    <div style="color:#ff6b6b">✗ <?php echo esc_html($entry['title']); ?>: <?php echo esc_html($entry['message']); ?></div>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                            </div>
+                        </details>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <p style="padding:16px 20px;margin:0;color:#50575e">No batch has run yet.</p>
+            <?php endif; ?>
+            </div><!-- /ab-zone-body -->
+            </div><!-- /ab-card-lastrun -->
+
+        </div><!-- /ab-pane-batch -->
+
+        <?php /* ══════════════════ CATEGORY FIXER PANE ══════════════════ */ ?>
+        <div class="ab-pane" id="ab-pane-catfix">
+
+            <div class="ab-zone-card ab-card-catfix">
+                <div class="ab-zone-header" style="display:flex;align-items:center;justify-content:space-between;">
+                    <span>🏷 Category Fixer</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <button class="button" id="cf-reload-hdr" onclick="cfLoad()" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#8635; Reload</button>
+                        <button class="button" id="cf-hideposts-hdr" onclick="cfTogglePosts()" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#128065; Hide Posts</button>
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-catfix', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                        <?php $this->explain_btn('catfix', 'Category Fixer', [
+                            ['name'=>'How it works','rec'=>'Info','desc'=>'Scans all posts using local keyword matching against your category list. No AI calls are made.'],
+                            ['name'=>'Scoring','rec'=>'Info','desc'=>'Compares post title (4pts), AI summary (3pts), tags (3pts), and slug (2pts) against each category name. Existing categories get a continuity bonus.'],
+                            ['name'=>'Proposal','rec'=>'Info','desc'=>'Up to four categories are proposed per post. Posts where no category scores above 8 keep their existing categories and are flagged.'],
+                            ['name'=>'Apply','rec'=>'Info','desc'=>'You review every suggestion before anything changes. Use Apply to set categories on one post or Apply All Changed for a bulk update.'],
+                        ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body" style="padding:20px 24px;">
+
+                    <div id="cf-cta" style="text-align:center;padding:32px 0;">
+                        <p style="color:#555;margin:0 0 16px;">Scan all posts and suggest improved category assignments.</p>
+                        <button class="button button-primary button-hero" onclick="cfLoad()">&#128269; Scan Posts</button>
+                    </div>
+
+                    <div id="cf-toolbar" style="display:none;margin-bottom:16px;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span id="cf-status" style="color:#555;font-size:13px;flex:1;"></span>
+                        <button class="button" onclick="cfFilter('all')" id="cf-f-all">All</button>
+                        <button class="button" onclick="cfFilter('changed')" id="cf-f-changed">Changed</button>
+                        <button class="button" onclick="cfFilter('unchanged')" id="cf-f-unchanged">Unchanged</button>
+                        <button class="button" onclick="cfFilter('low')" id="cf-f-low">Low Confidence</button>
+                        <button class="button" onclick="cfFilter('missing')" id="cf-f-missing">Missing</button>
+                        <button class="button" id="cf-ai-btn" onclick="cfAiAnalyseAll()" style="background:#1a4a7a;border-color:#1a4a7a;color:#fff;">&#129302; AI Analyse All</button>
+                        <button class="button button-primary" id="cf-bulk-btn" onclick="cfBulkApply()" style="margin-left:auto;background:#2d6a4f;border-color:#2d6a4f;color:#fff;">&#10003; Apply All Changed</button>
+                    </div>
+
+                    <div id="cf-stats" style="display:none;margin-bottom:16px;gap:12px;flex-wrap:wrap;"></div>
+
+                    <div id="cf-legend" style="display:none;margin-bottom:12px;font-size:12px;color:#555;">
+                        <span style="margin-right:16px;">Proposed changes:</span>
+                        <span style="display:inline-block;background:#1a7a34;color:#fff;border-radius:10px;padding:1px 10px;margin-right:8px;">+ Added</span>
+                        <span style="display:inline-block;background:#d63638;color:#fff;border-radius:10px;padding:1px 10px;margin-right:8px;">− Removed</span>
+                        <span style="display:inline-block;background:#787c82;color:#fff;border-radius:10px;padding:1px 10px;">Kept</span>
+                    </div>
+
+                    <div id="cf-posts-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+                        <table id="cf-table" style="display:none;width:100%;min-width:700px;border-collapse:collapse;font-size:13px;">
+                            <thead>
+                                <tr style="background:#f0f0f0;">
+                                    <th style="padding:8px 10px;text-align:left;width:24px;"><input type="checkbox" id="cf-check-all" onchange="cfToggleAll(this)"></th>
+                                    <th style="padding:8px 10px;text-align:left;">Post</th>
+                                    <th style="padding:8px 10px;text-align:left;width:180px;">Current</th>
+                                    <th style="padding:8px 10px;text-align:left;width:180px;">Proposed</th>
+                                    <th style="padding:8px 10px;text-align:left;width:110px;">Confidence</th>
+                                    <th style="padding:8px 10px;text-align:left;width:140px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cf-tbody"></tbody>
+                        </table>
+                        <div id="cf-pager" style="display:none;margin-top:12px;text-align:center;font-size:13px;"></div>
+                    </div>
+
+                </div><!-- /ab-zone-body -->
+            </div><!-- /ab-card-catfix -->
+
+            <div class="ab-zone-card ab-card-cathealth" style="margin-top:24px;">
+                <div class="ab-zone-header" style="display:flex;align-items:center;justify-content:space-between;background:#0e5a6e;">
+                    <span>&#128202; Category Health</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <button class="button" id="ch-reload-hdr" onclick="chLoad()" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#8635; Reload</button>
+                        <button class="button" id="ch-hideposts-hdr" onclick="chToggleAllPosts()" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#128065; Hide Posts</button>
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-cathealth', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                        <?php $this->explain_btn('cathealth', 'Category Health Dashboard', [
+                            ['name'=>'Strong','rec'=>'✅ Recommended','desc'=>'10 or more published posts. This category is well established and should remain.'],
+                            ['name'=>'Moderate','rec'=>'⬜ Optional','desc'=>'4 to 9 posts. Healthy but could grow further.'],
+                            ['name'=>'New','rec'=>'⬜ Optional','desc'=>'1 to 3 posts published within the last 180 days. This category is growing and should not be treated as weak yet.'],
+                            ['name'=>'Weak','rec'=>'⬜ Optional','desc'=>'2 to 3 posts, none recent. Consider whether this topic needs its own category or should be merged.'],
+                            ['name'=>'Empty','rec'=>'ℹ️ Info','desc'=>'0 to 1 posts. This category adds no value to your taxonomy. Consider deleting it.'],
+                            ['name'=>'Uncategorized','rec'=>'ℹ️ Info','desc'=>'WordPress default fallback. Posts here were never assigned a real category.'],
+                        ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body" style="padding:20px 24px;">
+
+                    <div id="ch-cta" style="text-align:center;padding:32px 0;">
+                        <p style="color:#555;margin:0 0 16px;">Analyse all categories and show post counts, health grades, and per-category post lists.</p>
+                        <button class="button button-primary button-hero" onclick="chLoad()">&#128202; Analyse Categories</button>
+                    </div>
+
+                    <div id="ch-stats" style="display:none;margin-bottom:16px;gap:10px;flex-wrap:wrap;"></div>
+
+                    <div id="ch-legend" style="display:none;margin-bottom:12px;font-size:12px;color:#555;">
+                        <span style="margin-right:12px;font-weight:600;">Health grades:</span>
+                        <span style="display:inline-block;background:#1a7a34;color:#fff;border-radius:10px;padding:1px 10px;margin-right:6px;">&#9679; Strong</span>
+                        <span style="display:inline-block;background:#e67e00;color:#fff;border-radius:10px;padding:1px 10px;margin-right:6px;">&#9679; Moderate</span>
+                        <span style="display:inline-block;background:#2271b1;color:#fff;border-radius:10px;padding:1px 10px;margin-right:6px;">&#9679; New</span>
+                        <span style="display:inline-block;background:#b8a200;color:#fff;border-radius:10px;padding:1px 10px;margin-right:6px;">&#9679; Weak</span>
+                        <span style="display:inline-block;background:#d63638;color:#fff;border-radius:10px;padding:1px 10px;margin-right:6px;">&#9679; Empty</span>
+                        <span style="display:inline-block;background:#787c82;color:#fff;border-radius:10px;padding:1px 10px;">&#9679; Uncategorized</span>
+                    </div>
+
+                    <div id="ch-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;"></div>
+
+                </div>
+            </div><!-- /ab-card-cathealth -->
+
+            <div class="ab-zone-card ab-card-catdrift" style="margin-top:24px;">
+                <div class="ab-zone-header" style="display:flex;align-items:center;justify-content:space-between;background:#6b3fa0;">
+                    <span>&#9889; Category Drift</span>
+                    <span style="display:flex;align-items:center;gap:8px;">
+                        <button class="button" id="cd-reload-hdr" onclick="cdLoad()" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#129302; Re-run Analysis</button>
+                        <button type="button" class="button" onclick="abToggleCard('ab-card-catdrift', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
+                        <?php $this->explain_btn('catdrift', 'Category Drift Detection', [
+                            ['name'=>'How it works','rec'=>'ℹ️ Info','desc'=>'AI analyses the post titles in each category to determine whether the category covers a coherent topic or is being used as a catch-all for unrelated subjects. It uses semantic understanding, not pattern counting, so it can tell the difference between a legitimately broad category and a genuinely overloaded one.'],
+                            ['name'=>'Catch-all','rec'=>'ℹ️ Info','desc'=>'The category contains posts on clearly unrelated topics with no coherent theme. These are the most actionable findings and are listed first.'],
+                            ['name'=>'Drifting','rec'=>'ℹ️ Info','desc'=>'The category has a recognisable core theme but also includes posts that do not belong. The AI is less certain these are problems, so check the reasoning before acting.'],
+                            ['name'=>'Confidence','rec'=>'ℹ️ Info','desc'=>'High confidence means the AI saw clear evidence in the titles. Medium or low confidence means the sample was ambiguous. Always review the example titles and reasoning before making changes.'],
+                            ['name'=>'What to do','rec'=>'⬜ Optional','desc'=>'Each flagged category shows a specific suggestion from the AI. Common actions are: split into two more specific categories, rename to better reflect the actual content, merge into an existing category, or delete if the topic is already covered elsewhere.'],
+                        ]); ?>
+                    </span>
+                </div>
+                <div class="ab-zone-body" style="padding:20px 24px;">
+
+                    <div id="cd-cta" style="text-align:center;padding:32px 0;">
+                        <p style="color:#555;margin:0 0 16px;">Detect categories being used inconsistently across posts.</p>
+                        <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+                            <button class="button" id="cd-btn-cache" onclick="cdLoadFromCache()" style="background:#2d6a4f;color:#fff;border-color:#2d6a4f;padding:6px 16px;">&#128336; Load Cached Results</button>
+                            <button class="button button-primary" id="cd-btn-fresh" onclick="cdLoad()">&#9889; Run Fresh AI Analysis</button>
+                        </div>
+                        <p id="cd-cta-msg" style="color:#888;font-size:12px;margin:12px 0 0;">Load cached results instantly, or run a fresh AI analysis.</p>
+                    </div>
+
+                    <div id="cd-summary" style="display:none;margin-bottom:16px;"></div>
+                    <div id="cd-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;"></div>
+
+                </div>
+            </div><!-- /ab-card-catdrift -->
+
+        </div><!-- /ab-pane-catfix -->
+
+        <script>
+        function abFontLog(type, text) {
+            const consoleEl = document.getElementById('ab-font-console');
+            if (!consoleEl) return;
+            
+            // Clear placeholder text on first log
+            if (consoleEl.innerHTML.includes('Click "Scan')) {
+                consoleEl.innerHTML = '';
+            }
+            
+            const line = document.createElement('div');
+            line.className = 'ab-log-line ab-log-' + type;
+            line.textContent = text;
+            line.style.marginBottom = '4px';
+            
+            // Color coding
+            if (type === 'err') line.style.color = '#d32f2f';
+            if (type === 'ok') line.style.color = '#388e3c';
+            if (type === 'warn') line.style.color = '#f57c00';
+            if (type === 'info') line.style.color = '#1976d2';
+            
+            consoleEl.appendChild(line);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        function abFontClearConsole() {
+            const consoleEl = document.getElementById('ab-font-console');
+            if (!consoleEl) return;
+            consoleEl.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Click "Scan CSS Files" to analyze your fonts...</div>';
+        }
+
+        async function abFontDownload(btn) {
+            try {
+                btn.disabled = true;
+                btn.textContent = '⏳ Downloading...';
+                
+                // Clear console on start
+                const consoleEl = document.getElementById('ab-font-console');
+                if (consoleEl) consoleEl.innerHTML = '';
+                
+                abFontLog('info', 'Detecting Google Fonts CDN URLs...');
+                
+                if (typeof ajaxurl === 'undefined') {
+                    abFontLog('err', 'ERROR: WordPress AJAX not available');
+                    throw new Error('WordPress AJAX not initialized');
+                }
+                
+                abFontLog('info', 'Connecting to server...');
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000);
+                
+                const response = await fetch(ajaxurl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: new URLSearchParams({
+                        action: 'cs_seo_download_fonts',
+                        nonce: '<?php echo esc_attr($nonce); ?>'
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    abFontLog('err', 'ERROR: Server returned ' + response.status);
+                    throw new Error('HTTP ' + response.status);
+                }
+                
+                let data;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    abFontLog('err', 'ERROR: Invalid server response');
+                    throw new Error('JSON parse error');
+                }
+                
+                if (data.messages && Array.isArray(data.messages)) {
+                    data.messages.forEach(msg => {
+                        if (msg.includes('✓')) {
+                            abFontLog('ok', msg);
+                        } else if (msg.includes('✗')) {
+                            abFontLog('err', msg);
+                        } else if (msg.includes('ℹ')) {
+                            abFontLog('warn', msg);
+                        } else if (msg === '') {
+                            abFontLog('info', '');
+                        } else {
+                            abFontLog('info', msg);
+                        }
+                    });
+                }
+                
+                if (data.success && data.downloaded > 0) {
+                    abFontLog('ok', '✓ Fonts downloaded! Run "Scan CSS Files" to verify.');
+                }
+                
+            } catch (e) {
+                abFontLog('err', 'Download failed: ' + e.message);
+                console.error('[CloudScale Font Download]', e);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '⬇️ Auto-Download CDN Fonts';
+            }
+        }
+
+        async function abFontScan(btn) {
+            try {
+                btn.disabled = true;
+                btn.textContent = '🔄 Scanning...';
+                
+                // Clear console on start
+                const consoleEl = document.getElementById('ab-font-console');
+                if (consoleEl) consoleEl.innerHTML = '';
+                
+                abFontLog('info', 'Initializing font scanner...');
+                
+                if (typeof ajaxurl === 'undefined') {
+                    abFontLog('err', 'ERROR: WordPress AJAX not available');
+                    throw new Error('WordPress AJAX not initialized');
+                }
+                
+                abFontLog('info', 'Connecting to server...');
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 30000);
+                
+                const response = await fetch(ajaxurl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: new URLSearchParams({
+                        action: 'cs_seo_font_scan',
+                        nonce: '<?php echo esc_attr($nonce); ?>'
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    abFontLog('err', 'ERROR: Server returned ' + response.status);
+                    throw new Error('HTTP ' + response.status);
+                }
+                
+                abFontLog('info', 'Processing response...');
+                
+                let data;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    abFontLog('err', 'ERROR: Invalid server response');
+                    throw new Error('JSON parse error');
+                }
+                
+                if (!data || !data.console || !Array.isArray(data.console)) {
+                    abFontLog('err', 'ERROR: Invalid response structure');
+                    throw new Error('Invalid response');
+                }
+                
+                abFontLog('info', 'Displaying results...');
+                
+                data.console.forEach(line => {
+                    if (line && line.type && line.text) {
+                        abFontLog(line.type, line.text);
+                    }
+                });
+                
+                    if (data.findings && data.findings.missing_fonts > 0) {
+                        const fixBtn = document.getElementById('ab-font-fix-btn');
+                        if (fixBtn) {
+                            fixBtn.style.display = 'inline-block';
+                            fixBtn.textContent = '✨ Auto-Fix All (' + data.findings.missing_fonts + ' fonts)';
+                        }
+                    }
+                
+            } catch (e) {
+                abFontLog('err', 'Scan failed: ' + e.message);
+                console.error('[CloudScale Font Scan]', e);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔍 Scan CSS Files';
+            }
+        }
+
+        async function abFontFix(btn) {
+            try {
+                btn.disabled = true;
+                btn.textContent = '⏳ Checking fonts...';
+                
+                // Clear console on start
+                const consoleEl = document.getElementById('ab-font-console');
+                if (consoleEl) consoleEl.innerHTML = '';
+                
+                abFontLog('info', 'Checking for unoptimized fonts...');
+                
+                if (typeof ajaxurl === 'undefined') {
+                    abFontLog('err', 'ERROR: WordPress AJAX not available');
+                    throw new Error('WordPress AJAX not initialized');
+                }
+                
+                abFontLog('info', 'Scanning fonts...');
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000);
+                
+                const response = await fetch(ajaxurl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: new URLSearchParams({
+                        action: 'cs_seo_font_fix',
+                        nonce: '<?php echo esc_attr($nonce); ?>'
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    abFontLog('err', 'ERROR: Server returned ' + response.status);
+                    throw new Error('HTTP ' + response.status);
+                }
+                
+                abFontLog('info', 'Processing results...');
+                
+                let data;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    abFontLog('err', 'ERROR: Invalid server response');
+                    throw new Error('JSON parse error');
+                }
+                
+                if (!data || !data.console || !Array.isArray(data.console)) {
+                    abFontLog('err', 'ERROR: Invalid response structure');
+                    throw new Error('Invalid response');
+                }
+                
+                // Check if there's actually anything to fix
+                const hasUnoptimized = data.console && data.console.some(line => 
+                    line.text && line.text.includes('MISSING') || line.text.includes('unoptimized')
+                );
+                
+                if (!hasUnoptimized && data.console.length > 0) {
+                    abFontLog('info', '');
+                    abFontLog('ok', '✓ All fonts are already optimized!');
+                    abFontLog('info', 'No changes needed.');
+                    abFontLog('info', '');
+                    abFontLog('skip', 'Your fonts already have font-display and are properly deferred.');
+                } else {
+                    abFontLog('info', 'Applying optimizations...');
+                }
+                
+                data.console.forEach(line => {
+                    if (line && line.type && line.text) {
+                        abFontLog(line.type, line.text);
+                    }
+                });
+                
+            } catch (e) {
+                abFontLog('err', 'Fix failed: ' + e.message);
+                console.error('[CloudScale Font Fix]', e);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '✨ Auto-Fix All';
+            }
+        }
+        </script>
+
+        <script>
+        // ── Tab switching ────────────────────────────────────────────────────
+        function abToggleCard(cardClass, btn) {
+            const card = document.querySelector('.' + cardClass);
+            if (!card) return;
+            const body = card.querySelector('.ab-zone-body');
+            if (!body) return;
+            const isHidden = body.style.display === 'none';
+            body.style.display = isHidden ? '' : 'none';
+            btn.innerHTML = isHidden ? '&#9660; Hide Details' : '&#9658; Show Details';
+        }
+
+        function abTab(id, btn) {
+            document.querySelectorAll('.ab-pane').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.ab-tab').forEach(b  => b.classList.remove('active'));
+            document.getElementById('ab-pane-' + id).classList.add('active');
+            btn.classList.add('active');
+            if (id === 'sitemap') abRefreshRobotsPreview();
+            // If drift has already been run this session, re-render without a new API call
+            if (id === 'catfix') {
+                // If data is already in memory, re-render it. Otherwise show the CTA quietly.
+                if (cdDrift && cdDrift.length > 0) cdRender(cdTotalPosts);
+            }
+        }
+
+        // ── State ────────────────────────────────────────────────────────────
+        const abState = {
+            posts:         [],
+            page:          1,
+            totalPages:    1,
+            total:         0,
+            totalWithDesc: 0,
+            generated:     0,
+            stopped:       false,
+            running:       false,
+        };
+
+        const abNonce   = <?php echo wp_json_encode($nonce); ?>;
+        const abAjax    = <?php echo wp_json_encode(admin_url('admin-ajax.php')); ?>;
+        const abMinChar = <?php echo (int) $this->ai_opts['min_chars']; ?>;
+        const abMaxChar = <?php echo (int) $this->ai_opts['max_chars']; ?>;
+        const abHasApiKey = <?php echo wp_json_encode(!empty(trim((string)($this->ai_opts['anthropic_key'] ?? '')))); ?>;
+
+        // ── Live robots.txt preview ──────────────────────────────────────────
+        function abRefreshRobotsPreview() {
+            try {
+            const pre = document.getElementById('ab-robots-live-preview');
+            if (!pre) return;
+            pre.textContent = 'Loading…';
+            const params = new URLSearchParams({action: 'cs_seo_fetch_robots', nonce: abNonce});
+            fetch(abAjax, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: params})
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        pre.textContent = data.data.content;
+                    } else {
+                        pre.textContent = '(error: ' + data.data + ')';
+                    }
+                })
+                .catch(e => { pre.textContent = '(fetch error: ' + e.message + ')'; });
+            } catch(e) { console.warn('abRefreshRobotsPreview error:', e); }
+        }
+
+        function abCopyRobots() {
+            const btn  = document.getElementById('ab-robots-copy');
+            const ta   = document.getElementById('cs-robots-txt');
+            if (!btn || !ta) return;
+            const text = ta.value;
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(function() {
+                const orig = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.style.color = '#0a3622';
+                btn.style.background = '#d1e7dd';
+                btn.style.borderColor = '#a3cfbb';
+                setTimeout(function() {
+                    btn.textContent = orig;
+                    btn.style.color = '';
+                    btn.style.background = '';
+                    btn.style.borderColor = '';
+                }, 2000);
+            }).catch(function() {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;opacity:0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                btn.textContent = '✓ Copied!';
+                setTimeout(function() { btn.textContent = '⎘ Copy'; }, 2000);
+            });
+        }
+
+        function abCopyRobotsLive() {
+            const btn = document.getElementById('ab-robots-live-copy');
+            const pre = document.getElementById('ab-robots-live-preview');
+            if (!btn || !pre) return;
+            const text = pre.textContent;
+            if (!text || text === 'Loading…') {
+                btn.textContent = '⚠ Load first';
+                setTimeout(function() { btn.textContent = '⎘ Copy'; }, 2000);
+                return;
+            }
+            navigator.clipboard.writeText(text).then(function() {
+                const orig = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.style.color = '#0a3622';
+                btn.style.background = '#d1e7dd';
+                btn.style.borderColor = '#a3cfbb';
+                setTimeout(function() {
+                    btn.textContent = orig;
+                    btn.style.color = '';
+                    btn.style.background = '';
+                    btn.style.borderColor = '';
+                }, 2000);
+            }).catch(function() {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;opacity:0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                btn.textContent = '✓ Copied!';
+                setTimeout(function() { btn.textContent = '⎘ Copy'; }, 2000);
+            });
+        }
+        function abCopySitemap() {
+            const btn  = document.getElementById('ab-sitemap-copy');
+            const urls = window._abSitemapUrls || [];
+            if (!btn) return;
+            if (!urls.length) { btn.textContent = '⚠ Load first'; setTimeout(function(){ btn.textContent = '⎘ Copy URLs'; }, 2000); return; }
+            const text = urls.join('\n');
+            navigator.clipboard.writeText(text).then(function() {
+                const orig = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.style.color = '#0a3622';
+                btn.style.background = '#d1e7dd';
+                btn.style.borderColor = '#a3cfbb';
+                setTimeout(function() {
+                    btn.textContent = orig;
+                    btn.style.color = '';
+                    btn.style.background = '';
+                    btn.style.borderColor = '';
+                }, 2000);
+            }).catch(function() {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;opacity:0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                btn.textContent = '✓ Copied!';
+                setTimeout(function() { btn.textContent = '⎘ Copy URLs'; }, 2000);
+            });
+        }
+        function abCopyPrompt() {
+            const btn = document.getElementById('ab-copy-prompt');
+            const ta  = document.getElementById('ab-prompt-field');
+            if (!btn || !ta) return;
+            const text = ta.value;
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(function() {
+                const orig = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.style.color = '#0a3622';
+                btn.style.background = '#d1e7dd';
+                btn.style.borderColor = '#a3cfbb';
+                setTimeout(function() {
+                    btn.textContent = orig;
+                    btn.style.color = '';
+                    btn.style.background = '';
+                    btn.style.borderColor = '';
+                }, 2000);
+            }).catch(function() {
+                const ta2 = document.createElement('textarea');
+                ta2.value = text;
+                ta2.style.cssText = 'position:fixed;opacity:0';
+                document.body.appendChild(ta2);
+                ta2.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta2);
+                btn.textContent = '✓ Copied!';
+                setTimeout(function() { btn.textContent = '⎘ Copy'; }, 2000);
+            });
+        }
+
+        function abCopyLlms() {
+            const btn  = document.getElementById('ab-llms-copy');
+            const wrap = document.getElementById('ab-llms-preview-wrap');
+            if (!btn || !wrap) return;
+            const text = wrap.dataset.raw || '';
+            if (!text) { btn.textContent = '⚠ Load first'; setTimeout(function(){ btn.textContent = '⎘ Copy'; }, 2000); return; }
+            navigator.clipboard.writeText(text).then(function() {
+                const orig = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.style.color = '#0a3622';
+                btn.style.background = '#d1e7dd';
+                btn.style.borderColor = '#a3cfbb';
+                setTimeout(function() {
+                    btn.textContent = orig;
+                    btn.style.color = '';
+                    btn.style.background = '';
+                    btn.style.borderColor = '';
+                }, 2000);
+            }).catch(function() {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;opacity:0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                btn.textContent = '✓ Copied!';
+                setTimeout(function() { btn.textContent = '⎘ Copy'; }, 2000);
+            });
+        }
+        // Auto-load robots preview on page load if sitemap tab is active
+        document.addEventListener('DOMContentLoaded', function() {
+            if (document.getElementById('ab-pane-sitemap')?.classList.contains('active')) {
+                abRefreshRobotsPreview();
+            }
+
+            // Delegated click handler for title badges — works even after table is re-rendered
+            document.addEventListener('click', function(e) {
+                const badge = e.target.closest('[data-titleid]');
+                if (badge) {
+                    e.stopPropagation();
+                    abShowTitlePopup(parseInt(badge.getAttribute('data-titleid'), 10), badge);
+                } else {
+                    // Click outside any badge — dismiss popup if open
+                    const popup = document.getElementById('ab-title-popup');
+                    if (popup) popup.remove();
+                }
+            });
+        });
+
+        // ── Rename physical robots.txt ───────────────────────────────────────
+        function abRenameRobots() {
+            const btn    = document.getElementById('ab-rename-robots-btn');
+            const status = document.getElementById('ab-rename-robots-status');
+            btn.disabled = true;
+            btn.textContent = '⟳ Renaming...';
+            status.style.color = '#50575e';
+            status.textContent = 'Working...';
+
+            const params = new URLSearchParams({action: 'cs_seo_rename_robots', nonce: abNonce});
+            fetch(abAjax, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: params})
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        const warn = document.getElementById('ab-physical-robots-warn');
+                        if (warn) {
+                            warn.style.background = '#edfaef';
+                            warn.style.borderColor = '#1a7a34';
+                            warn.innerHTML = '<div style="font-size:22px">✅</div>' +
+                                '<div><strong>Done!</strong> robots.txt has been renamed to robots.txt.bak. ' +
+                                'The plugin is now managing your robots.txt. ' +
+                                'Purge your Cloudflare cache, then <a href="' + window.location.href + '">reload this page</a> to confirm.</div>';
+                        }
+                    } else {
+                        btn.disabled = false;
+                        btn.textContent = 'Rename robots.txt → robots.txt.bak';
+                        status.style.color = '#c3372b';
+                        status.textContent = '✗ ' + data.data;
+                    }
+                })
+                .catch(e => {
+                    btn.disabled = false;
+                    btn.textContent = 'Rename robots.txt → robots.txt.bak';
+                    status.style.color = '#c3372b';
+                    status.textContent = '✗ Network error: ' + e.message;
+                });
+        }
+        let abSitemapPage = 1;
+
+        function abLoadSitemap(pg) {
+            abSitemapPage = pg || 1;
+            const wrap = document.getElementById('ab-sitemap-preview-wrap');
+            const btn  = document.getElementById('ab-sitemap-load');
+            if (!wrap || !btn) {
+                console.error('CloudScale SEO: sitemap preview elements not found');
+                return;
+            }
+            console.log('CloudScale SEO: loading sitemap preview page', abSitemapPage);
+            btn.disabled = true;
+            btn.textContent = '⟳ Loading...';
+            if (abSitemapPage === 1) {
+                wrap.innerHTML = '<p style="color:#50575e;font-size:13px">Fetching sitemap entries...</p>';
+            }
+
+            const params = new URLSearchParams({
+                action: 'cs_seo_sitemap_preview',
+                nonce: abNonce,
+                sitemap_pg: abSitemapPage,
+            });
+            fetch(abAjax, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: params})
+                .then(r => r.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.textContent = '↻ Reload';
+                    if (!data.success) {
+                        wrap.innerHTML = '<div style="background:#fef0f0;border:1px solid #f5bcbb;border-radius:4px;padding:12px;color:#c3372b"><strong>Preview failed:</strong> ' + (data.data || 'Unknown error') + '<br><small>Check that your API key is set and the plugin settings have been saved.</small></div>';
+                        return;
+                    }
+                    const d        = data.data;
+                    const entries  = d.entries;
+                    const total    = d.total;
+                    const page     = d.page;
+                    const pages    = d.pages;
+                    const per_page = d.per_page;
+                    const start    = (page - 1) * per_page + 1;
+                    const end      = Math.min(page * per_page, total);
+
+                    const typeLabels = {home:'Home', post:'Post', page:'Page', tax:'Taxonomy', cpt:'CPT'};
+                    const typeClass  = t => 'ab-sitemap-type ab-sitemap-type-' + (t || 'post');
+
+                    let rows = entries.map(e =>
+                        '<tr>' +
+                        '<td><a class="ab-sitemap-url" href="' + e.loc + '" target="_blank">' + e.loc + '</a>' +
+                        (e.title ? '<br><small style="color:#50575e;font-size:11px">' + e.title + '</small>' : '') + '</td>' +
+                        '<td><span class="' + typeClass(e.type) + '">' + (typeLabels[e.type] || e.type) + '</span></td>' +
+                        '<td style="color:#50575e;font-size:12px;white-space:nowrap">' + (e.lastmod || '—') + '</td>' +
+                        '</tr>'
+                    ).join('');
+
+                    // Pager
+                    let pager = '';
+                    if (pages > 1) {
+                        const sitemapLinks = Array.from({length: pages}, (_, i) => {
+                            const n = i + 1;
+                            const active = n === page ? 'font-weight:700;color:#1d2327' : 'color:#2271b1;cursor:pointer';
+                            return '<span style="' + active + ';padding:0 4px" ' +
+                                (n !== page ? 'onclick="abLoadSitemap(' + n + ')"' : '') + '>' + n + '</span>';
+                        }).join(' ');
+                        pager = '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">' +
+                            '<button class="button" ' + (page <= 1 ? 'disabled' : '') + ' onclick="abLoadSitemap(' + (page-1) + ')">← Prev</button>' +
+                            '<span style="font-size:12px;color:#50575e">Page ' + page + ' of ' + pages + '</span>' +
+                            '<button class="button" ' + (page >= pages ? 'disabled' : '') + ' onclick="abLoadSitemap(' + (page+1) + ')">Next →</button>' +
+                            '<span style="font-size:12px;color:#888;margin-left:auto">Showing ' + start + '–' + end + ' of ' + total + ' URLs</span>' +
+                            '</div>';
+                    }
+
+                    wrap.innerHTML =
+                        '<p class="ab-sitemap-count"><strong>' + total + '</strong> total URLs across <strong>' + pages + '</strong> sitemap file' + (pages > 1 ? 's' : '') +
+                        ' &nbsp;·&nbsp; <a href="' + <?php echo wp_json_encode(home_url('/sitemap.xml')); ?> + '" target="_blank">View sitemap index ↗</a></p>' +
+                        '<table class="ab-sitemap-tbl">' +
+                        '<thead><tr><th>URL</th><th>Type</th><th>Last Modified</th></tr></thead>' +
+                        '<tbody>' + rows + '</tbody></table>' +
+                        pager;
+                })
+                .catch(e => {
+                    btn.disabled = false;
+                    btn.textContent = '⬇ Load Preview';
+                    wrap.innerHTML = '<div style="background:#fef0f0;border:1px solid #f5bcbb;border-radius:4px;padding:12px;color:#c3372b"><strong>Network error:</strong> ' + e.message + '</div>';
+                    wrap.innerHTML = '<p style="color:#c3372b">Error: ' + e.message + '</p>';
+                });
+        }
+
+        // ── API key guard ─────────────────────────────────────────────────────
+        function abCheckApiKey() {
+            if (abHasApiKey) return true;
+            document.getElementById('ab-api-warn').classList.add('visible');
+            abLog('⚠ No API key saved. Scroll up to the ✦ AI Meta Writer section, enter your Anthropic API key and click Save AI Settings, then reload the page.', 'err');
+            return false;
+        }
+
+        // Show warning banner on page load if no key saved
+        if (!abHasApiKey) {
+            document.addEventListener('DOMContentLoaded', function() {
+                document.getElementById('ab-api-warn').classList.add('visible');
+            });
+        }
+
+        // ── Utilities ────────────────────────────────────────────────────────
+        function abLog(msg, type) {
+            const wrap = document.getElementById('ab-log-wrap');
+            const el   = document.getElementById('ab-log');
+            if (wrap) wrap.style.display = '';
+            el.classList.add('visible');
+            const ts  = new Date().toLocaleTimeString('en-GB');
+            const cls = type ? 'ab-log-' + type : 'ab-log-line';
+            el.innerHTML += '<div class="' + cls + '">[' + ts + '] ' + abEsc(msg) + '</div>';
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function abEsc(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        // Title popup — store titles in a plain object to avoid HTML attribute escaping issues
+        const abTitleMap = {};
+
+        function abShowTitlePopup(postId, el) {
+            // Remove any existing popup
+            const existing = document.getElementById('ab-title-popup');
+            if (existing) {
+                existing.remove();
+                if (existing.dataset.postId === String(postId)) return;
+            }
+            const raw   = abTitleMap[postId] || el.getAttribute('data-title') || '';
+            if (!raw) return;
+            // Decode HTML entities (WordPress stores titles with e.g. &#8230; &#8217;)
+            const txt   = document.createElement('textarea');
+            txt.innerHTML = raw;
+            const title = txt.value;
+            const chars = title.length;
+            const isAi  = abTitleMap['_ai_' + postId] === true;
+
+            const rect   = el.getBoundingClientRect();
+            const popup  = document.createElement('div');
+            popup.id = 'ab-title-popup';
+            popup.dataset.postId = String(postId);
+            popup.style.cssText = [
+                'position:fixed',
+                'z-index:99999',
+                'background:#1a1a2e',
+                'color:#fff',
+                'border:1px solid #4f46e5',
+                'border-radius:8px',
+                'padding:12px 16px',
+                'max-width:420px',
+                'min-width:240px',
+                'box-shadow:0 8px 24px rgba(0,0,0,0.4)',
+                'font-size:13px',
+                'line-height:1.5',
+            ].join(';');
+            popup.innerHTML =
+                '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#8080b0;margin-bottom:6px">' +
+                    (isAi ? '✦ AI Rewritten Title' : 'SEO Title') + ' · ' + chars + ' chars' +
+                '</div>' +
+                '<div style="color:#fff;font-weight:600">' + abEsc(title) + '</div>' +
+                '<div style="margin-top:8px;font-size:11px;color:#6060a0">Click anywhere to dismiss</div>';
+            document.body.appendChild(popup);
+            const top  = rect.bottom + 6;
+            const left = Math.min(rect.left, window.innerWidth - 440);
+            popup.style.top  = top + 'px';
+            popup.style.left = Math.max(8, left) + 'px';
+        }
+
+        // Decode HTML entities WordPress puts in titles (e.g. &#8211; → –)
+        function abDecodeTitle(s) {
+            const txt = document.createElement('textarea');
+            txt.innerHTML = String(s);
+            return txt.value;
+        }
+
+        function abSetStatus(msg) {
+            document.getElementById('ab-toolbar-status').textContent = msg;
+        }
+
+        function abSetProgress(done, total) {
+            const pct = total > 0 ? Math.round(done/total*100) : 0;
+            document.getElementById('ab-progress').classList.add('visible');
+            document.getElementById('ab-progress-fill').style.width = pct + '%';
+            document.getElementById('ab-prog-label').textContent =
+                done + ' / ' + total + ' processed (' + pct + '%)';
+        }
+
+        function abUpdateSummary() {
+            const total   = abState.total;
+            const hasDesc = abState.totalWithDesc + abState.generated;
+            const missing = Math.max(0, total - hasDesc);
+            document.getElementById('sum-total').textContent     = total;
+            document.getElementById('sum-has').textContent       = hasDesc;
+            document.getElementById('sum-missing').textContent   = missing;
+            document.getElementById('sum-generated').textContent = abState.generated;
+            document.getElementById('ab-summary').style.display  = 'grid';
+        }
+
+        function abPost(action, extra) {
+            const params = new URLSearchParams({action, nonce: abNonce, ...extra});
+            return fetch(abAjax, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: params
+            }).then(r => r.json());
+        }
+
+        // ── Test API key ─────────────────────────────────────────────────────
+        function abProviderChanged() {
+            const provider = document.getElementById('ab-ai-provider').value;
+            const isGemini = provider === 'gemini';
+            document.getElementById('ab-anthropic-key-field').style.display = isGemini ? 'none' : '';
+            document.getElementById('ab-gemini-key-field').style.display    = isGemini ? '' : 'none';
+            document.getElementById('ab-key-hint-anthropic').style.display  = isGemini ? 'none' : '';
+            document.getElementById('ab-key-hint-gemini').style.display     = isGemini ? '' : 'none';
+            // Show/hide model options for the active provider
+            document.querySelectorAll('#ab-model-select option').forEach(opt => {
+                opt.style.display = opt.dataset.provider === provider ? '' : 'none';
+            });
+            // Select first visible model if current is wrong provider
+            const sel = document.getElementById('ab-model-select');
+            const cur = sel.options[sel.selectedIndex];
+            if (cur && cur.dataset.provider !== provider) {
+                const first = sel.querySelector('option[data-provider="' + provider + '"]');
+                if (first) sel.value = first.value;
+            }
+            document.getElementById('ab-key-status').textContent = '';
+        }
+
+        function abTestKey() {
+            const status   = document.getElementById('ab-key-status');
+            const provider = document.getElementById('ab-ai-provider').value;
+            const keyField = provider === 'gemini'
+                ? document.getElementById('ab-gemini-key-field')
+                : document.getElementById('ab-anthropic-key-field');
+            const key      = keyField.value.trim();
+            if (!key) {
+                status.textContent = '✗ Enter a key first';
+                status.className   = 'ab-key-status ab-key-err';
+                return;
+            }
+            status.textContent = '⟳ Testing...';
+            status.className   = 'ab-key-status';
+
+            fetch(abAjax, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: new URLSearchParams({
+                    action:   'cs_seo_ai_test_key',
+                    nonce:    abNonce,
+                    live_key: key,
+                    provider: provider,
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    status.textContent = '✓ ' + data.data;
+                    status.className   = 'ab-key-status ab-key-ok';
+                } else {
+                    status.textContent = '✗ ' + data.data;
+                    status.className   = 'ab-key-status ab-key-err';
+                }
+            })
+            .catch(e => {
+                status.textContent = '✗ Network error: ' + e.message;
+                status.className   = 'ab-key-status ab-key-err';
+            });
+        }
+
+        // ── Load posts ───────────────────────────────────────────────────────
+        function abTogglePosts(btn) {
+            const wrap = document.getElementById('ab-posts-wrap');
+            if (!wrap) return;
+            const hidden = wrap.style.display === 'none';
+            wrap.style.display = hidden ? '' : 'none';
+            btn.textContent = hidden ? '↑ Hide Posts' : '↓ Show Posts';
+        }
+
+        function abLoadPosts(page) {
+            page = page || 1;
+            abState.page = page;
+            document.getElementById('ab-load-posts').disabled = true;
+            abSetStatus('Loading posts...');
+            abPost('cs_seo_ai_get_posts', {page}).then(data => {
+                document.getElementById('ab-load-posts').disabled = false;
+                if (!data.success) { abLog('Failed to load posts: ' + data.data, 'err'); return; }
+                abState.posts      = data.data.posts;
+                abState.total          = data.data.total;
+                abState.totalWithDesc  = data.data.total_with_desc;
+                abState.totalPages     = data.data.total_pages;
+                abState.page       = data.data.page;
+                abUpdateSummary();
+                abRenderTable();
+                abSetStatus(data.data.total + ' posts loaded');
+                // Hide the load CTA, show the action toolbar
+                document.getElementById('ab-load-cta').style.display = 'none';
+                document.getElementById('ab-ai-toolbar').style.display = 'flex';
+                document.getElementById('ab-reload-hdr').style.display = '';
+                document.getElementById('ab-posts-hide-hdr').style.display = '';
+                document.getElementById('ab-ai-gen-missing').disabled = false;
+                document.getElementById('ab-ai-gen-all').disabled = false;
+                document.getElementById('ab-ai-fix').disabled = false;
+            document.getElementById('ab-ai-fix-titles').disabled = false;
+                document.getElementById('ab-ai-static').disabled = false;
+                document.getElementById('ab-ai-score-all').disabled = false;
+                // Pager
+                const pager = document.getElementById('ab-pager');
+                pager.style.display = abState.totalPages > 1 ? 'flex' : 'none';
+                document.getElementById('ab-page-info').textContent =
+                    'Page ' + abState.page + ' of ' + abState.totalPages;
+                document.getElementById('ab-prev').disabled = abState.page <= 1;
+                document.getElementById('ab-next').disabled = abState.page >= abState.totalPages;
+            }).catch(e => {
+                document.getElementById('ab-load-posts').disabled = false;
+                abLog('Error: ' + e.message, 'err');
+            });
+        }
+
+        function abPage(dir) {
+            abLoadPosts(abState.page + dir);
+        }
+
+        // ── Render table ─────────────────────────────────────────────────────
+        function abScoreBadge(post) {
+            const s = (post._seo_score !== undefined) ? post._seo_score : post.seo_score;
+            const n = (post._seo_notes !== undefined) ? post._seo_notes : (post.seo_notes || '');
+            const click = post.no_post ? '' : ' onclick="abScoreOne(' + post.id + ')"';
+            if (!s) return '<span class="ab-score-badge ab-score-none"' + click + ' title="Click to score">Score</span>';
+            const cls = s >= 90 ? 'ab-score-great' : s >= 75 ? 'ab-score-good' : s >= 50 ? 'ab-score-fair' : 'ab-score-poor';
+            const tip = n ? abEsc(n) + ' — click to re-score' : 'Click to re-score';
+            return '<span class="ab-score-badge ' + cls + '"' + click + ' title="' + tip + '">' + s + '%</span>';
+        }
+
+        function abBadge(post) {
+            if (!post.has_desc && !post._gen) return '<span class="ab-badge ab-badge-none">No AI description</span>';
+            const desc  = post._gen || post.desc;
+            const chars = desc ? desc.length : 0;
+            if (post._gen) {
+                if (chars > 0 && chars < abMinChar) return '<span class="ab-badge ab-badge-gen-short">✦ Generated · ' + chars + 'c</span>';
+                if (chars > abMaxChar)              return '<span class="ab-badge ab-badge-gen-long">✦ Generated · ' + chars + 'c</span>';
+                return '<span class="ab-badge ab-badge-gen">✦ Generated · ' + chars + 'c</span>';
+            }
+            if (chars >= abMinChar && chars <= abMaxChar) return '<span class="ab-badge ab-badge-ok">✓ ' + chars + 'c</span>';
+            if (chars > 0 && chars < abMinChar)           return '<span class="ab-badge ab-badge-short">Short · ' + chars + 'c</span>';
+            if (chars > abMaxChar)                         return '<span class="ab-badge ab-badge-long">Long · ' + chars + 'c</span>';
+            return '<span class="ab-badge ab-badge-none">No AI description</span>';
+        }
+
+        function abRenderTable() {
+            const wrap = document.getElementById('ab-posts-wrap');
+            if (!abState.posts.length) {
+                wrap.innerHTML = '<p style="color:#50575e">No posts found.</p>';
+                return;
+            }
+            let rows = abState.posts.map(p => {
+                const existDesc = p.desc
+                    ? '<div class="ab-desc-text">' + abEsc(p.desc) + '</div>'
+                    : '';
+                const genDesc = p._gen
+                    ? '<div class="ab-desc-gen">✦ ' + abEsc(p._gen) + '</div>'
+                    : '';
+                const canGen = !p._processing && !p.no_post;
+                // ALT badge — update after generation using alts_saved
+                const missingAlt = (p.missing_alt || 0) - (p._alts_saved || 0);
+                const altCell = missingAlt > 0
+                    ? '<span style="display:inline-block;background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;white-space:nowrap">⚠ ' + missingAlt + ' missing</span>'
+                    : (p.missing_alt !== undefined
+                        ? '<span style="display:inline-block;background:#d1e7dd;color:#0a3622;border:1px solid #a3cfbb;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;white-space:nowrap">✓ OK</span>'
+                        : '');
+
+                // Title length badge
+                const tChars = p._new_title_chars !== undefined ? p._new_title_chars : (p.title_chars || 0);
+                const tTitle = p._new_title || p.effective_title || p.title || '';
+                const isAiTitle = p._new_title !== undefined;
+                // Store title in map for popup — avoids all HTML attribute escaping issues
+                if (tTitle) {
+                    abTitleMap[p.id] = tTitle;
+                    abTitleMap['_ai_' + p.id] = isAiTitle;
+                }
+                const titleCursor = tTitle ? 'cursor:pointer;' : '';
+                const titleDataId = tTitle ? 'data-titleid="' + p.id + '" ' : '';
+                let titleBadge;
+                if (tChars === 0) {
+                    titleBadge = '<span style="color:#aaa;font-size:11px">—</span>';
+                } else if (tChars >= 50 && tChars <= 60) {
+                    titleBadge = '<span ' + titleDataId + 'style="display:inline-block;background:#d1e7dd;color:#0a3622;border:1px solid #a3cfbb;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;' + titleCursor + '">' + tChars + 'c ✓' + (isAiTitle ? ' ✦' : '') + '</span>';
+                } else if (tChars >= 40 && tChars <= 69) {
+                    titleBadge = '<span ' + titleDataId + 'style="display:inline-block;background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;' + titleCursor + '">⚠ ' + tChars + 'c' + (isAiTitle ? ' ✦' : '') + '</span>';
+                } else {
+                    titleBadge = '<span ' + titleDataId + 'style="display:inline-block;background:#f8d7da;color:#842029;border:1px solid #f5c2c7;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;' + titleCursor + '">✗ ' + tChars + 'c' + (isAiTitle ? ' ✦' : '') + '</span>';
+                }
+
+                // Homepage row gets a pinned style and special label
+                const isHome   = p.is_homepage;
+                const rowStyle = isHome
+                    ? 'background:linear-gradient(90deg,#f0f7ff 0%,#fff 100%);border-left:3px solid #2271b1'
+                    : '';
+                const typeLabel = isHome
+                    ? '<span style="background:#2271b1;color:#fff;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700;margin-right:4px">🏠 Homepage</span>'
+                    : '';
+                const noPostNote = p.no_post
+                    ? '<span style="color:#888;font-size:12px">Blog posts index — no post object. Set a static front page to enable AI generation.</span>'
+                    : '';
+                const actionCell = p.no_post
+                    ? '<span style="color:#aaa;font-size:12px">N/A</span>'
+                    : '<button class="button ab-row-btn" onclick="abGenOne(' + p.id + ')" ' + (canGen?'':'disabled') + ' id="ab-btn-' + p.id + '">' +
+                      (p._processing ? '<span class="ab-spinner">⟳</span>' : '✦') + ' Generate</button>';
+
+                const titleLink = p.edit_link
+                    ? '<a href="' + p.edit_link + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="Edit post">' + abEsc(abDecodeTitle(p.title)) + '</a>'
+                    : abEsc(abDecodeTitle(p.title));
+                return '<tr id="ab-row-' + p.id + '" style="' + rowStyle + '">' +
+                    '<td><strong>' + typeLabel + titleLink + '</strong>' +
+                    (p.date ? '<br><small style="color:#888">' + p.type + ' · ' + p.date + '</small>' : '') +
+                    noPostNote + '</td>' +
+                    '<td>' + abBadge(p) + existDesc + genDesc + '</td>' +
+                    '<td style="text-align:center">' + titleBadge + '</td>' +
+                    '<td style="text-align:center">' + altCell + '</td>' +
+                    '<td style="text-align:center" class="ab-score-cell">' + abScoreBadge(p) + '</td>' +
+                    '<td>' + actionCell + '</td>' +
+                '</tr>';
+            }).join('');
+
+            wrap.innerHTML = '<table class="ab-posts" style="min-width:760px">' +
+                '<thead><tr>' +
+                '<th style="width:29%">Post</th>' +
+                '<th style="width:34%">Description</th>' +
+                '<th style="width:8%;text-align:center">Title</th>' +
+                '<th style="width:8%;text-align:center">ALT</th>' +
+                '<th style="width:9%;text-align:center">SEO Score</th>' +
+                '<th style="width:12%">Action</th>' +
+                '</tr></thead>' +
+                '<tbody>' + rows + '</tbody></table>';
+        }
+
+        // ── Generate one post ─────────────────────────────────────────────────
+        function abGenOne(postId) {
+            if (!abCheckApiKey()) return;
+            const post = abState.posts.find(p => p.id === postId);
+            if (!post) return;
+            post._processing = true;
+            abRenderTable();
+
+            abPost('cs_seo_ai_generate_one', {post_id: postId}).then(data => {
+                post._processing = false;
+                if (data.success) {
+                    const d = data.data;
+                    // ── Description ──────────────────────────────────────────
+                    post._gen     = d.description;
+                    post.has_desc = true;
+                    post.desc     = d.description;
+                    if (d.alts_saved > 0) {
+                        post._alts_saved = (post._alts_saved || 0) + d.alts_saved;
+                    }
+                    if (d.seo_score !== undefined) { post._seo_score = d.seo_score; post._seo_notes = d.seo_notes || ''; }
+                    const altNote = d.alts_saved > 0 ? ' + ' + d.alts_saved + ' ALT(s)' : '';
+                    const scoreNote = d.seo_score !== undefined ? ' · SEO ' + d.seo_score + '%' : '';
+                    abLog('✓ Description → ' + d.chars + 'c' + altNote + scoreNote + ': ' + d.description, 'ok');
+
+                    // ── Title ─────────────────────────────────────────────────
+                    if (d.title_status === 'fixed' || d.title_status === 'fixed_imperfect') {
+                        post._new_title       = d.title;
+                        post._new_title_chars = d.title_chars;
+                        const titleQuality = d.title_status === 'fixed' ? '✓' : '⚠';
+                        abLog(titleQuality + ' Title fixed ' + d.title_chars + 'c: ' + d.title, d.title_status === 'fixed' ? 'ok' : 'warn');
+                        if (d.title_was) {
+                            abLog('  was: ' + d.title_was, 'info');
+                        }
+                    } else {
+                        abLog('  Title already in range (' + d.title_chars + 'c): ' + d.title, 'info');
+                    }
+
+                    abState.generated++;
+                    abUpdateSummary();
+                } else {
+                    abLog('✗ "' + post.title.slice(0,45) + '": ' + (data.data || 'Unknown error'), 'err');
+                }
+                abRenderTable();
+            }).catch(e => {
+                post._processing = false;
+                abLog('✗ Network error: ' + e.message, 'err');
+                abRenderTable();
+            });
+        }
+
+        // ── Score one post ────────────────────────────────────────────────────
+        function abScoreOne(postId) {
+            if (!abCheckApiKey()) return;
+            const post = abState.posts.find(p => p.id === postId);
+            if (!post || post.no_post) return;
+            const cell = document.querySelector('#ab-row-' + postId + ' .ab-score-cell');
+            if (cell) cell.innerHTML = '<span style="color:#888;font-size:11px">⟳ Scoring…</span>';
+            abPost('cs_seo_score_one', {post_id: postId}).then(data => {
+                if (data.success) {
+                    post._seo_score = data.data.seo_score;
+                    post._seo_notes = data.data.seo_notes || '';
+                    abLog('📊 SEO score: ' + data.data.seo_score + '% — ' + (data.data.seo_notes || ''), 'info');
+                } else {
+                    post._seo_score = undefined;
+                    abLog('✗ Score error for post ' + postId + ': ' + (data.data || 'Unknown error'), 'err');
+                }
+                if (cell) cell.innerHTML = abScoreBadge(post);
+            }).catch(e => {
+                if (cell) cell.innerHTML = abScoreBadge(post);
+                abLog('✗ Score network error: ' + e.message, 'err');
+            });
+        }
+
+        // ── Score all posts ───────────────────────────────────────────────────
+        async function abScoreAll() {
+            if (!abCheckApiKey()) return;
+            if (!abState.posts.length) { abSetStatus('Load posts first'); return; }
+            if (abState.running) return;
+            abState.running  = true;
+            abState.stopped  = false;
+            document.getElementById('ab-ai-gen-missing').disabled = true;
+            document.getElementById('ab-ai-gen-all').disabled = true;
+            document.getElementById('ab-ai-fix').disabled = true;
+            document.getElementById('ab-ai-fix-titles').disabled = true;
+            document.getElementById('ab-ai-static').disabled = true;
+            document.getElementById('ab-ai-score-all').disabled = true;
+            document.getElementById('ab-ai-stop').style.display = 'inline-block';
+            abLog('Starting SEO scoring run...', 'info');
+
+            let allPosts = [];
+            for (let pg = 1; pg <= abState.totalPages; pg++) {
+                if (abState.stopped) break;
+                try {
+                    const data = await abPost('cs_seo_ai_get_posts', {page: pg});
+                    if (data.success) allPosts = allPosts.concat(data.data.posts);
+                } catch(e) {}
+            }
+            const targets = allPosts.filter(p => !p.no_post);
+            let done = 0, errors = 0;
+            for (const post of targets) {
+                if (abState.stopped) { abLog('Stopped after ' + done + ' posts scored', 'skip'); break; }
+                abSetStatus('Scoring "' + post.title.slice(0,50) + '"…');
+                abSetProgress(done, targets.length);
+                try {
+                    const data = await abPost('cs_seo_score_one', {post_id: post.id});
+                    if (data.success) {
+                        const local = abState.posts.find(p => p.id === post.id);
+                        if (local) { local._seo_score = data.data.seo_score; local._seo_notes = data.data.seo_notes || ''; }
+                        const cell = document.querySelector('#ab-row-' + post.id + ' .ab-score-cell');
+                        if (cell && local) cell.innerHTML = abScoreBadge(local);
+                        done++;
+                    } else { errors++; }
+                } catch(e) { errors++; }
+                await abSleep(300);
+            }
+            abSetProgress(done, targets.length);
+            abSetStatus('✓ Scored ' + done + ' posts' + (errors > 0 ? ', ' + errors + ' errors' : ''));
+            abLog('Score run complete: ' + done + ' scored, ' + errors + ' errors', done > 0 ? 'ok' : 'info');
+            abState.running = false;
+            document.getElementById('ab-ai-gen-missing').disabled = false;
+            document.getElementById('ab-ai-gen-all').disabled = false;
+            document.getElementById('ab-ai-fix').disabled = false;
+            document.getElementById('ab-ai-fix-titles').disabled = false;
+            document.getElementById('ab-ai-static').disabled = false;
+            document.getElementById('ab-ai-score-all').disabled = false;
+            document.getElementById('ab-ai-stop').style.display = 'none';
+        }
+
+        // ── Generate all ──────────────────────────────────────────────────────
+        async function abGenAll(overwrite) {
+            if (!abCheckApiKey()) return;
+            if (abState.running) return;
+            abState.stopped = false;
+            abState.running = true;
+
+            document.getElementById('ab-ai-gen-missing').disabled = true;
+            document.getElementById('ab-ai-gen-all').disabled = true;
+            document.getElementById('ab-ai-fix').disabled = true;
+            document.getElementById('ab-ai-fix-titles').disabled = true;
+            document.getElementById('ab-ai-static').disabled = true;
+            document.getElementById('ab-ai-stop').style.display = 'inline-block';
+
+            abLog(overwrite ? 'Starting full regeneration run...' : 'Starting generation run (missing only)...', 'info');
+
+            let allPosts = [];
+            abSetStatus('Fetching full post list...');
+            for (let pg = 1; pg <= abState.totalPages; pg++) {
+                if (abState.stopped) break;
+                try {
+                    const data = await abPost('cs_seo_ai_get_posts', {page: pg});
+                    if (data.success) allPosts = allPosts.concat(data.data.posts);
+                } catch(e) {}
+            }
+
+            const targets = allPosts.filter(p => !p.is_homepage && !p.no_post && (!p.has_desc || overwrite));
+            abLog('Found ' + targets.length + ' posts to process', 'info');
+
+            let done = 0, errors = 0, skipped = 0;
+
+            for (const post of targets) {
+                if (abState.stopped) { abLog('Stopped by user after ' + done + ' posts', 'skip'); break; }
+
+                abSetStatus('Processing: "' + post.title.slice(0,50) + '"...');
+                abSetProgress(done, targets.length);
+
+                try {
+                    const data = await abPost('cs_seo_ai_generate_all', {
+                        post_id:   post.id,
+                        overwrite: overwrite ? 1 : 0,
+                    });
+
+                    if (data.success) {
+                        const r = data.data;
+                        if (r.status === 'skipped') {
+                            skipped++;
+                            abLog('⊘ "' + post.title.slice(0,55) + '" — skipped (has desc)', 'skip');
+                        } else {
+                            done++;
+                            abState.generated++;
+                            const bulkAltNote = r.alts_saved > 0 ? ' + ' + r.alts_saved + ' ALT(s)' : '';
+                            abLog('✓ Description → ' + r.chars + 'c' + bulkAltNote + ': ' + r.description, 'ok');
+                            if (r.title_status === 'fixed' || r.title_status === 'fixed_imperfect') {
+                                const tq = r.title_status === 'fixed' ? '✓' : '⚠';
+                                abLog(tq + ' Title fixed ' + r.title_chars + 'c: ' + r.title, r.title_status === 'fixed' ? 'ok' : 'warn');
+                                if (r.title_was) abLog('  was: ' + r.title_was, 'info');
+                            }
+                            const local = abState.posts.find(p => p.id === post.id);
+                            if (local) {
+                                local._gen = r.description; local.has_desc = true; local.desc = r.description;
+                                if (r.alts_saved > 0) local._alts_saved = (local._alts_saved || 0) + r.alts_saved;
+                                if (r.title_status === 'fixed' || r.title_status === 'fixed_imperfect') {
+                                    local._new_title       = r.title;
+                                    local._new_title_chars = r.title_chars;
+                                }
+                                if (r.seo_score !== undefined) { local._seo_score = r.seo_score; local._seo_notes = r.seo_notes || ''; }
+                            }
+                        }
+                    } else {
+                        errors++;
+                        const msg = typeof data.data === 'object' ? data.data.message : data.data;
+                        abLog('✗ "' + post.title.slice(0,45) + '": ' + msg, 'err');
+                        await abSleep(12000); // longer pause on error — likely a rate limit
+                    }
+                } catch(e) {
+                    errors++;
+                    abLog('✗ Network error: ' + e.message, 'err');
+                    await abSleep(12000);
+                }
+
+                abUpdateSummary();
+                abRenderTable();
+                await abSleep(2500); // ~24 posts/min — stays under Anthropic's 30k token/min limit
+            }
+
+            abSetProgress(done + skipped, targets.length);
+            abSetStatus('Done — ' + done + ' generated, ' + skipped + ' skipped, ' + errors + ' errors');
+            abLog('Run complete: ' + done + ' generated, ' + skipped + ' skipped, ' + errors + ' errors', done > 0 ? 'ok' : 'info');
+            if (done > 0) abPost('cs_seo_rebuild_health', {}).catch(() => {});
+
+            document.getElementById('ab-ai-gen-missing').disabled = false;
+            document.getElementById('ab-ai-gen-all').disabled      = false;
+            document.getElementById('ab-ai-fix').disabled          = false;
+            document.getElementById('ab-ai-static').disabled       = false;
+            document.getElementById('ab-ai-stop').style.display    = 'none';
+            abState.running = false;
+        }
+
+        // ── Fix out-of-range descriptions ──────────────────────────────────────
+        async function abFixAll() {
+            if (!abCheckApiKey()) return;
+            if (abState.running) return;
+            abState.stopped = false;
+            abState.running = true;
+
+            document.getElementById('ab-ai-gen-missing').disabled = true;
+            document.getElementById('ab-ai-gen-all').disabled     = true;
+            document.getElementById('ab-ai-fix').disabled         = true;
+            document.getElementById('ab-ai-static').disabled      = true;
+            document.getElementById('ab-ai-stop').style.display   = 'inline-block';
+
+            abLog('Starting fix run — scanning for short and long descriptions...', 'info');
+
+            // Fetch all posts across all pages.
+            let allPosts = [];
+            abSetStatus('Fetching full post list...');
+            for (let pg = 1; pg <= abState.totalPages; pg++) {
+                if (abState.stopped) break;
+                try {
+                    const data = await abPost('cs_seo_ai_get_posts', {page: pg});
+                    if (data.success) allPosts = allPosts.concat(data.data.posts);
+                } catch(e) {}
+            }
+
+            // Target only posts that have a description but it's outside the configured range.
+            const targets = allPosts.filter(p => {
+                if (!p.has_desc || !p.desc) return false;
+                const len = p.desc.length;
+                return len < abMinChar || len > abMaxChar;
+            });
+
+            if (targets.length === 0) {
+                abLog('No out-of-range descriptions found — nothing to fix.', 'info');
+                abSetStatus('Nothing to fix.');
+                document.getElementById('ab-ai-gen-missing').disabled = false;
+                document.getElementById('ab-ai-gen-all').disabled     = false;
+                document.getElementById('ab-ai-fix').disabled         = false;
+                document.getElementById('ab-ai-stop').style.display   = 'none';
+                abState.running = false;
+                return;
+            }
+
+            abLog('Found ' + targets.length + ' descriptions to fix (' + abMinChar + '–' + abMaxChar + ' char target)', 'info');
+
+            let done = 0, errors = 0, skipped = 0;
+
+            for (const post of targets) {
+                if (abState.stopped) { abLog('Stopped by user after ' + done + ' posts', 'skip'); break; }
+
+                const len = post.desc ? post.desc.length : 0;
+                const issue = len < abMinChar ? 'too short (' + len + 'c)' : 'too long (' + len + 'c)';
+                abSetStatus('Fixing: "' + post.title.slice(0,50) + '" — ' + issue);
+                abSetProgress(done, targets.length);
+
+                try {
+                    const data = await abPost('cs_seo_ai_fix_desc', {post_id: post.id});
+
+                    if (data.success) {
+                        const r = data.data;
+                        if (r.status === 'skipped') {
+                            skipped++;
+                            abLog('⊘ "' + post.title.slice(0,55) + '" — ' + r.message, 'skip');
+                        } else {
+                            done++;
+                            abState.generated++;
+                            if (r.in_range) {
+                                abLog('✓ "' + post.title.slice(0,55) + '" fixed: ' + r.was_chars + 'c → ' + r.chars + 'c', 'ok');
+                            } else {
+                                abLog('⚠ "' + post.title.slice(0,55) + '" still out of range after retries: ' + r.was_chars + 'c → ' + r.chars + 'c', 'err');
+                            }
+                            const local = abState.posts.find(p => p.id === post.id);
+                            if (local) { local._gen = r.description; local.has_desc = true; local.desc = r.description; }
+                        }
+                    } else {
+                        errors++;
+                        const msg = typeof data.data === 'object' ? data.data.message : data.data;
+                        abLog('✗ "' + post.title.slice(0,45) + '": ' + msg, 'err');
+                        await abSleep(12000);
+                    }
+                } catch(e) {
+                    errors++;
+                    abLog('✗ Network error: ' + e.message, 'err');
+                    await abSleep(12000);
+                }
+
+                abUpdateSummary();
+                abRenderTable();
+                await abSleep(2500);
+            }
+
+            abSetProgress(done + skipped, targets.length);
+            abSetStatus('Fix run done — ' + done + ' fixed, ' + skipped + ' skipped, ' + errors + ' errors');
+            abLog('Fix run complete: ' + done + ' fixed, ' + skipped + ' skipped, ' + errors + ' errors', done > 0 ? 'ok' : 'info');
+
+            document.getElementById('ab-ai-gen-missing').disabled    = false;
+            document.getElementById('ab-ai-gen-all').disabled         = false;
+            document.getElementById('ab-ai-fix').disabled             = false;
+            document.getElementById('ab-ai-fix-titles').disabled      = false;
+            document.getElementById('ab-ai-static').disabled          = false;
+            document.getElementById('ab-ai-stop').style.display       = 'none';
+            abState.running = false;
+        }
+
+        // ── Fix Titles ────────────────────────────────────────────────────────
+        async function abFixTitles() {
+            if (!abCheckApiKey()) return;
+            if (abState.running) return;
+            abState.stopped = false;
+            abState.running = true;
+
+            document.getElementById('ab-ai-gen-missing').disabled    = true;
+            document.getElementById('ab-ai-gen-all').disabled         = true;
+            document.getElementById('ab-ai-fix').disabled             = true;
+            document.getElementById('ab-ai-fix-titles').disabled      = true;
+            document.getElementById('ab-ai-static').disabled          = true;
+            document.getElementById('ab-ai-stop').style.display       = 'inline-block';
+
+            abLog('Starting title fix run — scanning for titles outside 50–60 chars...', 'info');
+
+            let allPosts = [];
+            abSetStatus('Fetching full post list...');
+            for (let pg = 1; pg <= abState.totalPages; pg++) {
+                if (abState.stopped) break;
+                try {
+                    const data = await abPost('cs_seo_ai_get_posts', {page: pg});
+                    if (data.success) allPosts = allPosts.concat(data.data.posts);
+                } catch(e) {}
+            }
+
+            const targets = allPosts.filter(p => !p.is_homepage && !p.no_post && p.title_chars > 0 && (p.title_chars < 50 || p.title_chars > 60));
+            abLog('Found ' + targets.length + ' title(s) outside 50–60 char range', 'info');
+
+            if (targets.length === 0) {
+                abLog('All titles are within range — nothing to fix.', 'info');
+                abSetStatus('Nothing to fix.');
+                document.getElementById('ab-ai-gen-missing').disabled  = false;
+                document.getElementById('ab-ai-gen-all').disabled       = false;
+                document.getElementById('ab-ai-fix').disabled           = false;
+                document.getElementById('ab-ai-fix-titles').disabled    = false;
+                document.getElementById('ab-ai-static').disabled        = false;
+                document.getElementById('ab-ai-stop').style.display     = 'none';
+                abState.running = false;
+                return;
+            }
+
+            let done = 0, errors = 0, skipped = 0;
+
+            for (const post of targets) {
+                if (abState.stopped) { abLog('Stopped by user after ' + done + ' posts', 'skip'); break; }
+
+                const issue = post.title_chars < 50 ? 'too short (' + post.title_chars + 'c)' : 'too long (' + post.title_chars + 'c)';
+                abSetStatus('Fixing title: "' + post.title.slice(0,50) + '" — ' + issue);
+                abSetProgress(done, targets.length);
+
+                try {
+                    const data = await abPost('cs_seo_ai_fix_title', {post_id: post.id});
+                    if (data.success) {
+                        const r = data.data;
+                        if (r.status === 'skipped') {
+                            skipped++;
+                            abLog('⊘ "' + post.title.slice(0,55) + '" — already in range', 'skip');
+                        } else {
+                            done++;
+                            const local = abState.posts.find(p => p.id === post.id);
+                            if (local) {
+                                local._new_title       = r.title;
+                                local._new_title_chars = r.chars;
+                            }
+                            if (r.in_range) {
+                                abLog('✓ Title fixed ' + r.was_chars + 'c → ' + r.chars + 'c: ' + r.title, 'ok');
+                                abLog('  was: ' + (post.effective_title || post.title), 'info');
+                            } else {
+                                abLog('⚠ Title still out of range ' + r.was_chars + 'c → ' + r.chars + 'c: ' + r.title, 'warn');
+                                abLog('  was: ' + (post.effective_title || post.title), 'info');
+                            }
+                        }
+                    } else {
+                        errors++;
+                        const msg = typeof data.data === 'object' ? data.data.message : data.data;
+                        abLog('✗ "' + post.title.slice(0,45) + '": ' + msg, 'err');
+                        await abSleep(12000);
+                    }
+                } catch(e) {
+                    errors++;
+                    abLog('✗ Network error: ' + e.message, 'err');
+                    await abSleep(12000);
+                }
+
+                abRenderTable();
+                await abSleep(2000);
+            }
+
+            abSetProgress(done + skipped, targets.length);
+            abSetStatus('Title fix done — ' + done + ' fixed, ' + skipped + ' skipped, ' + errors + ' errors');
+            abLog('Title fix complete: ' + done + ' fixed, ' + skipped + ' skipped, ' + errors + ' errors', done > 0 ? 'ok' : 'info');
+
+            document.getElementById('ab-ai-gen-missing').disabled  = false;
+            document.getElementById('ab-ai-gen-all').disabled       = false;
+            document.getElementById('ab-ai-fix').disabled           = false;
+            document.getElementById('ab-ai-fix-titles').disabled    = false;
+            document.getElementById('ab-ai-static').disabled        = false;
+            document.getElementById('ab-ai-stop').style.display     = 'none';
+            abState.running = false;
+        }
+
+        async function abRegenStatic() {
+            if (abState.running) return;
+            abState.running = true;
+            abState.stopped = false;
+
+            document.getElementById('ab-ai-gen-missing').disabled = true;
+            document.getElementById('ab-ai-gen-all').disabled     = true;
+            document.getElementById('ab-ai-fix').disabled         = true;
+            document.getElementById('ab-ai-static').disabled      = true;
+            document.getElementById('ab-ai-stop').style.display   = 'inline-block';
+
+            abLog('Starting static regeneration — clearing stale OG image data for all posts...', 'info');
+            abSetStatus('Regenerating static data...');
+
+            let done = 0, cleared = 0, errors = 0;
+
+            for (const post of abState.posts) {
+                if (abState.stopped) { abLog('Stopped by user after ' + done + ' posts', 'skip'); break; }
+
+                abSetStatus('Processing: "' + post.title.slice(0,50) + '"');
+                abSetProgress(done, abState.posts.length);
+
+                try {
+                    const data = await abPost('cs_seo_regen_static', {post_id: post.id});
+                    if (data.success) {
+                        const r = data.data;
+                        done++;
+                        if (r.had_custom) {
+                            cleared++;
+                            const src = r.source === 'featured_image' ? 'now using featured image'
+                                      : r.source === 'site_default'   ? 'now using site default OG image'
+                                      : 'no image found';
+                            abLog('✓ "' + post.title.slice(0,55) + '" — cleared stale custom image, ' + src, 'ok');
+                        } else {
+                            abLog('⊘ "' + post.title.slice(0,55) + '" — no custom image was set, nothing to clear', 'skip');
+                        }
+                    } else {
+                        errors++;
+                        abLog('✗ "' + post.title.slice(0,45) + '": ' + data.data, 'err');
+                    }
+                } catch(e) {
+                    errors++;
+                    abLog('✗ Network error: ' + e.message, 'err');
+                }
+
+                await abSleep(300);
+            }
+
+            abSetProgress(done, abState.posts.length);
+            abSetStatus('Static regen done — ' + cleared + ' posts updated, ' + errors + ' errors');
+            abLog('Static regeneration complete: ' + cleared + ' OG images cleared, ' + (done - cleared) + ' already clean, ' + errors + ' errors', cleared > 0 ? 'ok' : 'info');
+
+            document.getElementById('ab-ai-gen-missing').disabled = false;
+            document.getElementById('ab-ai-gen-all').disabled     = false;
+            document.getElementById('ab-ai-fix').disabled         = false;
+            document.getElementById('ab-ai-static').disabled      = false;
+            document.getElementById('ab-ai-stop').style.display   = 'none';
+            abState.running = false;
+        }
+
+        function abStop() { abState.stopped = true; abSetStatus('Stopping...'); }
+        function abSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ALT Text Generator
+        // ═══════════════════════════════════════════════════════════════════════
+
+        const altState = {
+            posts:   [],
+            running: false,
+            stopped: false,
+            fixed:   0,
+            page:    0,
+        };
+
+        function altLog(msg, type) {
+            const wrap = document.getElementById('ab-alt-log-wrap');
+            const log  = document.getElementById('ab-alt-log');
+            if (wrap) wrap.style.display = '';
+            if (log)  log.style.display  = 'block';
+            const ts   = new Date().toLocaleTimeString('en-GB');
+            const line = document.createElement('div');
+            line.className = type ? 'ab-log-' + type : 'ab-log-line';
+            line.textContent = '[' + ts + '] ' + msg;
+            log.appendChild(line);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function altSetStatus(msg) {
+            document.getElementById('ab-alt-status').textContent = msg;
+        }
+
+        function altSetProgress(done, total) {
+            const pct = total > 0 ? Math.round(done/total*100) : 0;
+            document.getElementById('ab-alt-progress').classList.add('visible');
+            document.getElementById('ab-alt-progress-fill').style.width = pct + '%';
+            document.getElementById('ab-alt-prog-label').textContent =
+                done + ' / ' + total + ' processed (' + pct + '%)';
+        }
+
+        function altUpdateSummary() {
+            const totalMissing = altState.posts.reduce((a, p) => a + p.missing_count, 0);
+            const remaining    = Math.max(0, totalMissing - altState.fixed);
+            document.getElementById('alt-sum-posts').textContent  = altState.posts.reduce((a,p)=>a+(p.missing_count>0?1:0),0);
+            document.getElementById('alt-sum-images').textContent = remaining;
+            document.getElementById('alt-sum-done').textContent   = altState.fixed;
+            document.getElementById('ab-alt-summary').style.display = 'grid';
+        }
+
+        function altRenderTable() {
+            const wrap = document.getElementById('ab-alt-posts-wrap');
+
+            // Sync the toolbar checkbox to current state
+            const cbx = document.getElementById('ab-alt-show-all');
+            if (cbx) cbx.checked = altState.showAll || false;
+
+            const showAll = altState.showAll || false;
+            const visiblePosts = showAll
+                ? altState.posts
+                : altState.posts.filter(p => p.missing_count > 0 || p._done);
+
+            if (!altState.posts.length) {
+                wrap.innerHTML = '<p style="color:#1a7a34;margin-top:12px">✓ No images found in posts or featured images.</p>';
+                return;
+            }
+
+            if (!visiblePosts.length) {
+                wrap.innerHTML = '<p style="color:#1a7a34">✓ All images across all posts already have ALT text.</p>';
+                return;
+            }
+
+            const PAGE_SIZE  = 50;
+            const totalPages = Math.ceil(visiblePosts.length / PAGE_SIZE);
+            if (altState.page >= totalPages) altState.page = Math.max(0, totalPages - 1);
+            const pageStart  = altState.page * PAGE_SIZE;
+            const pagePosts  = visiblePosts.slice(pageStart, pageStart + PAGE_SIZE);
+
+            let rows = pagePosts.map(p => {
+                const hasMissing = p.missing_count > 0 && !p._done;
+                const statusBadge = p._done
+                    ? '<span class="ab-badge ab-badge-ok">✓ Fixed</span>'
+                    : hasMissing
+                        ? '<span class="ab-badge ab-badge-none">' + p.missing_count + ' missing</span>'
+                        : '<span class="ab-badge ab-badge-ok">✓ All ALT set</span>';
+
+                // Build image rows
+                const imgRows = (p.images || []).map(img => {
+                    const filename = img.src.split('/').pop().split('?')[0];
+                    const missing  = img.missing && !p._done;
+                    const altText  = img.alt || (p._done ? '(generated this session)' : '');
+                    return '<tr style="background:' + (missing ? '#fff8f8' : '#f8fff8') + '">' +
+                        '<td style="padding:6px 8px;width:60px;vertical-align:middle">' +
+                            '<img src="' + abEsc(img.src) + '" style="width:52px;height:40px;object-fit:cover;border-radius:3px;border:1px solid #ddd">' +
+                        '</td>' +
+                        '<td style="padding:6px 8px;font-size:12px;color:#555;vertical-align:middle;word-break:break-all">' +
+                            abEsc(filename) +
+                        '</td>' +
+                        '<td style="padding:6px 8px;font-size:12px;vertical-align:middle">' +
+                            (missing
+                                ? '<span style="color:#c00">✗ Missing</span>'
+                                : '<span style="color:#1a7a34">✓ </span><em style="color:#444">' + abEsc(altText) + '</em>') +
+                        '</td>' +
+                    '</tr>';
+                }).join('');
+
+                const expanded = p._expanded || false;
+                const imgCount = (p.images || []).length;
+                const toggleId = 'ab-alt-toggle-' + p.id;
+
+                const altTitleLink = p.edit_link
+                    ? '<a href="' + p.edit_link + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="Edit post">' + abEsc(abDecodeTitle(p.title)) + '</a>'
+                    : abEsc(abDecodeTitle(p.title));
+                return '<tr id="ab-alt-row-' + p.id + '" style="border-top:2px solid #e0e0e0">' +
+                    '<td style="padding:8px 10px;vertical-align:middle">' +
+                        '<strong>' + altTitleLink + '</strong>' +
+                        '<br><small style="color:#888">' + p.type + ' · ' + p.date + ' · ' + imgCount + ' image(s)</small>' +
+                    '</td>' +
+                    '<td style="padding:8px 10px;vertical-align:middle">' + statusBadge + '</td>' +
+                    '<td style="padding:8px 10px;vertical-align:middle;white-space:nowrap">' +
+                        (hasMissing ? '<button class="button ab-row-btn" onclick="altGenOne(' + p.id + ')" id="ab-alt-btn-' + p.id + '" ' + (p._processing?'disabled':'') + '>' +
+                            (p._processing ? '<span class="ab-spinner">⟳</span>' : '✦') + ' Generate</button> ' : '') +
+                        '<button class="button" style="font-size:11px;padding:2px 8px" id="' + toggleId + '" onclick="altToggleImages(' + p.id + ')">' +
+                            (expanded ? '▲ Hide' : '▼ Images') +
+                        '</button>' +
+                    '</td>' +
+                '</tr>' +
+                '<tr id="ab-alt-imgs-' + p.id + '" style="display:' + (expanded?'table-row':'none') + '">' +
+                    '<td colspan="3" style="padding:0 0 8px 20px;background:#fafafa">' +
+                        '<table style="width:100%;border-collapse:collapse">' +
+                        '<thead><tr>' +
+                            '<th style="padding:4px 8px;font-size:11px;color:#888;text-align:left;width:60px">Thumb</th>' +
+                            '<th style="padding:4px 8px;font-size:11px;color:#888;text-align:left">Filename</th>' +
+                            '<th style="padding:4px 8px;font-size:11px;color:#888;text-align:left">ALT Text</th>' +
+                        '</tr></thead>' +
+                        '<tbody>' + imgRows + '</tbody>' +
+                        '</table>' +
+                    '</td>' +
+                '</tr>';
+            }).join('');
+
+            let altPager = '';
+            if (totalPages > 1) {
+                const from = pageStart + 1;
+                const to   = Math.min(pageStart + PAGE_SIZE, visiblePosts.length);
+                altPager = '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:#50575e">' +
+                    '<button class="button" onclick="altState.page--;altRenderTable()" ' + (altState.page === 0 ? 'disabled' : '') + '>← Prev</button>' +
+                    '<span>Page ' + (altState.page + 1) + ' of ' + totalPages + ' &nbsp;·&nbsp; ' + from + '–' + to + ' of ' + visiblePosts.length + '</span>' +
+                    '<button class="button" onclick="altState.page++;altRenderTable()" ' + (altState.page >= totalPages - 1 ? 'disabled' : '') + '>Next →</button>' +
+                    '</div>';
+            }
+
+            wrap.innerHTML =
+                '<table class="ab-posts" style="width:100%;min-width:560px">' +
+                '<thead><tr><th style="width:45%">Post</th><th style="width:20%">Status</th><th style="width:35%">Actions</th></tr></thead>' +
+                '<tbody>' + rows + '</tbody></table>' + altPager;
+        }
+
+        function altToggleImages(postId) {
+            const post = altState.posts.find(p => p.id === postId);
+            if (!post) return;
+            post._expanded = !post._expanded;
+            altRenderTable();
+        }
+
+        function altTogglePosts(btn) {
+            const wrap = document.getElementById('ab-alt-posts-wrap');
+            if (!wrap) return;
+            const hidden = wrap.style.display === 'none';
+            wrap.style.display = hidden ? '' : 'none';
+            btn.textContent = hidden ? '↑ Hide Posts' : '↓ Show Posts';
+        }
+
+        function altLoad() {
+            document.getElementById('ab-alt-load-btn').disabled = true;
+            altSetStatus('Scanning posts...');
+            abPost('cs_seo_alt_get_posts', {}).then(data => {
+                document.getElementById('ab-alt-load-btn').disabled = false;
+                if (!data.success) { altLog('Failed to scan: ' + data.data, 'err'); return; }
+                altState.posts = data.data.posts;
+                // Auto-enable show-all when nothing is missing so the audit view is useful
+                if (data.data.missing_alt === 0) altState.showAll = true;
+                const cbx = document.getElementById('ab-alt-show-all');
+                if (cbx) cbx.checked = altState.showAll;
+                altUpdateSummary();
+                altRenderTable();
+                altState.page = 0;
+                document.getElementById('ab-alt-load-cta').style.display = 'none';
+                document.getElementById('ab-alt-toolbar').style.display  = 'flex';
+                document.getElementById('ab-alt-reload-hdr').style.display = '';
+                document.getElementById('ab-alt-hide-hdr').style.display = '';
+                document.getElementById('ab-alt-gen-all').disabled       = data.data.missing_alt === 0;
+                const total = data.data.missing_alt;
+                altSetStatus(total > 0
+                    ? total + ' image(s) missing ALT across ' + altState.posts.filter(p=>p.missing_count>0).length + ' post(s)'
+                    : '✓ All images have ALT text');
+                if (total === 0) {
+                    altLog('✓ All images across all posts already have ALT text.', 'ok');
+                }
+            }).catch(e => {
+                document.getElementById('ab-alt-load-btn').disabled = false;
+                altLog('Error: ' + e.message, 'err');
+            });
+        }
+
+        function altGenOne(postId) {
+            if (!abCheckApiKey()) return;
+            const post = altState.posts.find(p => p.id === postId);
+            if (!post) return;
+            post._processing = true;
+            post._expanded   = true;
+            altRenderTable();
+
+            abPost('cs_seo_alt_generate_one', {post_id: postId}).then(data => {
+                post._processing = false;
+                if (data.success) {
+                    const updated   = data.data.updated;
+                    const generated = data.data.generated || [];
+                    post._done = true;
+                    post.missing_count = 0;
+                    // Store the generated alt text back onto each image object by src match
+                    (post.images || []).forEach(img => {
+                        img.missing = false;
+                        const match = generated.find(g => g.src === img.src);
+                        if (match) img.alt = match.alt;
+                    });
+                    altState.fixed += updated;
+                    altLog('✓ "' + abDecodeTitle(post.title).slice(0,55) + '" — ' + updated + ' image(s) updated', 'ok');
+                    altUpdateSummary();
+                } else {
+                    altLog('✗ "' + abDecodeTitle(post.title).slice(0,45) + '": ' + (data.data || 'Unknown error'), 'err');
+                }
+                altRenderTable();
+            }).catch(e => {
+                post._processing = false;
+                altLog('✗ Network error: ' + e.message, 'err');
+                altRenderTable();
+            });
+        }
+
+        async function altGenAll(force) {
+            if (!abCheckApiKey()) return;
+            if (altState.running) return;
+
+            if (force && !confirm('This will regenerate ALT text for ALL images across ALL posts, overwriting existing ALT text. Continue?')) return;
+
+            altState.running = true;
+            altState.stopped = false;
+
+            document.getElementById('ab-alt-gen-all').disabled     = true;
+            document.getElementById('ab-alt-force-all').disabled   = true;
+            document.getElementById('ab-alt-stop').style.display   = 'inline-block';
+
+            altLog('Starting ALT text generation run' + (force ? ' (FORCE mode — all images)' : '') + '...', 'info');
+
+            // In force mode: process all posts with images. In normal mode: only posts with missing ALT.
+            const postsToProcess = force
+                ? altState.posts.filter(p => !p._done)
+                : altState.posts.filter(p => !p._done && p.missing_count > 0);
+            altLog(postsToProcess.length + ' post(s) to process', 'info');
+
+            let done = 0, errors = 0, totalFixed = 0;
+
+            for (const post of postsToProcess) {
+                if (altState.stopped) { altLog('Stopped after ' + done + ' posts', 'skip'); break; }
+                if (post._done) continue;
+
+                altSetStatus('Processing: "' + post.title.slice(0,50) + '"...');
+                altSetProgress(done, postsToProcess.length);
+                post._processing = true;
+                altRenderTable();
+
+                try {
+                    const data = await abPost('cs_seo_alt_generate_all', {post_id: post.id, force: force ? 1 : 0});
+                    post._processing = false;
+                    if (data.success) {
+                        const updated   = data.data.updated;
+                        const generated = data.data.generated || [];
+                        post._done = true;
+                        post.missing_count = 0;
+                        (post.images || []).forEach(img => {
+                            img.missing = false;
+                            const match = generated.find(g => g.src === img.src);
+                            if (match) img.alt = match.alt;
+                        });
+                        totalFixed += updated;
+                        altState.fixed += updated;
+                        altLog('✓ "' + abDecodeTitle(post.title).slice(0,55) + '" — ' + updated + ' image(s) updated', 'ok');
+                    } else {
+                        errors++;
+                        altLog('✗ "' + post.title.slice(0,45) + '": ' + (data.data || 'Error'), 'err');
+                        await new Promise(r => setTimeout(r, 5000));
+                    }
+                } catch(e) {
+                    post._processing = false;
+                    errors++;
+                    altLog('✗ Network error: ' + e.message, 'err');
+                    await new Promise(r => setTimeout(r, 5000));
+                }
+
+                done++;
+                altUpdateSummary();
+                altRenderTable();
+                await new Promise(r => setTimeout(r, 1500));
+            }
+
+            altSetProgress(done, postsToProcess.length);
+            altSetStatus('Done — ' + totalFixed + ' image(s) updated across ' + done + ' post(s), ' + errors + ' errors');
+            altLog('Run complete: ' + totalFixed + ' images updated, ' + errors + ' errors', totalFixed > 0 ? 'ok' : 'info');
+            if (totalFixed > 0) abPost('cs_seo_rebuild_health', {}).catch(() => {});
+
+            document.getElementById('ab-alt-gen-all').disabled     = false;
+            document.getElementById('ab-alt-force-all').disabled   = false;
+            document.getElementById('ab-alt-stop').style.display   = 'none';
+            altState.running = false;
+        }
+
+        function altStop() { altState.stopped = true; altSetStatus('Stopping...'); }
+
+        // ── AI Summary Box bulk generator ─────────────────────────────────────
+        const sumState = { running: false, stopped: false, done: 0, total: 0, missing: 0, page: 0 };
+
+        function sumLog(msg, cls) {
+            const wrap = document.getElementById('ab-sum-log-wrap');
+            const log  = document.getElementById('ab-sum-log');
+            wrap.style.display = 'block';
+            const d = document.createElement('div');
+            d.className = 'ab-log-entry' + (cls ? ' ' + cls : '');
+            d.textContent = msg;
+            log.prepend(d);
+        }
+
+        function sumSetStatus(msg) {
+            document.getElementById('ab-sum-status').textContent = msg;
+            document.getElementById('ab-sum-prog-label').textContent = msg;
+        }
+
+        function sumSetProgress(pct) {
+            document.getElementById('ab-sum-progress-fill').style.width = pct + '%';
+        }
+
+        async function sumLoad() {
+            const btn = document.getElementById('ab-sum-load-btn');
+            btn.disabled = true;
+            btn.textContent = 'Loading...';
+            sumSetStatus('Loading...');
+            const data = await abPost('cs_seo_summary_load', {});
+            btn.disabled = false;
+            if (!data.success) { btn.textContent = 'Load Posts'; sumSetStatus('Error: ' + (data.data || 'Unknown')); return; }
+            const d = data.data;
+            sumState.page    = 0;
+            sumState.total   = d.total;
+            sumState.missing = d.missing;
+            document.getElementById('sum-s-total').textContent   = d.total;
+            document.getElementById('sum-s-has').textContent     = d.has;
+            document.getElementById('sum-s-missing').textContent = d.missing;
+            document.getElementById('sum-s-done').textContent    = 0;
+            document.getElementById('ab-sum-summary').style.display = '';
+            document.getElementById('ab-sum-toolbar').style.display = '';
+            document.getElementById('ab-sum-gen-all').disabled = d.missing === 0;
+            sumSetStatus(d.missing === 0 ? '✓ All posts have summaries' : d.missing + ' posts need summaries');
+            // Store posts and render table
+            sumState.posts = d.posts || [];
+            sumRenderTable();
+            document.getElementById('ab-sum-load-cta').style.display = 'none';
+            document.getElementById('ab-sum-reload-hdr').style.display = '';
+            document.getElementById('ab-sum-hide-hdr').style.display = '';
+        }
+
+        function sumRenderTable() {
+            const wrap = document.getElementById('ab-sum-posts-wrap');
+            if (!wrap) return;
+            const posts = sumState.posts || [];
+            if (!posts.length) {
+                wrap.innerHTML = '<p style="color:#1a7a34;margin-top:8px">✓ No posts found.</p>';
+                return;
+            }
+            const SUM_PAGE_SIZE  = 50;
+            const sumTotalPages  = Math.ceil(posts.length / SUM_PAGE_SIZE);
+            if (sumState.page >= sumTotalPages) sumState.page = Math.max(0, sumTotalPages - 1);
+            const sumPageStart   = sumState.page * SUM_PAGE_SIZE;
+            const pagePosts      = posts.slice(sumPageStart, sumPageStart + SUM_PAGE_SIZE);
+
+            let rows = pagePosts.map(function(p) {
+                const done   = p._done;
+                const badge  = done
+                    ? '<span class="ab-badge ab-badge-ok">✓ Generated</span>'
+                    : p.has_sum
+                        ? '<span class="ab-badge ab-badge-ok">✓ Has Summary</span>'
+                        : '<span class="ab-badge ab-badge-none">Missing</span>';
+                const sumTitleLink = p.edit_link
+                    ? '<a href="' + p.edit_link + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="Edit post">' + abEsc(p.title) + '</a>'
+                    : abEsc(p.title);
+                return '<tr>' +
+                    '<td style="padding:6px 10px;font-size:13px;color:#1d2327">' + sumTitleLink + '</td>' +
+                    '<td style="padding:6px 10px;text-align:right">' + badge + '</td>' +
+                    '</tr>';
+            }).join('');
+
+            let sumPager = '';
+            if (sumTotalPages > 1) {
+                const from = sumPageStart + 1;
+                const to   = Math.min(sumPageStart + SUM_PAGE_SIZE, posts.length);
+                sumPager = '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:#50575e">' +
+                    '<button class="button" onclick="sumState.page--;sumRenderTable()" ' + (sumState.page === 0 ? 'disabled' : '') + '>← Prev</button>' +
+                    '<span>Page ' + (sumState.page + 1) + ' of ' + sumTotalPages + ' &nbsp;·&nbsp; ' + from + '–' + to + ' of ' + posts.length + '</span>' +
+                    '<button class="button" onclick="sumState.page++;sumRenderTable()" ' + (sumState.page >= sumTotalPages - 1 ? 'disabled' : '') + '>Next →</button>' +
+                    '</div>';
+            }
+
+            wrap.innerHTML = '<table style="width:100%;border-collapse:collapse;margin-top:4px">' +
+                '<thead><tr style="background:#f0f0f0">' +
+                '<th style="padding:6px 10px;text-align:left;font-size:12px;color:#50575e;font-weight:600">Post Title</th>' +
+                '<th style="padding:6px 10px;text-align:right;font-size:12px;color:#50575e;font-weight:600">Status</th>' +
+                '</tr></thead>' +
+                '<tbody>' + rows + '</tbody>' +
+                '</table>' + sumPager;
+        }
+
+        function sumTogglePosts(btn) {
+            const wrap = document.getElementById('ab-sum-posts-wrap');
+            if (!wrap) return;
+            const hidden = wrap.style.display === 'none';
+            wrap.style.display = hidden ? '' : 'none';
+            btn.textContent = hidden ? '↑ Hide Posts' : '↓ Show Posts';
+        }
+
+        function sumToggle() {
+            const btn      = document.getElementById('ab-sum-load-btn');
+            const summary  = document.getElementById('ab-sum-summary');
+            const toolbar  = document.getElementById('ab-sum-toolbar');
+            const postsWrap = document.getElementById('ab-sum-posts-wrap');
+            const isHidden = summary.style.display === 'none';
+            summary.style.display   = isHidden ? '' : 'none';
+            toolbar.style.display   = isHidden ? '' : 'none';
+            if (postsWrap) postsWrap.style.display = isHidden ? '' : 'none';
+            btn.textContent = isHidden ? '↑ Hide' : '↺ Refresh';
+            btn.onclick = isHidden ? function() { sumToggle(); } : function() { sumLoad(); };
+        }
+
+        async function sumGenAll(force) {
+            if (sumState.running) return;
+            if (force && !confirm('This will overwrite ALL existing AI summaries. Continue?')) return;
+            sumState.running = true;
+            sumState.stopped = false;
+            sumState.done    = 0;
+            document.getElementById('ab-sum-gen-all').disabled   = true;
+            document.getElementById('ab-sum-force-all').disabled = true;
+            document.getElementById('ab-sum-stop').style.display = '';
+            sumSetProgress(0);
+
+            while (!sumState.stopped) {
+                const data = await abPost('cs_seo_summary_generate_all', { force: force ? 1 : 0 });
+                if (!data.success) {
+                    sumLog('✗ Error: ' + (data.data || 'Unknown'), 'ab-log-error');
+                    break;
+                }
+                const d = data.data;
+                if (d.done) break;
+                sumState.done++;
+                document.getElementById('sum-s-done').textContent = sumState.done;
+                const title = d.title || 'Post #' + d.post_id;
+                sumLog('✓ ' + title, 'ab-log-ok');
+                const total = force ? sumState.total : sumState.missing;
+                const pct   = total > 0 ? Math.round((sumState.done / total) * 100) : 0;
+                sumSetProgress(pct);
+                sumSetStatus(sumState.done + ' generated' + (d.remaining > 0 ? ', ' + d.remaining + ' remaining' : ''));
+            }
+
+            sumState.running = false;
+            document.getElementById('ab-sum-gen-all').disabled   = false;
+            document.getElementById('ab-sum-force-all').disabled = false;
+            document.getElementById('ab-sum-stop').style.display = 'none';
+            if (!sumState.stopped) {
+                sumSetProgress(100);
+                sumSetStatus('✓ Done — ' + sumState.done + ' summaries generated');
+                sumLog('✓ Batch complete: ' + sumState.done + ' generated', 'ab-log-ok');
+                document.getElementById('ab-sum-gen-all').disabled = true;
+                if (sumState.done > 0) abPost('cs_seo_rebuild_health', {}).catch(() => {});
+            } else {
+                sumSetStatus('Stopped after ' + sumState.done + ' generated');
+            }
+        }
+
+        function sumStop() { sumState.stopped = true; sumSetStatus('Stopping...'); }
+
+        // ── Category Fixer ───────────────────────────────────────────────────
+        const cfNonce = '<?php echo esc_js(wp_create_nonce('cs_seo_nonce')); ?>';
+        let cfAllPosts   = [];
+        let cfFiltered   = [];
+        let cfPage       = 1;
+        const CF_PER_PAGE = 50;
+
+        function cfPills(names, colour) {
+            if (!names || !names.length) return '<span style="color:#aaa;font-size:12px;">None</span>';
+            return names.map(n => `<span style="display:inline-block;background:${colour};color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 2px;white-space:nowrap;">${n}</span>`).join('');
+        }
+
+        function cfConfBadge(score) {
+            const bg = score >= 60 ? '#2d6a4f' : score >= 30 ? '#e67e00' : '#c3372b';
+            const label = score >= 60 ? 'High' : score >= 30 ? 'Medium' : 'Low';
+            return `<span style="background:${bg};color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;white-space:nowrap;">${label} ${score}%</span>`;
+        }
+
+        function cfStatusBadge(status) {
+            if (status === 'applied')  return '<span style="background:#2d6a4f;color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;">Applied</span>';
+            if (status === 'skipped')  return '<span style="background:#888;color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;">Skipped</span>';
+            return '';
+        }
+
+        function cfRender() {
+            const tbody = document.getElementById('cf-tbody');
+            const start = (cfPage - 1) * CF_PER_PAGE;
+            const slice = cfFiltered.slice(start, start + CF_PER_PAGE);
+            tbody.innerHTML = slice.map(p => {
+                const rowStyle = p.status === 'applied' ? 'opacity:.55;' : p.status === 'skipped' ? 'opacity:.4;' : '';
+                const changedCols = p.changed
+                    ? [
+                        p.add_names.map(n => `<span style="display:inline-block;background:#1a7a34;color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 2px;white-space:nowrap;">+ ${n}</span>`).join(''),
+                        p.remove_names.map(n => `<span style="display:inline-block;background:#d63638;color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 2px;white-space:nowrap;">− ${n}</span>`).join(''),
+                        p.unchanged_names.map(n => `<span style="display:inline-block;background:#787c82;color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 2px;white-space:nowrap;">${n}</span>`).join(''),
+                      ].join('')
+                    : cfPills(p.proposed_names, '#2d6a4f');
+                const effectivelyMatched = !p.changed || (p.add_names.length === 0 && p.remove_names.length === 0);
+                const actions = (p.status === 'applied' || p.status === 'skipped')
+                    ? cfStatusBadge(p.status)
+                    : effectivelyMatched
+                        ? `<span style="display:inline-block;background:#d0f0d0;color:#1a7a34;border:1px solid #a8d5a8;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:600;">✓ Matched</span>
+                           <button class="button button-small" onclick="cfSkipOne(${p.post_id})">Skip</button>
+                           <button class="button button-small" title="${p.reason}" onclick="cfReanalyse(${p.post_id})">&#8635;</button>`
+                        : `<button class="button button-small" style="background:#2d6a4f;color:#fff;border-color:#2d6a4f;" onclick="cfApplyOne(${p.post_id})">Apply</button>
+                           <button class="button button-small" onclick="cfSkipOne(${p.post_id})">Skip</button>
+                           <button class="button button-small" title="${p.reason}" onclick="cfReanalyse(${p.post_id})">&#8635;</button>`;
+                return `<tr data-pid="${p.post_id}" data-changed="${p.changed?1:0}" data-conf="${p.confidence}" data-status="${p.status}" style="border-bottom:1px solid #f0f0f0;${rowStyle}">
+                    <td style="padding:8px 10px;"><input type="checkbox" class="cf-chk" data-pid="${p.post_id}"></td>
+                    <td style="padding:8px 10px;"><a href="/wp-admin/post.php?post=${p.post_id}&action=edit" target="_blank">${p.title}</a></td>
+                    <td style="padding:8px 10px;">${cfPills(p.current_names, '#555')}</td>
+                    <td style="padding:8px 10px;">${changedCols}</td>
+                    <td style="padding:8px 10px;">${cfConfBadge(p.confidence)}</td>
+                    <td style="padding:8px 10px;white-space:nowrap;">${actions}</td>
+                </tr>`;
+            }).join('');
+
+            // Pager
+            const total = cfFiltered.length;
+            const pages = Math.ceil(total / CF_PER_PAGE);
+            const pager = document.getElementById('cf-pager');
+            if (pages > 1) {
+                let html = `<span style="color:#555;">Page ${cfPage} of ${pages} &nbsp;</span>`;
+                if (cfPage > 1) html += `<button class="button button-small" onclick="cfPage--;cfRender()">&#8592; Prev</button> `;
+                if (cfPage < pages) html += `<button class="button button-small" onclick="cfPage++;cfRender()">Next &#8594;</button>`;
+                pager.innerHTML = html;
+                pager.style.display = 'block';
+            } else {
+                pager.style.display = 'none';
+            }
+
+            // Stats
+            const changed   = cfAllPosts.filter(p => p.changed).length;
+            const applied   = cfAllPosts.filter(p => p.status === 'applied').length;
+            const low       = cfAllPosts.filter(p => p.confidence < 30).length;
+            const missing   = cfAllPosts.filter(p => !p.current_ids || p.current_ids.length === 0).length;
+            const statsEl   = document.getElementById('cf-stats');
+            statsEl.innerHTML = [
+                cfStatPill('Total', cfAllPosts.length, '#555'),
+                cfStatPill('Changed', changed, '#e67e00'),
+                cfStatPill('Applied', applied, '#2d6a4f'),
+                cfStatPill('Low Conf', low, '#c3372b'),
+                cfStatPill('Missing', missing, '#1a4a7a'),
+            ].join('');
+            statsEl.style.display = 'flex';
+
+            document.getElementById('cf-status').textContent =
+                `${cfFiltered.length} posts shown (${changed} changed, ${applied} applied)`;
+
+            // Re-apply post column visibility if hidden
+            if (!cfPostsVisible) {
+                document.getElementById('cf-table').querySelectorAll('tr').forEach(row => {
+                    if (row.children[1]) row.children[1].style.display = 'none';
+                });
+            }
+        }
+
+        function cfStatPill(label, val, colour) {
+            return `<span style="background:${colour};color:#fff;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;">${label}: ${val}</span>`;
+        }
+
+        function cfFilter(type) {
+            cfPage = 1;
+            if (type === 'changed')   cfFiltered = cfAllPosts.filter(p => p.changed);
+            else if (type === 'unchanged') cfFiltered = cfAllPosts.filter(p => !p.changed);
+            else if (type === 'low')  cfFiltered = cfAllPosts.filter(p => p.confidence < 30);
+            else if (type === 'missing') cfFiltered = cfAllPosts.filter(p => !p.current_ids || p.current_ids.length === 0);
+            else cfFiltered = [...cfAllPosts];
+            // Highlight active filter button
+            ['all','changed','unchanged','low','missing'].forEach(t => {
+                const btn = document.getElementById('cf-f-' + t);
+                if (btn) btn.style.background = (t === type) ? '#2d6a4f' : '';
+                if (btn) btn.style.color = (t === type) ? '#fff' : '';
+                if (btn) btn.style.borderColor = (t === type) ? '#2d6a4f' : '';
+            });
+            cfRender();
+        }
+
+        function cfToggleAll(cb) {
+            document.querySelectorAll('.cf-chk').forEach(c => c.checked = cb.checked);
+        }
+
+        async function cfLoad() {
+            document.getElementById('cf-cta').style.display = 'none';
+            document.getElementById('cf-status').textContent = 'Scanning posts...';
+            document.getElementById('cf-toolbar').style.display = 'flex';
+            document.getElementById('cf-stats').style.display = 'none';
+            document.getElementById('cf-table').style.display = 'none';
+            document.getElementById('cf-reload-hdr').style.display = '';
+            document.getElementById('cf-hideposts-hdr').style.display = '';
+
+            const fd = new FormData();
+            fd.append('action', 'cs_catfix_load');
+            fd.append('nonce', cfNonce);
+            const r = await fetch(ajaxurl, {method:'POST', body:fd});
+            const d = await r.json();
+            if (!d.success) { document.getElementById('cf-status').textContent = 'Error loading posts.'; return; }
+
+            cfAllPosts = d.posts;
+            cfPage = 1;
+            document.getElementById('cf-table').style.display = 'table';
+            document.getElementById('cf-legend').style.display = 'block';
+            cfFilter('all'); // default to all posts view after scan
+        }
+
+        async function cfApplyOne(postId) {
+            const p = cfAllPosts.find(x => x.post_id === postId);
+            if (!p) return;
+            const fd = new FormData();
+            fd.append('action', 'cs_catfix_apply');
+            fd.append('nonce', cfNonce);
+            fd.append('post_id', postId);
+            p.proposed_ids.forEach(id => fd.append('proposed_ids[]', id));
+            const r = await fetch(ajaxurl, {method:'POST', body:fd});
+            const d = await r.json();
+            if (d.success) {
+                p.status = 'applied';
+                cfRender();
+            }
+        }
+
+        async function cfSkipOne(postId) {
+            const p = cfAllPosts.find(x => x.post_id === postId);
+            if (!p) return;
+            const fd = new FormData();
+            fd.append('action', 'cs_catfix_skip');
+            fd.append('nonce', cfNonce);
+            fd.append('post_id', postId);
+            await fetch(ajaxurl, {method:'POST', body:fd});
+            p.status = 'skipped';
+            cfRender();
+        }
+
+        async function cfAiOne(postId) {
+            const fd = new FormData();
+            fd.append('action', 'cs_catfix_ai_one');
+            fd.append('nonce', cfNonce);
+            fd.append('post_id', postId);
+            const r = await fetch(ajaxurl, {method:'POST', body:fd});
+            const d = await r.json();
+            if (!d.success) return null;
+            // Merge result back into cfAllPosts
+            const idx = cfAllPosts.findIndex(p => p.post_id === postId);
+            if (idx !== -1) {
+                cfAllPosts[idx] = Object.assign(cfAllPosts[idx], {
+                    proposed_ids:    d.proposed_ids,
+                    proposed_names:  d.proposed_names,
+                    add_ids:         d.add_ids,
+                    add_names:       d.add_names,
+                    remove_ids:      d.remove_ids,
+                    remove_names:    d.remove_names,
+                    unchanged_names: d.unchanged_names,
+                    confidence:      d.confidence,
+                    changed:         d.changed,
+                    source:          'ai',
+                    status:          'pending',
+                });
+            }
+            return d;
+        }
+
+        async function cfAiAnalyseAll() {
+            const btn = document.getElementById('cf-ai-btn');
+            btn.disabled = true;
+            const posts = cfAllPosts.filter(p => p.status !== 'applied' && p.status !== 'skipped');
+            const total = posts.length;
+            let done = 0;
+            for (const p of posts) {
+                document.getElementById('cf-status').textContent = `AI analysing ${++done} / ${total}...`;
+                await cfAiOne(p.post_id);
+                // Re-apply current filter so row updates live
+                const active = document.querySelector('[id^="cf-f-"][style*="#2d6a4f"]');
+                const type = active ? active.id.replace('cf-f-','') : 'changed';
+                cfFilter(type);
+            }
+            document.getElementById('cf-status').textContent = `AI analysis complete. ${total} posts analysed.`;
+            btn.disabled = false;
+        }
+
+        async function cfReanalyse(postId) {
+            // Now uses AI instead of local scorer
+            document.getElementById('cf-status').textContent = `AI analysing post ${postId}...`;
+            const d = await cfAiOne(postId);
+            if (d) {
+                const active = document.querySelector('[id^="cf-f-"][style*="#2d6a4f"]');
+                const type = active ? active.id.replace('cf-f-','') : 'changed';
+                cfFilter(type);
+                document.getElementById('cf-status').textContent = `AI re-analysis complete.`;
+            }
+        }
+
+        async function cfBulkApply() {
+            const checked = Array.from(document.querySelectorAll('.cf-chk:checked')).map(c => parseInt(c.dataset.pid));
+            const targets = checked.length
+                ? cfAllPosts.filter(p => checked.includes(p.post_id) && p.changed && p.status !== 'applied')
+                : cfAllPosts.filter(p => p.changed && p.status !== 'applied');
+            if (!targets.length) { alert('No changed posts to apply.'); return; }
+            if (!confirm(`Apply category changes to ${targets.length} posts?`)) return;
+
+            const fd = new FormData();
+            fd.append('action', 'cs_catfix_bulk_apply');
+            fd.append('nonce', cfNonce);
+            targets.forEach((p, i) => {
+                fd.append(`items[${i}][post_id]`, p.post_id);
+                p.proposed_ids.forEach(id => fd.append(`items[${i}][proposed_ids][]`, id));
+            });
+            const r = await fetch(ajaxurl, {method:'POST', body:fd});
+            const d = await r.json();
+            if (d.success) {
+                targets.forEach(p => p.status = 'applied');
+                document.getElementById('cf-status').textContent = `Applied ${d.applied} posts.`;
+                cfRender();
+            }
+        }
+
+        // ── Category Health ───────────────────────────────────────────────────
+        const chNonce = '<?php echo esc_js(wp_create_nonce('cs_seo_nonce')); ?>';
+        let chData = [];
+
+        async function chLoad() {
+            const cta    = document.getElementById('ch-cta');
+            const wrap   = document.getElementById('ch-wrap');
+            const stats  = document.getElementById('ch-stats');
+            const legend = document.getElementById('ch-legend');
+            const reload    = document.getElementById('ch-reload-hdr');
+            const hideBtn   = document.getElementById('ch-hideposts-hdr');
+            cta.style.display = 'none';
+            wrap.innerHTML = '<p style="color:#555;font-size:13px;padding:12px 0;">&#9203; Loading categories...</p>';
+            const fd = new FormData();
+            fd.append('action', 'cs_catfix_health');
+            fd.append('nonce', chNonce);
+            const r = await fetch(ajaxurl, {method:'POST', body:fd});
+            const d = await r.json();
+            if (!d.success) { wrap.innerHTML = '<p style="color:#c3372b;">Error loading health data.</p>'; return; }
+            chData = d.categories;
+            reload.style.display   = '';
+            hideBtn.style.display  = '';
+            stats.style.display    = 'flex';
+            legend.style.display = 'block';
+            chRenderStats();
+            chRenderTable();
+        }
+
+        function chGradeBadge(grade) {
+            const map = {
+                strong:        {bg:'#1a7a34', label:'Strong'},
+                moderate:      {bg:'#e67e00', label:'Moderate'},
+                new:           {bg:'#2271b1', label:'New'},
+                weak:          {bg:'#b8a200', label:'Weak'},
+                empty:         {bg:'#d63638', label:'Empty'},
+                uncategorized: {bg:'#787c82', label:'Uncategorized'},
+            };
+            const g = map[grade] || {bg:'#555', label:grade};
+            return `<span style="display:inline-block;background:${g.bg};color:#fff;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:600;white-space:nowrap;">${g.label}</span>`;
+        }
+
+        function chRenderStats() {
+            const counts = {strong:0, moderate:0, new:0, weak:0, empty:0, uncategorized:0};
+            chData.forEach(c => { if (counts[c.grade] !== undefined) counts[c.grade]++; });
+            const colors = {strong:'#1a7a34', moderate:'#e67e00', new:'#2271b1', weak:'#b8a200', empty:'#d63638', uncategorized:'#787c82'};
+            const labels = {strong:'Strong', moderate:'Moderate', new:'New', weak:'Weak', empty:'Empty', uncategorized:'Uncategorized'};
+            document.getElementById('ch-stats').innerHTML = Object.entries(counts).map(([g, n]) =>
+                `<span style="display:inline-flex;align-items:center;gap:6px;background:#f6f7f7;border:1px solid #ddd;border-radius:8px;padding:4px 12px;font-size:12px;">
+                    <span style="width:10px;height:10px;border-radius:50%;background:${colors[g]};display:inline-block;"></span>
+                    <strong>${labels[g]}</strong>: ${n}
+                </span>`
+            ).join('');
+        }
+
+        function chRenderTable() {
+            const wrap = document.getElementById('ch-wrap');
+            if (!chData.length) { wrap.innerHTML = '<p style="color:#555;">No categories found.</p>'; return; }
+            const rows = chData.map(c => {
+                const postRows = c.posts.length
+                    ? c.posts.map(p =>
+                        `<li style="margin:2px 0;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${p.title}</a></li>`
+                      ).join('')
+                    : '<li style="color:#888;font-size:12px;">No published posts</li>';
+                const expandId = `ch-posts-${c.id}`;
+                const postToggle = `<button class="button button-small" onclick="chToggle(${c.id})" id="ch-btn-${c.id}" style="font-size:11px;">&#9660; Show posts</button>`;
+                const editLink   = `<a href="${c.edit_url}" target="_blank" class="button button-small" style="font-size:11px;">Edit</a>`;
+                const rowBg = c.grade === 'uncategorized' ? '#fff8e1' : (c.grade === 'empty' ? '#fff5f5' : '#fff');
+                return `<tr style="border-bottom:1px solid #f0f0f0;background:${rowBg};">
+                    <td style="padding:10px 12px;font-weight:600;font-size:13px;">${c.name}</td>
+                    <td style="padding:10px 12px;text-align:center;font-size:13px;">${c.count}</td>
+                    <td style="padding:10px 12px;">${chGradeBadge(c.grade)}</td>
+                    <td style="padding:10px 12px;white-space:nowrap;">${postToggle} ${editLink}</td>
+                </tr>
+                <tr id="${expandId}" style="display:none;background:#fafafa;">
+                    <td colspan="4" style="padding:8px 24px 12px;">
+                        <ul style="margin:0;padding:0;list-style:none;columns:2;gap:16px;">${postRows}</ul>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            wrap.innerHTML = `<table style="width:100%;min-width:500px;border-collapse:collapse;font-size:13px;">
+                <thead><tr style="background:#f0f0f0;">
+                    <th style="padding:8px 12px;text-align:left;">Category</th>
+                    <th style="padding:8px 12px;text-align:center;width:80px;">Posts</th>
+                    <th style="padding:8px 12px;text-align:left;width:130px;">Health</th>
+                    <th style="padding:8px 12px;text-align:left;width:160px;">Actions</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        }
+
+        function chToggle(catId) {
+            const row = document.getElementById('ch-posts-' + catId);
+            const btn = document.getElementById('ch-btn-' + catId);
+            if (!row) return;
+            const visible = row.style.display !== 'none';
+            row.style.display = visible ? 'none' : 'table-row';
+            btn.innerHTML = visible ? '&#9660; Show posts' : '&#9650; Hide posts';
+        }
+
+        let chPostsVisible = true;
+        function chToggleAllPosts() {
+            chPostsVisible = !chPostsVisible;
+            document.querySelectorAll('[id^="ch-posts-"]').forEach(row => {
+                row.style.display = chPostsVisible ? 'table-row' : 'none';
+            });
+            document.querySelectorAll('[id^="ch-btn-"]').forEach(btn => {
+                btn.innerHTML = chPostsVisible ? '&#9650; Hide posts' : '&#9660; Show posts';
+            });
+            const hdr = document.getElementById('ch-hideposts-hdr');
+            if (hdr) hdr.innerHTML = chPostsVisible ? '&#128065; Hide Posts' : '&#128065; Show Posts';
+        }
+
+        let cfPostsVisible = true;
+        function cfTogglePosts() {
+            cfPostsVisible = !cfPostsVisible;
+            // Toggle the Post title column (col index 1 in cf-table)
+            const table = document.getElementById('cf-table');
+            if (!table) return;
+            table.querySelectorAll('tr').forEach(row => {
+                const cells = row.children;
+                if (cells[1]) cells[1].style.display = cfPostsVisible ? '' : 'none';
+            });
+            const hdr = document.getElementById('cf-hideposts-hdr');
+            if (hdr) hdr.innerHTML = cfPostsVisible ? '&#128065; Hide Posts' : '&#128065; Show Posts';
+        }
+
+        // ── Category Drift ───────────────────────────────────────────────
+        const cdNonce = '<?php echo esc_js(wp_create_nonce('cs_seo_nonce')); ?>';
+        let cdDrift      = [];
+        let cdTotalPosts = 0;
+
+        // cdRender: display already-fetched drift data without any API call
+        function cdRender(totalPosts, cachedAt) {
+            const cta     = document.getElementById('cd-cta');
+            const wrap    = document.getElementById('cd-wrap');
+            const summary = document.getElementById('cd-summary');
+            const reload  = document.getElementById('cd-reload-hdr');
+            cta.style.display     = 'none';
+            reload.style.display  = '';
+            summary.style.display = 'block';
+            if (!cdDrift.length) {
+                summary.innerHTML = '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;color:#1a7a34;font-size:13px;">&#10003; AI found no category drift across ' + totalPosts + ' posts. Your taxonomy looks semantically consistent.</div>';
+                wrap.innerHTML = '';
+                return;
+            }
+            const catchAll = cdDrift.filter(c => c.verdict === 'catch-all').length;
+            const drifting = cdDrift.filter(c => c.verdict === 'drifting').length;
+            let parts = [];
+            if (catchAll) parts.push(`<strong>${catchAll}</strong> catch-all ${catchAll === 1 ? 'category' : 'categories'}`);
+            if (drifting) parts.push(`<strong>${drifting}</strong> drifting ${drifting === 1 ? 'category' : 'categories'}`);
+            const cacheNote = cachedAt ? ` <span style="font-size:11px;opacity:0.75;">(cached &mdash; ${cachedAt})</span>` : '';
+            summary.innerHTML = '<div style="background:#fef9ec;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;color:#92400e;font-size:13px;">'
+                + '&#129302; AI identified ' + parts.join(' and ') + ' across ' + totalPosts + ' posts.' + cacheNote + '</div>';
+            cdRenderDrift();
+        }
+
+        // cdLoadFromCache: called by the Load Cached Results button
+        async function cdLoadFromCache() {
+            const cta     = document.getElementById('cd-cta');
+            const wrap    = document.getElementById('cd-wrap');
+            const reload  = document.getElementById('cd-reload-hdr');
+            const cacheBtn = document.getElementById('cd-btn-cache');
+            const ctaMsg  = document.getElementById('cd-cta-msg');
+
+            // Already have data in memory from this session — just re-render, no AJAX needed
+            if (cdDrift && cdDrift.length > 0) {
+                cta.style.display = 'none';
+                if (reload) reload.style.display = 'inline-block';
+                cdRender(cdTotalPosts);
+                return;
+            }
+
+            // Show loading state on the button only
+            if (cacheBtn) { cacheBtn.disabled = true; cacheBtn.innerHTML = '&#128336; Checking cache…'; }
+
+            const fd = new FormData();
+            fd.append('action', 'cs_catfix_drift_cache_get');
+            fd.append('nonce', cdNonce);
+            const r = await fetch(ajaxurl, {method:'POST', body:fd});
+            const d = await r.json();
+
+            if (d.success) {
+                cta.style.display = 'none';
+                cdDrift      = d.drift;
+                cdTotalPosts = d.total_posts;
+                if (reload) reload.style.display = 'inline-block';
+                cdRender(cdTotalPosts, d.cached_at);
+            } else if (d.stale) {
+                // Taxonomy has changed but data is still useful — just load it silently
+                cta.style.display = 'none';
+                cdDrift      = d.drift;
+                cdTotalPosts = d.total_posts;
+                if (reload) reload.style.display = 'inline-block';
+                cdRender(cdTotalPosts, d.cached_at);
+            } else {
+                // No cache at all
+                if (cacheBtn) { cacheBtn.disabled = false; cacheBtn.innerHTML = '&#128336; Load Cached Results'; }
+                if (ctaMsg) { ctaMsg.innerHTML = '&#9888; No cached results found. Run a fresh AI analysis below.'; ctaMsg.style.color = '#b8860b'; }
+            }
+        }
+
+        // cdLoad: always makes a fresh API call — called by Re-run Analysis button
+        async function cdLoad() {
+            const cta     = document.getElementById('cd-cta');
+            const wrap    = document.getElementById('cd-wrap');
+            const summary = document.getElementById('cd-summary');
+            const reload  = document.getElementById('cd-reload-hdr');
+            cta.style.display     = 'none';
+            summary.style.display = 'none';
+            wrap.innerHTML = '<p style="color:#555;font-size:13px;padding:12px 0;">&#129302; Asking AI to analyse your taxonomy&hellip; this may take a few seconds.</p>';
+            const fd = new FormData();
+            fd.append('action', 'cs_catfix_drift');
+            fd.append('nonce', cdNonce);
+            const r = await fetch(ajaxurl, {method:'POST', body:fd});
+            const d = await r.json();
+            if (!d.success) {
+                wrap.innerHTML = `<p style="color:#c3372b;font-size:13px;">&#9888; ${d.error || 'Error running drift analysis.'}</p>`;
+                cta.style.display = 'block';
+                return;
+            }
+            cdDrift      = d.drift;
+            cdTotalPosts = d.total_posts;
+            if (reload) reload.style.display = 'inline-block';
+            cdRender(cdTotalPosts);
+        }
+
+        // cdAnalyseRemaining: analyses unassigned posts for one category and merges moves
+        async function cdAnalyseRemaining(btn, catIdx) {
+            const c = cdDrift[catIdx];
+            if (!c) return;
+            const assignedTitles = (c.moves || []).flatMap(m => m.titles || []);
+            const allPosts = c.posts || [];
+
+            // Keep button in place showing loading state — do NOT re-render the table
+            btn.disabled = true;
+            btn.innerHTML = '&#129302; Analysing…';
+
+            const fd = new FormData();
+            fd.append('action',          'cs_catfix_drift_analyse_remaining');
+            fd.append('nonce',           cdNonce);
+            fd.append('cat_id',          c.cat_id);
+            fd.append('cat_name',        c.cat_name);
+            fd.append('assigned_titles', JSON.stringify(assignedTitles));
+            const r = await fetch(ajaxurl, {method:'POST', body:fd});
+            const d = await r.json();
+
+            if (!d.success) {
+                btn.disabled = false;
+                btn.innerHTML = '&#9888; ' + (d.error || 'Error');
+                return;
+            }
+
+            const newMoves = d.moves || [];
+
+            if (!newMoves.length) {
+                btn.innerHTML = '&#10003; All posts already in correct categories';
+                btn.style.background = '#1a7a34';
+                return;
+            }
+
+            // Merge into cdDrift state
+            cdDrift[catIdx].moves = [...(cdDrift[catIdx].moves || []), ...newMoves];
+
+            // Find the moves column for this row and inject new groups without re-rendering
+            const movesCell = document.querySelector(`#cd-move-cell-${catIdx}`);
+            if (movesCell) {
+                const newAssignedIds = new Set();
+                newMoves.forEach((m, midx) => {
+                    const globalMidx = (c.moves.length - newMoves.length) + midx;
+                    const groupId = `cd-move-${catIdx}-${globalMidx}`;
+                    const matchedPosts = (m.titles || []).map(t => cdMatchPost(t, allPosts)).filter(Boolean);
+                    matchedPosts.forEach(p => newAssignedIds.add(p.id));
+                    const postItems = matchedPosts.map(p =>
+                        `<li style="padding:4px 0;border-bottom:1px solid #f0eaff;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${p.title}</a></li>`
+                    ).join('');
+                    const postCount = matchedPosts.length;
+                    const toggleBtn = postCount > 0
+                        ? `<button class="button button-small" onclick="cdTogglePosts('${groupId}', this)" style="font-size:11px;margin:4px 0 0;">&#9660; ${postCount} post${postCount !== 1 ? 's' : ''}</button>`
+                        : `<span style="font-size:11px;color:#aaa;">No matched posts</span>`;
+                    const postList = postCount > 0
+                        ? `<div id="${groupId}" style="display:none;margin-top:6px;"><ul style="margin:0;padding:0;list-style:none;">${postItems}</ul></div>`
+                        : '';
+                    const div = document.createElement('div');
+                    div.style.cssText = 'margin-bottom:12px;padding-bottom:10px;border-bottom:1px dashed #d8c8f0;';
+                    div.innerHTML = `<div style="font-weight:600;font-size:12px;color:#fff;background:#6b3fa0;border-radius:4px;padding:3px 8px;display:inline-block;margin-bottom:3px;">&#8594; ${m.to}</div>
+                        <div style="font-size:11px;color:#666;font-style:italic;margin-bottom:4px;">${m.because || ''}</div>
+                        ${toggleBtn}${postList}`;
+                    movesCell.appendChild(div);
+                });
+            }
+
+            // Update the analyse button to reflect remaining unanalysed count
+            const allAssignedTitles = cdDrift[catIdx].moves.flatMap(m => m.titles || []);
+            const stillUnassigned = allPosts.filter(p => !allAssignedTitles.some(t => {
+                const n = t.toLowerCase().trim(), h = p.title.toLowerCase().trim();
+                return h.includes(n) || n.includes(h);
+            }));
+            if (stillUnassigned.length > 0) {
+                btn.disabled = false;
+                btn.innerHTML = `&#129302; Analyse ${stillUnassigned.length} remaining`;
+            } else {
+                btn.innerHTML = '&#10003; All posts classified';
+                btn.style.background = '#1a7a34';
+                btn.style.borderColor = '#1a7a34';
+                btn.disabled = true;
+            }
+        }
+
+        function cdVerdictBadge(verdict, confidence) {
+            const vMap = {
+                'catch-all': {bg:'#d63638', label:'Catch-all'},
+                'drifting':  {bg:'#e67e00', label:'Drifting'},
+            };
+            const cMap = {high:'High', medium:'Medium', low:'Low'};
+            const v = vMap[verdict] || {bg:'#787c82', label: verdict};
+            const cLabel = cMap[confidence] || confidence;
+            return `<span style="display:inline-block;background:${v.bg};color:#fff;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:600;white-space:nowrap;margin-bottom:4px;">${v.label}</span>`
+                 + `<br><span style="font-size:11px;color:#888;">${cLabel} confidence</span>`;
+        }
+
+        function cdRenderDrift() {
+            const wrap = document.getElementById('cd-wrap');
+            // Match an AI title string to a real post object (fuzzy: substring match both ways)
+            function cdMatchPost(titleStr, posts) {
+                const needle = titleStr.toLowerCase().trim();
+                return posts.find(p => {
+                    const hay = p.title.toLowerCase().trim();
+                    return hay.includes(needle) || needle.includes(hay);
+                }) || null;
+            }
+
+            const rows = cdDrift.map((c, idx) => {
+                const allPosts = c.posts || [];
+                const totalCount = c.post_count || 0;
+                const moves = c.moves || [];
+
+                // Track which post IDs have been assigned to a move group
+                const assignedIds = new Set();
+
+                // Render each move group with its own collapsible post list
+                const movesHtml = moves.length
+                    ? moves.map((m, midx) => {
+                        const groupId = `cd-move-${idx}-${midx}`;
+                        const matchedPosts = (m.titles || []).map(t => cdMatchPost(t, allPosts)).filter(Boolean);
+                        matchedPosts.forEach(p => assignedIds.add(p.id));
+
+                        const postItems = matchedPosts.map(p =>
+                            `<li style="padding:4px 0;border-bottom:1px solid #f0eaff;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${p.title}</a></li>`
+                        ).join('');
+                        const postCount = matchedPosts.length;
+                        const toggleBtn = postCount > 0
+                            ? `<button class="button button-small" onclick="cdTogglePosts('${groupId}', this)" style="font-size:11px;margin:4px 0 0;">&#9660; ${postCount} post${postCount !== 1 ? 's' : ''}</button>`
+                            : `<span style="font-size:11px;color:#aaa;">No matched posts</span>`;
+                        const postList = postCount > 0
+                            ? `<div id="${groupId}" style="display:none;margin-top:6px;"><ul style="margin:0;padding:0;list-style:none;">${postItems}</ul></div>`
+                            : '';
+
+                        return `<div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px dashed #d8c8f0;">
+                            <div style="font-weight:600;font-size:12px;color:#fff;background:#6b3fa0;border-radius:4px;padding:3px 8px;display:inline-block;margin-bottom:3px;">&#8594; ${m.to}</div>
+                            <div style="font-size:11px;color:#666;font-style:italic;margin-bottom:4px;">${m.because || ''}</div>
+                            ${toggleBtn}${postList}
+                        </div>`;
+                    }).join('')
+                    : `<span style="color:#888;font-size:11px;">No structured moves returned</span>`;
+
+                // Unanalysed posts (those not matched to any move group)
+                const unassigned = allPosts.filter(p => !assignedIds.has(p.id));
+                const unassignedId = `cd-posts-${idx}`;
+                const unassignedHtml = (() => {
+                    if (!allPosts.length) return '';
+                    const listSrc = unassigned.length ? unassigned : allPosts;
+                    const uCount  = listSrc.length;
+                    const label   = unassigned.length
+                        ? `&#9660; ${uCount} unanalysed post${uCount !== 1 ? 's' : ''}`
+                        : `&#9660; All ${uCount} posts analysed`;
+                    const items = listSrc.map(p =>
+                        `<li style="padding:5px 0;border-bottom:1px solid #ede8f5;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${p.title}</a></li>`
+                    ).join('');
+                    const analyseBtn = unassigned.length
+                        ? `<div style="margin-top:8px;"><button class="button button-small" onclick="cdAnalyseRemaining(this, ${idx})" style="font-size:11px;background:#6b3fa0;border-color:#6b3fa0;color:#fff;">&#129302; Analyse ${uCount} remaining</button></div>`
+                        : '';
+                    return `<button class="button button-small" onclick="cdTogglePosts('${unassignedId}', this)" style="font-size:11px;">${label}</button>
+                        <div id="${unassignedId}" style="display:none;margin-top:6px;"><ul style="margin:0;padding:0;list-style:none;border-top:1px solid #ede8f5;">${items}</ul></div>
+                        ${analyseBtn}`;
+                })();
+
+                // Action badge
+                const actionStr = (c.action || '').toLowerCase();
+                const actionColor = actionStr.startsWith('delete') ? '#d63638' : actionStr === 'rename' ? '#e67e00' : '#1a7a34';
+                const actionHtml = c.action
+                    ? `<div style="margin-top:8px;"><span style="font-size:11px;font-weight:600;background:${actionColor};color:#fff;border-radius:4px;padding:2px 8px;">${c.action}</span></div>`
+                    : '';
+
+                const rowBg = c.verdict === 'catch-all' ? '#fff5f5' : '#fffbf0';
+                return `<tr style="border-bottom:2px solid #e0d0f0;vertical-align:top;background:${rowBg};">
+                    <td style="padding:12px;font-weight:600;font-size:13px;min-width:130px;">
+                        ${c.cat_name}
+                        <div style="font-size:11px;font-weight:400;color:#888;margin-top:2px;">${totalCount} posts total</div>
+                        ${actionHtml}
+                    </td>
+                    <td style="padding:12px;min-width:110px;">${cdVerdictBadge(c.verdict, c.confidence)}</td>
+                    <td style="padding:12px;min-width:200px;font-size:12px;color:#3c434a;line-height:1.5;">${c.reason || ''}</td>
+                    <td id="cd-move-cell-${idx}" style="padding:12px;min-width:260px;">${movesHtml}</td>
+                    <td style="padding:12px;min-width:160px;">${unassignedHtml}</td>
+                </tr>`;
+            }).join('');
+
+            wrap.innerHTML = `<table style="width:100%;min-width:800px;border-collapse:collapse;font-size:13px;">
+                <thead><tr style="background:#f0f0f0;">
+                    <th style="padding:8px 12px;text-align:left;">Category</th>
+                    <th style="padding:8px 12px;text-align:left;width:110px;">Verdict</th>
+                    <th style="padding:8px 12px;text-align:left;width:200px;">AI Reasoning</th>
+                    <th style="padding:8px 12px;text-align:left;">Where to move posts</th>
+                    <th style="padding:8px 12px;text-align:left;width:160px;">Remaining posts</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        }
+
+        function cdTogglePosts(id, btn) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const open = el.style.display !== 'none';
+            el.style.display = open ? 'none' : 'block';
+            btn.innerHTML = open ? btn.innerHTML.replace('&#9650;', '&#9660;').replace('Hide', 'Show') : btn.innerHTML.replace('&#9660;', '&#9650;').replace('Show', 'Hide');
+        }
+
+        // =====================================================================
+        // Related Articles — admin UI
+        // =====================================================================
+
+        function rcCheckCountWarning(input, warnId) {
+            const saved = parseInt(input.dataset.saved, 10) || 0;
+            const now   = parseInt(input.value, 10) || 0;
+            const warn  = document.getElementById(warnId);
+            if (warn) warn.style.display = (now > saved) ? 'block' : 'none';
+        }
+
+        let rcCurrentFilter = 'all';
+        let rcCurrentPage   = 1;
+        let rcTotalPages    = 1;
+        let rcBatchQueue    = [];
+        let rcBatchRunning  = false;
+        let rcBatchStop     = false;
+        let rcBatchDone     = 0;
+        let rcBatchTotal    = 0;
+
+        const rcNonce = '<?php echo esc_js(wp_create_nonce("cs_seo_nonce")); ?>';
+
+        // ── Status badge helper
+        function rcBadge(status, step) {
+            const map = {
+                pending:    '<span style="background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Pending</span>',
+                processing: '<span style="background:#eff6ff;color:#2563eb;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Processing</span>',
+                complete:   '<span style="background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">&#9989; Complete</span>',
+                error:      '<span style="background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">&#10060; Error</span>',
+                skipped:    '<span style="background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">&#9745; Skipped</span>',
+            };
+            return map[status] || '<span style="background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">' + status + '</span>';
+        }
+
+        // ── Load posts into table
+        async function rcLoadTable(page, filter) {
+            page   = page   || rcCurrentPage;
+            filter = filter || rcCurrentFilter;
+            rcCurrentPage   = page;
+            rcCurrentFilter = filter;
+
+            const tbody = document.getElementById('rc-posts-tbody');
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#999;">Loading…</td></tr>';
+
+            const fd = new FormData();
+            fd.append('action', 'cs_rc_get_posts');
+            fd.append('nonce',  rcNonce);
+            fd.append('page',   page);
+            fd.append('filter', filter);
+
+            try {
+                const r = await fetch(ajaxurl, { method: 'POST', body: fd });
+                const d = await r.json();
+                if (!d.success) { tbody.innerHTML = '<tr><td colspan="6" style="color:#b91c1c;padding:24px;text-align:center;">Error: ' + (d.data?.message || 'Unknown') + '</td></tr>'; return; }
+
+                rcTotalPages = d.data.total_pages || 1;
+                const posts  = d.data.posts || [];
+
+                if (!posts.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#999;">No posts found.</td></tr>';
+                    rcRenderPagination();
+                    return;
+                }
+
+                tbody.innerHTML = posts.map(p => {
+                    const err = p.error ? '<br><small style="color:#b91c1c;">' + p.error.substring(0, 80) + '</small>' : '';
+                    return '<tr id="rc-row-' + p.id + '">' +
+                        '<td><a href="?post=' + p.id + '&action=edit" target="_blank" style="font-weight:500;">' + p.title + '</a></td>' +
+                        '<td style="text-align:center;">' + rcBadge(p.status, p.last_step) + err + '</td>' +
+                        '<td style="text-align:center;color:#6366f1;font-weight:600;">' + (p.top_count || '—') + '</td>' +
+                        '<td style="text-align:center;color:#0e7490;font-weight:600;">' + (p.bot_count || '—') + '</td>' +
+                        '<td style="text-align:center;color:#6b7280;font-size:12px;">' + (p.generated || '—') + '</td>' +
+                        '<td style="text-align:center;">' +
+                            '<button class="button" onclick="rcRunOne(' + p.id + ')" style="font-size:11px;padding:2px 8px;">&#9654; Run</button> ' +
+                            '<button class="button" onclick="rcResetOne(' + p.id + ')" style="font-size:11px;padding:2px 8px;color:#b91c1c;border-color:#b91c1c;">&#128465;</button>' +
+                        '</td>' +
+                    '</tr>';
+                }).join('');
+
+                rcRenderPagination();
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="6" style="color:#b91c1c;padding:24px;text-align:center;">Network error: ' + e.message + '</td></tr>';
+            }
+        }
+
+        function rcRenderPagination() {
+            const el = document.getElementById('rc-pagination');
+            if (rcTotalPages <= 1) { el.innerHTML = ''; return; }
+            let html = '<span style="font-size:13px;color:#1d2327;">Page</span>';
+            for (let i = 1; i <= rcTotalPages; i++) {
+                const active = i === rcCurrentPage ? 'button-primary' : '';
+                html += '<button type="button" class="button ' + active + '" onclick="rcLoadTable(' + i + ')" style="min-width:32px;">' + i + '</button>';
+            }
+            el.innerHTML = html;
+        }
+
+        function rcSetFilter(filter, btn) {
+            rcCurrentFilter = filter;
+            rcCurrentPage   = 1;
+            document.querySelectorAll('.rc-filter-btn').forEach(b => b.classList.remove('rc-filter-active'));
+            if (btn) btn.classList.add('rc-filter-active');
+            rcLoadTable(1, filter);
+        }
+
+        // ── Run all 8 steps for one post, polling until done
+        // Updates a single table row in-place without reloading the full table or scrolling.
+        function rcUpdateRow(postId, status, topCount, botCount, generated, errorMsg) {
+            const row = document.getElementById('rc-row-' + postId);
+            if (!row) return;
+            row.querySelector('td:nth-child(2)').innerHTML = rcBadge(status) + (errorMsg ? '<br><small style="color:#b91c1c;">' + errorMsg.substring(0, 80) + '</small>' : '');
+            row.querySelector('td:nth-child(3)').textContent = topCount || '\u2014';
+            row.querySelector('td:nth-child(3)').style.color = topCount ? '#6366f1' : '';
+            row.querySelector('td:nth-child(3)').style.fontWeight = topCount ? '600' : '';
+            row.querySelector('td:nth-child(4)').textContent = botCount || '\u2014';
+            row.querySelector('td:nth-child(4)').style.color = botCount ? '#0e7490' : '';
+            row.querySelector('td:nth-child(4)').style.fontWeight = botCount ? '600' : '';
+            row.querySelector('td:nth-child(5)').textContent = generated || '\u2014';
+        }
+
+        async function rcRunOne(postId) {
+            const row = document.getElementById('rc-row-' + postId);
+            if (row) {
+                row.querySelector('td:nth-child(2)').innerHTML = '<span style="background:#eff6ff;color:#2563eb;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Running\u2026</span>';
+            }
+
+            let done = false;
+            while (!done) {
+                const fd = new FormData();
+                fd.append('action',  'cs_rc_step');
+                fd.append('nonce',   rcNonce);
+                fd.append('post_id', postId);
+
+                const r = await fetch(ajaxurl, { method: 'POST', body: fd });
+                const d = await r.json();
+
+                if (!d.success) {
+                    rcUpdateRow(postId, 'error', 0, 0, '', d.data?.message || d.error || 'Failed');
+                    return;
+                }
+
+                done = d.data.done;
+            }
+
+            // Fetch final state for this post to update counts — search current page first, then page 1
+            for (const pg of [rcCurrentPage, 1]) {
+                const fd2 = new FormData();
+                fd2.append('action', 'cs_rc_get_posts');
+                fd2.append('nonce',  rcNonce);
+                fd2.append('page',   pg);
+                fd2.append('filter', 'all');
+                const r2 = await fetch(ajaxurl, { method: 'POST', body: fd2 });
+                const d2 = await r2.json();
+                if (d2.success) {
+                    const p = (d2.data.posts || []).find(x => x.id === postId);
+                    if (p) { rcUpdateRow(postId, p.status, p.top_count, p.bot_count, p.generated, p.error); break; }
+                }
+            }
+        }
+
+        // ── Reset one post
+        async function rcResetOne(postId) {
+            if (!confirm('Reset Related Articles data for this post?')) return;
+            const fd = new FormData();
+            fd.append('action',  'cs_rc_reset');
+            fd.append('nonce',   rcNonce);
+            fd.append('post_id', postId);
+            fd.append('mode',    'one');
+            await fetch(ajaxurl, { method: 'POST', body: fd });
+            rcUpdateRow(postId, 'pending', 0, 0, '', '');
+        }
+
+        // ── Reset all posts
+        async function rcResetAll() {
+            if (!confirm('This will delete all Related Articles data for ALL posts. Are you sure?')) return;
+            const fd = new FormData();
+            fd.append('action', 'cs_rc_reset');
+            fd.append('nonce',  rcNonce);
+            fd.append('mode',   'all');
+            await fetch(ajaxurl, { method: 'POST', body: fd });
+            await rcLoadTable(1, 'all');
+        }
+
+        // ── Batch generation
+        async function rcBatch(mode) {
+            if (rcBatchRunning) return;
+
+            // Build queue based on mode
+            // Fetch all posts matching the mode filter, then queue their IDs
+            const filterMap = { missing: 'pending', stale: 'all', failed: 'error' };
+            const filter    = filterMap[mode] || 'pending';
+
+            // Load up to 200 posts to batch-process
+            const fd = new FormData();
+            fd.append('action', 'cs_rc_get_posts');
+            fd.append('nonce',  rcNonce);
+            fd.append('page',   1);
+            fd.append('filter', filter);
+            const r  = await fetch(ajaxurl, { method: 'POST', body: fd });
+            const d  = await r.json();
+            if (!d.success) { alert('Could not load posts: ' + (d.data?.message || 'error')); return; }
+
+            let ids = (d.data.posts || []).map(p => p.id);
+            if (mode === 'missing') ids = ids.filter(id => { const row = document.getElementById('rc-row-' + id); return !row || row.querySelector('td:nth-child(2)')?.textContent?.trim() === 'Pending'; });
+
+            if (!ids.length) { alert('No posts to process for this mode.'); return; }
+
+            rcBatchQueue   = ids;
+            rcBatchRunning = true;
+            rcBatchStop    = false;
+            rcBatchDone    = 0;
+            rcBatchTotal   = ids.length;
+
+            document.getElementById('rc-batch-bar').style.display = 'block';
+            rcUpdateBatchProgress();
+
+            for (const postId of rcBatchQueue) {
+                if (rcBatchStop) break;
+                await rcRunOne(postId);
+                rcBatchDone++;
+                rcUpdateBatchProgress();
+                await new Promise(res => setTimeout(res, 300));
+            }
+
+            rcBatchRunning = false;
+            document.getElementById('rc-batch-bar').style.display = 'none';
+            if (rcBatchDone > 0) abPost('cs_seo_rebuild_health', {}).catch(() => {});
+            await rcLoadTable(rcCurrentPage, rcCurrentFilter);
+        }
+
+        function rcStopBatch() {
+            rcBatchStop = true;
+            rcBatchRunning = false;
+            document.getElementById('rc-batch-bar').style.display = 'none';
+        }
+
+        function rcUpdateBatchProgress() {
+            const pct = rcBatchTotal ? Math.round((rcBatchDone / rcBatchTotal) * 100) : 0;
+            document.getElementById('rc-batch-progress-bar').style.width = pct + '%';
+            document.getElementById('rc-batch-label').textContent = rcBatchDone + ' / ' + rcBatchTotal;
+        }
+
+        // ── Auto-load table when SEO tab is opened
+        (function() {
+            const origAbTab = typeof window.abTab === 'function' ? window.abTab : null;
+            window.__rcTabLoaded = false;
+            // Hook into tab switching via MutationObserver on the AI Tools panel
+            const rcPane = document.getElementById('ab-pane-aitools');
+            if (rcPane) {
+                const obs = new MutationObserver(() => {
+                    if (rcPane.classList.contains('active') && !window.__rcTabLoaded) {
+                        window.__rcTabLoaded = true;
+                        rcLoadTable(1, 'all');
+                    }
+                    if (!rcPane.classList.contains('active')) {
+                        window.__rcTabLoaded = false;
+                    }
+                });
+                obs.observe(rcPane, { attributes: true, attributeFilter: ['class'] });
+                // If already on AI Tools tab on load
+                if (rcPane.classList.contains('active')) {
+                    window.__rcTabLoaded = true;
+                    rcLoadTable(1, 'all');
+                }
+            }
+        })();
+
+        </script>
+        </div><!-- /wrap -->
+        <?php
+    }
+
+    private function tr_text(string $k, string $label, array $o, string $placeholder = '', string $hint = ''): void { ?>
+        <tr><th><label><?php echo esc_html($label); ?></label></th>
+            <td>
+                <input class="regular-text"
+                    name="<?php echo esc_attr(self::OPT); ?>[<?php echo esc_attr($k); ?>]"
+                    value="<?php echo esc_attr((string)($o[$k] ?? '')); ?>"
+                    <?php if ($placeholder) echo 'placeholder="' . esc_attr($placeholder) . '"'; ?>>
+                <?php if ($hint): ?>
+                    <p class="description"><?php echo esc_html($hint); ?></p>
+                <?php endif; ?>
+            </td></tr>
+    <?php }
+
+    private function tr_bool(string $k, string $label, array $o): void { ?>
+        <tr><th><?php echo esc_html($label); ?></th>
+            <td><label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[<?php echo esc_attr($k); ?>]" value="1" <?php checked((int)($o[$k] ?? 0), 1); ?>> Enabled</label></td></tr>
+    <?php }
+
+}

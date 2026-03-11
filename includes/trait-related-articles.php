@@ -1,0 +1,557 @@
+<?php
+// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
+trait CS_SEO_Related_Articles {
+    public function inject_related_links(string $content): string {
+        if (!is_singular('post') || is_admin()) return $content;
+        if (!in_the_loop() || !is_main_query()) return $content;
+        if (!(int)($this->opts['rc_enable'] ?? 1)) return $content;
+
+        $pid    = (int) get_the_ID();
+        $status = get_post_meta($pid, self::META_RC_STATUS, true);
+        if ($status !== 'complete') return $content;
+
+        $top_raw    = maybe_unserialize(get_post_meta($pid, self::META_RC_TOP,    true));
+        $bottom_raw = maybe_unserialize(get_post_meta($pid, self::META_RC_BOTTOM, true));
+        $top_ids    = array_values(array_filter(array_map('intval', is_array($top_raw)    ? $top_raw    : [])));
+        $bottom_ids = array_values(array_filter(array_map('intval', is_array($bottom_raw) ? $bottom_raw : [])));
+
+        // Slice to the current settings — decreasing the count just hides links immediately
+        // without needing regeneration. Increasing requires a regenerate (handled in admin UI).
+        $top_count    = max(2, min(5,  (int)($this->opts['rc_top_count']    ?? 3)));
+        $bottom_count = max(3, min(10, (int)($this->opts['rc_bottom_count'] ?? 5)));
+        $top_ids      = array_slice($top_ids,    0, $top_count);
+        $bottom_ids   = array_slice($bottom_ids, 0, $bottom_count);
+
+        // Top block — inject after the summary box div if present, otherwise prepend.
+        // prepend_summary_box() runs first (priority 10) so its output is already in $content.
+        // The summary box wrapper ends with a known closing </table></div> sequence we can
+        // anchor on via the unique class marker.
+        if ((int)($this->opts['rc_top_enabled'] ?? 1) && count($top_ids) >= 2) {
+            $top_html = $this->render_rc_block('Related Articles', $top_ids, 'top');
+            if (strpos($content, 'cs-seo-summary-box') !== false) {
+                // Append a sentinel comment to the summary box output so we have a
+                // reliable anchor regardless of nesting depth.
+                $anchor = '<!-- /cs-seo-summary-box -->';
+                if (strpos($content, $anchor) !== false) {
+                    $content = str_replace($anchor, $anchor . $top_html, $content);
+                } else {
+                    // Fallback: insert after the first occurrence of the wrapper closing tag.
+                    // We know the summary box is a single-level <div> wrapping a <table>.
+                    // Find end of div that contains class cs-seo-summary-box.
+                    $pos = strpos($content, 'cs-seo-summary-box');
+                    if ($pos !== false) {
+                        $end = strpos($content, '</div>', $pos);
+                        if ($end !== false) {
+                            $end += strlen('</div>');
+                            $content = substr($content, 0, $end) . $top_html . substr($content, $end);
+                        } else {
+                            $content = $top_html . $content;
+                        }
+                    } else {
+                        $content = $top_html . $content;
+                    }
+                }
+            } else {
+                $content = $top_html . $content;
+            }
+        }
+
+        // Bottom block — append after content
+        if ((int)($this->opts['rc_bottom_enabled'] ?? 1) && count($bottom_ids) >= 3) {
+            $content .= $this->render_rc_block('You Might Also Like', $bottom_ids, 'bottom');
+        }
+
+        return $content;
+    }
+
+    /**
+     * Renders a Related Articles or You Might Also Like link block.
+     *
+     * @param string $heading  Block heading text.
+     * @param int[]  $post_ids Ordered list of post IDs to link.
+     * @param string $position 'top' or 'bottom' — controls accent colour.
+     */
+    private function render_rc_block(string $heading, array $post_ids, string $position): string {
+        $accent  = $position === 'top' ? '#4f46e5' : '#0e7490';
+        $bg_head = $position === 'top'
+            ? 'linear-gradient(120deg,#4338ca 0%,#6366f1 60%,#818cf8 100%)'
+            : 'linear-gradient(120deg,#0c4a6e 0%,#0e7490 60%,#22d3ee 100%)';
+
+        $links = [];
+        foreach ($post_ids as $tid) {
+            $post = get_post($tid);
+            if (!$post || $post->post_status !== 'publish') continue;
+            $links[] = [
+                'url'   => get_permalink($post),
+                'title' => get_the_title($post),
+            ];
+        }
+
+        if (empty($links)) return '';
+
+        $icon_top    = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+        $icon_bottom = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>';
+        $icon = $position === 'top' ? $icon_top : $icon_bottom;
+
+        $out  = '<div class="cs-rc-block cs-rc-' . esc_attr($position) . '" style="';
+        $out .= 'background:#ffffff;border-radius:14px;overflow:hidden;';
+        $out .= 'margin:0 0 36px;';
+        $out .= 'box-shadow:0 2px 8px rgba(0,0,0,0.06),0 4px 24px rgba(79,70,229,0.10),0 1px 2px rgba(0,0,0,0.04);';
+        $out .= '">';
+
+        // Header bar
+        $out .= '<div style="background:' . $bg_head . ';padding:12px 24px;display:flex;align-items:center;gap:9px;">';
+        $out .= $icon;
+        $out .= '<span style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,0.95);">' . esc_html($heading) . '</span>';
+        $out .= '</div>';
+
+        // Link list
+        $out .= '<ul style="margin:0;padding:16px 24px;list-style:none;display:flex;flex-direction:column;gap:10px;">';
+        foreach ($links as $link) {
+            $out .= '<li style="margin:0;padding:0;">';
+            $out .= '<a href="' . esc_url($link['url']) . '" style="color:' . esc_attr($accent) . ';font-size:14px;font-weight:500;text-decoration:none;line-height:1.5;"';
+            $out .= ' onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">'
+                  . '&#8594;&nbsp;' . esc_html($link['title']) . '</a>';
+            $out .= '</li>';
+        }
+        $out .= '</ul>';
+        $out .= '</div>';
+
+        return $out;
+    }
+    public function ajax_rc_get_posts(): void {
+        check_ajax_referer('cs_seo_nonce', 'nonce');
+        if (!current_user_can('manage_options')) wp_die();
+
+        // phpcs:disable WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- nonce checked via check_ajax_referer above
+        $page     = max(1, (int)(wp_unslash($_POST['page'] ?? 1)));
+        $per_page = 50;
+        $filter   = sanitize_text_field(wp_unslash($_POST['filter'] ?? 'all'));
+        // phpcs:enable WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+
+        // Build meta_query filter
+        $meta_query = [];
+        if ($filter === 'pending') {
+            $meta_query = [['key' => self::META_RC_STATUS, 'compare' => 'NOT EXISTS']];
+        } elseif ($filter === 'complete') {
+            $meta_query = [['key' => self::META_RC_STATUS, 'value' => 'complete']];
+        } elseif ($filter === 'error') {
+            $meta_query = [['key' => self::META_RC_STATUS, 'value' => 'error']];
+        }
+
+        $args = [
+            'post_type'      => 'post',
+            'post_status'    => 'publish',
+            'posts_per_page' => $per_page,
+            'paged'          => $page,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+            'fields'         => 'ids',
+        ];
+        if (!empty($meta_query)) $args['meta_query'] = $meta_query; // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- filtered list view with fixed per_page; meta_query only applied when user selects a filter, not on default load
+
+        $q     = new WP_Query($args);
+        $posts = [];
+        foreach ($q->posts as $pid) {
+            $status   = get_post_meta($pid, self::META_RC_STATUS, true) ?: 'pending';
+            $gen_at   = (int) get_post_meta($pid, self::META_RC_GENERATED, true);
+            $last_step= (int) get_post_meta($pid, self::META_RC_LAST_STEP, true);
+            $error    = get_post_meta($pid, self::META_RC_ERROR, true);
+            $top_raw  = maybe_unserialize(get_post_meta($pid, self::META_RC_TOP, true));
+            $bot_raw  = maybe_unserialize(get_post_meta($pid, self::META_RC_BOTTOM, true));
+            $posts[]  = [
+                'id'         => $pid,
+                'title'      => get_the_title($pid),
+                'status'     => $status,
+                'last_step'  => $last_step,
+                'top_count'  => is_array($top_raw) ? count($top_raw) : 0,
+                'bot_count'  => is_array($bot_raw) ? count($bot_raw) : 0,
+                'generated'  => $gen_at ? human_time_diff($gen_at) . ' ago' : '',
+                'error'      => $error ?: '',
+            ];
+        }
+
+        wp_send_json_success([
+            'posts'       => $posts,
+            'total'       => $q->found_posts,
+            'total_pages' => $q->max_num_pages,
+            'page'        => $page,
+        ]);
+    }
+
+    /**
+     * Executes exactly one step of the RC generation pipeline for one post.
+     * Saves state after each step and returns the updated status.
+     */
+    public function ajax_rc_step(): void {
+        check_ajax_referer('cs_seo_nonce', 'nonce');
+        if (!current_user_can('manage_options')) wp_die();
+
+        // phpcs:disable WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- nonce checked via check_ajax_referer above
+        $pid = (int)(wp_unslash($_POST['post_id'] ?? 0));
+        // phpcs:enable WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+        if (!$pid || get_post_status($pid) !== 'publish') {
+            wp_send_json(['success' => false, 'error' => 'Invalid post.']);
+            return;
+        }
+
+        $last_step = (int)(get_post_meta($pid, self::META_RC_LAST_STEP, true) ?: 0);
+        $status    = get_post_meta($pid, self::META_RC_STATUS, true) ?: 'pending';
+
+        // If already complete, return immediately
+        if ($status === 'complete') {
+            wp_send_json_success(['status' => 'complete', 'step' => self::RC_STEP_COMPLETE, 'done' => true]);
+            return;
+        }
+
+        $next_step = $last_step + 1;
+        if ($next_step < self::RC_STEP_LOAD) $next_step = self::RC_STEP_LOAD;
+
+        try {
+            switch ($next_step) {
+                case self::RC_STEP_LOAD:
+                    $this->rc_step_load($pid);
+                    break;
+                case self::RC_STEP_VALIDATE:
+                    $this->rc_step_validate($pid);
+                    break;
+                case self::RC_STEP_CANDIDATES:
+                    $this->rc_step_candidates($pid);
+                    break;
+                case self::RC_STEP_SCORE:
+                    $this->rc_step_score($pid);
+                    break;
+                case self::RC_STEP_TOP:
+                    $this->rc_step_top($pid);
+                    break;
+                case self::RC_STEP_BOTTOM:
+                    $this->rc_step_bottom($pid);
+                    break;
+                case self::RC_STEP_VALIDATE_OUT:
+                    $this->rc_step_validate_out($pid);
+                    break;
+                case self::RC_STEP_COMPLETE:
+                    $this->rc_step_complete($pid);
+                    break;
+                default:
+                    wp_send_json(['success' => false, 'error' => 'Unknown step ' . $next_step]);
+                    return;
+            }
+        } catch (\Throwable $e) {
+            update_post_meta($pid, self::META_RC_STATUS,    'error');
+            update_post_meta($pid, self::META_RC_ERROR,     $e->getMessage());
+            wp_send_json(['success' => false, 'error' => $e->getMessage()]);
+            return;
+        }
+
+        $status_now = get_post_meta($pid, self::META_RC_STATUS, true);
+        $step_now   = (int) get_post_meta($pid, self::META_RC_LAST_STEP, true);
+
+        wp_send_json_success([
+            'status'  => $status_now,
+            'step'    => $step_now,
+            'done'    => ($status_now === 'complete' || $status_now === 'skipped'),
+        ]);
+    }
+
+    /**
+     * Resets RC meta for one or all posts so they can be regenerated.
+     */
+    public function ajax_rc_reset(): void {
+        check_ajax_referer('cs_seo_nonce', 'nonce');
+        if (!current_user_can('manage_options')) wp_die();
+
+        // phpcs:disable WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- nonce checked via check_ajax_referer above
+        $pid  = (int)(wp_unslash($_POST['post_id'] ?? 0));
+        $mode = sanitize_text_field(wp_unslash($_POST['mode'] ?? 'one'));
+        // phpcs:enable WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash
+
+        $meta_keys = [
+            self::META_RC_TOP, self::META_RC_BOTTOM, self::META_RC_CANDIDATES,
+            self::META_RC_SCORES, self::META_RC_FINGERPRINT, self::META_RC_VERSION,
+            self::META_RC_GENERATED, self::META_RC_LAST_STEP, self::META_RC_STATUS,
+            self::META_RC_ERROR,
+        ];
+
+        if ($mode === 'all') {
+            // Delete meta in batches using direct DB query for performance
+            global $wpdb;
+            $placeholders = implode(',', array_fill(0, count($meta_keys), '%s'));
+            // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- bulk delete of plugin meta keys; $placeholders contains only %s tokens built by array_fill; no WP API for multi-key delete; cache invalidated immediately
+            $wpdb->query(
+                $wpdb->prepare(
+                    "DELETE FROM {$wpdb->postmeta} WHERE meta_key IN ({$placeholders})",
+                    ...$meta_keys
+                )
+            );
+            // phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+            wp_send_json_success(['reset' => 'all']);
+        } else {
+            if (!$pid) { wp_send_json(['success' => false, 'error' => 'Missing post_id']); return; }
+            foreach ($meta_keys as $k) delete_post_meta($pid, $k);
+            wp_send_json_success(['reset' => $pid]);
+        }
+    }
+
+    // ── RC Step implementations ───────────────────────────────────────────────
+
+    private function rc_step_load(int $pid): void {
+        $post = get_post($pid);
+        $fp   = $this->rc_fingerprint($pid);
+        update_post_meta($pid, self::META_RC_FINGERPRINT, $fp);
+        update_post_meta($pid, self::META_RC_STATUS,      'processing');
+        update_post_meta($pid, self::META_RC_ERROR,       '');
+        update_post_meta($pid, self::META_RC_LAST_STEP,   self::RC_STEP_LOAD);
+    }
+
+    private function rc_step_validate(int $pid): void {
+        // Check if existing output is still valid — skip if nothing changed
+        $stored_fp  = (string) get_post_meta($pid, self::META_RC_FINGERPRINT, true);
+        $current_fp = $this->rc_fingerprint($pid);
+        $stored_ver = (string) get_post_meta($pid, self::META_RC_VERSION, true);
+        $top_raw    = maybe_unserialize(get_post_meta($pid, self::META_RC_TOP, true));
+        $bot_raw    = maybe_unserialize(get_post_meta($pid, self::META_RC_BOTTOM, true));
+        $has_output = is_array($top_raw) && count($top_raw) >= 2
+                   && is_array($bot_raw) && count($bot_raw) >= 3;
+
+        if ($stored_fp === $current_fp && $stored_ver === self::RC_VERSION && $has_output) {
+            // Validate that linked posts still exist
+            $all_valid = true;
+            foreach (array_merge($top_raw, $bot_raw) as $lid) {
+                if (get_post_status((int)$lid) !== 'publish') { $all_valid = false; break; }
+            }
+            if ($all_valid) {
+                // Mark skipped — already valid
+                update_post_meta($pid, self::META_RC_STATUS,    'complete');
+                update_post_meta($pid, self::META_RC_LAST_STEP, self::RC_STEP_COMPLETE);
+                return;
+            }
+        }
+
+        // Store current fingerprint and continue
+        update_post_meta($pid, self::META_RC_FINGERPRINT, $current_fp);
+        update_post_meta($pid, self::META_RC_LAST_STEP,   self::RC_STEP_VALIDATE);
+    }
+
+    private function rc_step_candidates(int $pid): void {
+        $opts         = $this->opts;
+        $pool_size    = max(10, min(50, (int)($opts['rc_pool_size'] ?? 20)));
+        $use_cats     = (int)($opts['rc_use_categories'] ?? 1);
+        $use_tags     = (int)($opts['rc_use_tags'] ?? 1);
+        $exclude_cats = array_map('intval', (array)($opts['rc_exclude_cats'] ?? []));
+
+        $post_cats = wp_get_post_categories($pid, ['fields' => 'ids']);
+        $post_tags = wp_get_post_tags($pid, ['fields' => 'ids']);
+
+        $candidate_ids = [];
+
+        // By shared category
+        if ($use_cats && !empty($post_cats)) {
+            $active_cats = array_diff($post_cats, $exclude_cats);
+            if (!empty($active_cats)) {
+                $q = new WP_Query([
+                    'post_type'      => 'post',
+                    'post_status'    => 'publish',
+                    'posts_per_page' => $pool_size,
+                    'post__not_in'   => [$pid], // phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.PostNotIn_post__not_in -- pool limited to $pool_size; exclusion of current post is necessary for related articles
+                    'fields'         => 'ids',
+                    'category__in'   => $active_cats,
+                    'orderby'        => 'date',
+                    'order'          => 'DESC',
+                ]);
+                $candidate_ids = array_merge($candidate_ids, $q->posts);
+            }
+        }
+
+        // By shared tag
+        if ($use_tags && !empty($post_tags)) {
+            $q = new WP_Query([
+                'post_type'      => 'post',
+                'post_status'    => 'publish',
+                'posts_per_page' => $pool_size,
+                'post__not_in'   => [$pid], // phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.PostNotIn_post__not_in -- pool limited to $pool_size; exclusion of current post is necessary for related articles
+                'fields'         => 'ids',
+                'tag__in'        => $post_tags,
+                'orderby'        => 'date',
+                'order'          => 'DESC',
+            ]);
+            $candidate_ids = array_merge($candidate_ids, $q->posts);
+        }
+
+        // Deduplicate, exclude self, cap at pool_size
+        $candidate_ids = array_values(array_unique(array_map('intval', $candidate_ids)));
+        $candidate_ids = array_slice($candidate_ids, 0, $pool_size);
+
+        update_post_meta($pid, self::META_RC_CANDIDATES, $candidate_ids);
+        update_post_meta($pid, self::META_RC_LAST_STEP,  self::RC_STEP_CANDIDATES);
+    }
+
+    private function rc_step_score(int $pid): void {
+        $opts      = $this->opts;
+        $use_cats  = (int)($opts['rc_use_categories'] ?? 1);
+        $use_tags  = (int)($opts['rc_use_tags'] ?? 1);
+        $use_summ  = (int)($opts['rc_use_summary'] ?? 1);
+
+        $candidates = maybe_unserialize(get_post_meta($pid, self::META_RC_CANDIDATES, true));
+        if (!is_array($candidates) || empty($candidates)) {
+            update_post_meta($pid, self::META_RC_SCORES,    []);
+            update_post_meta($pid, self::META_RC_LAST_STEP, self::RC_STEP_SCORE);
+            return;
+        }
+
+        // Source signals
+        $src_cats  = $use_cats ? wp_get_post_categories($pid, ['fields' => 'ids']) : [];
+        $src_tags  = $use_tags ? array_map(fn($t) => $t->term_id, wp_get_post_tags($pid)) : [];
+        $src_title = $this->rc_keywords(get_the_title($pid));
+        $src_summ  = [];
+        if ($use_summ) {
+            $w = (string) get_post_meta($pid, self::META_SUM_WHAT, true);
+            $y = (string) get_post_meta($pid, self::META_SUM_WHY,  true);
+            $k = (string) get_post_meta($pid, self::META_SUM_KEY,  true);
+            $src_summ = $this->rc_keywords($w . ' ' . $y . ' ' . $k);
+        }
+        $now = time();
+
+        $scores = [];
+        foreach ($candidates as $cid) {
+            $score = 0;
+
+            if ($use_cats) {
+                $cand_cats = wp_get_post_categories($cid, ['fields' => 'ids']);
+                $shared    = array_intersect($src_cats, $cand_cats);
+                // Primary category match: first category in each list
+                if (!empty($src_cats) && !empty($cand_cats) && $src_cats[0] === $cand_cats[0]) {
+                    $score += 40;
+                } else {
+                    $score += min(30, count($shared) * 15);
+                }
+            }
+
+            if ($use_tags) {
+                $cand_tags = array_map(fn($t) => $t->term_id, wp_get_post_tags($cid));
+                $shared    = count(array_intersect($src_tags, $cand_tags));
+                $score    += min(40, $shared * 10);
+            }
+
+            // Title keyword overlap
+            $cand_title_kw = $this->rc_keywords(get_the_title($cid));
+            $shared_title  = count(array_intersect($src_title, $cand_title_kw));
+            $score        += min(20, $shared_title * 5);
+
+            // Summary keyword overlap
+            if ($use_summ && !empty($src_summ)) {
+                $cw = (string) get_post_meta($cid, self::META_SUM_WHAT, true);
+                $cy = (string) get_post_meta($cid, self::META_SUM_WHY,  true);
+                $ck = (string) get_post_meta($cid, self::META_SUM_KEY,  true);
+                $cand_summ_kw = $this->rc_keywords($cw . ' ' . $cy . ' ' . $ck);
+                $shared_summ  = count(array_intersect($src_summ, $cand_summ_kw));
+                $score       += min(15, $shared_summ * 3);
+            }
+
+            // Recency bonus — published within 180 days
+            $pub = get_post_time('U', true, $cid);
+            if ($pub && ($now - $pub) < (180 * DAY_IN_SECONDS)) {
+                $score += 5;
+            }
+
+            $scores[$cid] = $score;
+        }
+
+        // Sort descending by score
+        arsort($scores);
+
+        update_post_meta($pid, self::META_RC_SCORES,    $scores);
+        update_post_meta($pid, self::META_RC_LAST_STEP, self::RC_STEP_SCORE);
+    }
+
+    private function rc_step_top(int $pid): void {
+        $count  = max(2, min(5, (int)($this->opts['rc_top_count'] ?? 3)));
+        $scores = maybe_unserialize(get_post_meta($pid, self::META_RC_SCORES, true));
+        if (!is_array($scores) || empty($scores)) {
+            update_post_meta($pid, self::META_RC_TOP,       []);
+            update_post_meta($pid, self::META_RC_LAST_STEP, self::RC_STEP_TOP);
+            return;
+        }
+        $top = array_keys(array_slice($scores, 0, $count, true));
+        update_post_meta($pid, self::META_RC_TOP,       $top);
+        update_post_meta($pid, self::META_RC_LAST_STEP, self::RC_STEP_TOP);
+    }
+
+    private function rc_step_bottom(int $pid): void {
+        $count   = max(3, min(10, (int)($this->opts['rc_bottom_count'] ?? 5)));
+        $scores  = maybe_unserialize(get_post_meta($pid, self::META_RC_SCORES, true));
+        $top_ids = maybe_unserialize(get_post_meta($pid, self::META_RC_TOP, true));
+        if (!is_array($scores) || empty($scores)) {
+            update_post_meta($pid, self::META_RC_BOTTOM,    []);
+            update_post_meta($pid, self::META_RC_LAST_STEP, self::RC_STEP_BOTTOM);
+            return;
+        }
+        $top_ids = is_array($top_ids) ? array_map('intval', $top_ids) : [];
+        // Exclude posts already in the top block
+        $remaining = array_diff_key($scores, array_flip($top_ids));
+        $bottom    = array_keys(array_slice($remaining, 0, $count, true));
+        update_post_meta($pid, self::META_RC_BOTTOM,    $bottom);
+        update_post_meta($pid, self::META_RC_LAST_STEP, self::RC_STEP_BOTTOM);
+    }
+
+    private function rc_step_validate_out(int $pid): void {
+        $top_raw = maybe_unserialize(get_post_meta($pid, self::META_RC_TOP,    true));
+        $bot_raw = maybe_unserialize(get_post_meta($pid, self::META_RC_BOTTOM, true));
+        $top_ids = is_array($top_raw) ? array_map('intval', $top_raw) : [];
+        $bot_ids = is_array($bot_raw) ? array_map('intval', $bot_raw) : [];
+
+        // Remove self-references and unpublished posts
+        $top_ids = array_values(array_filter($top_ids,
+            fn($id) => $id !== $pid && get_post_status($id) === 'publish'));
+        $bot_ids = array_values(array_filter($bot_ids,
+            fn($id) => $id !== $pid && get_post_status($id) === 'publish' && !in_array($id, $top_ids)));
+
+        update_post_meta($pid, self::META_RC_TOP,       $top_ids);
+        update_post_meta($pid, self::META_RC_BOTTOM,    $bot_ids);
+        update_post_meta($pid, self::META_RC_LAST_STEP, self::RC_STEP_VALIDATE_OUT);
+    }
+
+    private function rc_step_complete(int $pid): void {
+        update_post_meta($pid, self::META_RC_STATUS,    'complete');
+        update_post_meta($pid, self::META_RC_VERSION,   self::RC_VERSION);
+        update_post_meta($pid, self::META_RC_GENERATED, time());
+        update_post_meta($pid, self::META_RC_LAST_STEP, self::RC_STEP_COMPLETE);
+    }
+
+    // ── RC helpers ────────────────────────────────────────────────────────────
+
+    /**
+     * Computes a fingerprint for a post based on signals used in scoring.
+     * If any of these change, the cache is invalidated.
+     */
+    private function rc_fingerprint(int $pid): string {
+        $cats = wp_get_post_categories($pid, ['fields' => 'ids']);
+        $tags = array_map(fn($t) => $t->term_id, wp_get_post_tags($pid));
+        sort($cats); sort($tags);
+        return md5(serialize([
+            get_the_title($pid),
+            $cats,
+            $tags,
+            get_post_meta($pid, self::META_SUM_WHAT, true),
+            get_post_meta($pid, self::META_SUM_WHY,  true),
+            get_post_meta($pid, self::META_SUM_KEY,  true),
+        ]));
+    }
+
+    /**
+     * Extracts significant keywords from a text string for overlap scoring.
+     * Returns lowercase unique words, excluding common stop words.
+     */
+    private function rc_keywords(string $text): array {
+        static $stop = ['the','a','an','is','in','to','of','and','for','with','on','at','by',
+                        'from','as','it','its','be','or','that','this','was','are','how','why',
+                        'what','when','your','you','we','our','has','have','had','not','but',
+                        'more','also','can','will','about','up','if','do','so','all','into'];
+        $text  = strtolower(wp_strip_all_tags($text));
+        $text  = preg_replace('/[^a-z0-9\s]/', ' ', $text);
+        $words = preg_split('/\s+/', trim($text), -1, PREG_SPLIT_NO_EMPTY);
+        $words = array_filter($words, fn($w) => strlen($w) > 2 && !in_array($w, $stop));
+        return array_values(array_unique($words));
+    }
+
+}
