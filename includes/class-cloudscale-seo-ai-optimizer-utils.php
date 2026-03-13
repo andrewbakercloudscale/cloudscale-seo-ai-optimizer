@@ -22,6 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * @since 4.15.5
  */
+// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound -- class name IS prefixed with the plugin slug
 class CloudScale_SEO_AI_Optimizer_Utils {
 
 	/**

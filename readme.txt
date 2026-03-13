@@ -3,7 +3,7 @@ Contributors: andrewbaker007
 Tags: seo, meta description, ai, opengraph, schema
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 4.17.3
+Stable tag: 4.17.5
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -199,6 +199,18 @@ Yes. The Scheduled Batch tab lets you select which days of the week to run autom
 8. Scheduled Batch configuration with day selector and last run status
 
 == Changelog ==
+
+= 4.17.5 =
+* File-level DocBlocks (@package, @since) added to all 20 remaining trait files
+* Settings page: all form <th> field labels and RC table labels wrapped in esc_html_e()
+* ajax_rc_sync_counts @since history corrected to reflect 4.16.5, 4.17.1, 4.17.2 changes
+
+= 4.17.4 =
+* PCP: removed load_plugin_textdomain() call — discouraged since WP 4.6, auto-loaded by WordPress.org
+* PCP: added missing translators comment to printf in metabox
+* PCP: removed set_time_limit() call in ajax_rc_sync_counts
+* PCP: prefixed global variables in uninstall.php ($cs_seo_options, $cs_seo_meta_keys, etc.)
+* PCP: added phpcs:ignore to Utils class declaration with explanation
 
 = 4.17.3 =
 * Settings page now returns to the active tab after saving — active tab is saved to localStorage and restored on page reload
@@ -699,6 +711,12 @@ Yes. The Scheduled Batch tab lets you select which days of the week to run autom
 * Per post generation from post editor metabox
 
 == Upgrade Notice ==
+
+= 4.17.5 =
+Code quality pass: DocBlocks on all trait files, settings page i18n coverage expanded.
+
+= 4.17.4 =
+PCP compliance pass — resolves all WordPress.org Plugin Check errors and warnings.
 
 = 4.17.3 =
 Settings page now stays on the current tab after saving.

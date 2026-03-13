@@ -1,4 +1,10 @@
 <?php
+/**
+ * AI SEO scoring — rates post content from 0-100 via AI and stores per-post.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.12.2
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_AI_Scoring {

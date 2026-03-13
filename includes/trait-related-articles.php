@@ -1,4 +1,10 @@
 <?php
+/**
+ * Related Articles — scores, ranks, and injects contextually related post links.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.10.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Related_Articles {
@@ -288,14 +294,13 @@ trait CS_SEO_Related_Articles {
      *
      * Uses a direct DB query so no WP_Query environment issues apply.
      *
-     * @since 4.17.1
+     * @since 4.16.5
+     * @since 4.17.1 Extended to run the full generation pipeline for posts with no stored scores.
+     * @since 4.17.2 Added trim-only path for posts with output but no scores (fixes decreasing counts).
      * @return void
      */
     public function ajax_rc_sync_counts(): void {
         $this->ajax_check();
-
-        // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-        @set_time_limit( 120 );
 
         global $wpdb;
 

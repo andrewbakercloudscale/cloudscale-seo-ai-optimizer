@@ -1,4 +1,10 @@
 <?php
+/**
+ * AI-powered category analysis, health scoring, and drift detection.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.10.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Category_Fixer {

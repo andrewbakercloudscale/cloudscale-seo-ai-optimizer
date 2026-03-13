@@ -1,4 +1,10 @@
 <?php
+/**
+ * XML sitemap generation — serves paginated sitemap index and sub-sitemaps.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.0.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Sitemap {

@@ -1,4 +1,10 @@
 <?php
+/**
+ * Gutenberg / block editor integration — SEO sidebar panel and post meta.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.0.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Gutenberg {

@@ -1,4 +1,10 @@
 <?php
+/**
+ * llms.txt generation — serves an AI-crawler-friendly plain-text site index at /llms.txt.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.10.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_LLMS_Txt {

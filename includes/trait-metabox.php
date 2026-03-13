@@ -1,4 +1,10 @@
 <?php
+/**
+ * Post/page metabox — SEO title, meta description, OG image, and AI summary fields.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.0.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Metabox {
@@ -99,7 +105,10 @@ trait CS_SEO_Metabox {
         }
         <?php wp_add_inline_script('cs-seo-metabox-js', ob_get_clean()); ?>
         <?php else: ?>
-        <p style="color:#888;font-size:12px;"><em><?php printf( esc_html__( 'Add an Anthropic API key in %s to enable per-post generation.', 'cloudscale-seo-ai-optimizer' ), '<a href="' . esc_url( admin_url( 'options-general.php?page=cs-seo-optimizer#ai' ) ) . '">' . esc_html__( 'SEO Settings → AI Meta Writer', 'cloudscale-seo-ai-optimizer' ) . '</a>' ); ?></em></p>
+        <p style="color:#888;font-size:12px;"><em><?php
+            /* translators: %s: link to the AI Meta Writer settings section */
+            printf( esc_html__( 'Add an Anthropic API key in %s to enable per-post generation.', 'cloudscale-seo-ai-optimizer' ), '<a href="' . esc_url( admin_url( 'options-general.php?page=cs-seo-optimizer#ai' ) ) . '">' . esc_html__( 'SEO Settings → AI Meta Writer', 'cloudscale-seo-ai-optimizer' ) . '</a>' );
+        ?></em></p>
         <?php endif; ?>
         <?php
         $thumb_id  = get_post_thumbnail_id($post->ID);

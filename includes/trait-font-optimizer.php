@@ -1,4 +1,10 @@
 <?php
+/**
+ * Font-display optimisation — scans CSS files and injects font-display: swap.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.9.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Font_Optimizer {

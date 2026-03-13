@@ -1,4 +1,10 @@
 <?php
+/**
+ * HTTPS fixer — scans the database for http:// assets and rewrites them to https://.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.0.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_HTTPS_Fixer {

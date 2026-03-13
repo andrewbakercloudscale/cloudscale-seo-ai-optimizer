@@ -13,7 +13,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 global $wpdb;
 
 // ── Named options ─────────────────────────────────────────────────────────────
-$options = [
+$cs_seo_options = [
     'cs_seo_options',
     'cs_seo_ai_options',
     'cs_seo_batch_history',
@@ -22,8 +22,8 @@ $options = [
     'cs_seo_health_cache',
     'cs_seo_font_display_log',
 ];
-foreach ( $options as $opt ) {
-    delete_option( $opt );
+foreach ( $cs_seo_options as $cs_seo_opt ) {
+    delete_option( $cs_seo_opt );
 }
 
 // ── Wildcard options (font backup keys, attachment ID transient cache) ─────────
@@ -40,7 +40,7 @@ delete_transient( 'cs_seo_llms_txt' );
 delete_transient( 'cs_seo_sitemap_urls' );
 
 // ── Post meta ─────────────────────────────────────────────────────────────────
-$meta_keys = [
+$cs_seo_meta_keys = [
     // Core SEO
     '_cs_seo_title',
     '_cs_seo_desc',
@@ -71,9 +71,9 @@ $meta_keys = [
     '_cs_rc_status',
     '_cs_rc_error',
 ];
-foreach ( $meta_keys as $key ) {
+foreach ( $cs_seo_meta_keys as $cs_seo_key ) {
     // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
-    delete_post_meta_by_key( $key );
+    delete_post_meta_by_key( $cs_seo_key );
 }
 
 // Remove any remaining _cs_* post meta not covered by named keys above

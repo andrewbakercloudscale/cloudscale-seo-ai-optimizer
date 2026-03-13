@@ -1,4 +1,10 @@
 <?php
+/**
+ * AI Summary Box — injects What/Why/Takeaway summary block into post content.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.0.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Summary_Box {

@@ -1,24 +1,13 @@
 <?php
+/**
+ * Admin menu, settings registration, asset enqueuing, and admin notices.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.0.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Admin {
-    /**
-     * Loads the plugin text domain for translations.
-     *
-     * Hooked to `init` (PCP requirement); was previously on `plugins_loaded`.
-     *
-     * @since 4.14.5
-     * @since 4.15.5 Moved hook from plugins_loaded to init for PCP compliance.
-     * @return void
-     */
-    public function load_textdomain(): void {
-        load_plugin_textdomain(
-            'cloudscale-seo-ai-optimizer',
-            false,
-            dirname( plugin_basename( __FILE__ ) ) . '/../languages'
-        );
-    }
-
     /**
      * Displays an admin notice after the physical robots.txt has been renamed on activation.
      *

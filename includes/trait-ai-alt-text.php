@@ -1,4 +1,10 @@
 <?php
+/**
+ * AI-powered ALT text generation for images using Anthropic Claude or Google Gemini.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.0.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_AI_Alt_Text {

@@ -1,4 +1,10 @@
 <?php
+/**
+ * AI Summary Box generation — What/Why/Takeaway fields per post.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.0.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_AI_Summary {

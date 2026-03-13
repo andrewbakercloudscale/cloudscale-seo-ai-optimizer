@@ -1,4 +1,10 @@
 <?php
+/**
+ * Frontend <head> output — canonical, meta description, OG tags, schema, robots, and JS defer.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.0.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Frontend_Head {

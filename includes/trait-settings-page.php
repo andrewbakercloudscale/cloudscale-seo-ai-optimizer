@@ -1,4 +1,10 @@
 <?php
+/**
+ * Plugin settings page — renders all tabs, forms, and admin panels.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.0.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Settings_Page {
@@ -101,7 +107,7 @@ trait CS_SEO_Settings_Page {
                         <td><input class="regular-text" style="width:100%" name="<?php echo esc_attr(self::OPT); ?>[default_og_image]" value="<?php echo esc_attr($o['default_og_image']); ?>" placeholder="https://yoursite.com/wp-content/uploads/og-default.jpg">
                         <p class="description">Fallback image for social sharing. 1200×630px ideal.</p></td>
                     </tr>
-                    <tr><th>Home description:</th>
+                    <tr><th><?php esc_html_e( 'Home description:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td colspan="3">
                             <textarea class="large-text" rows="3" name="<?php echo esc_attr(self::OPT); ?>[home_desc]" placeholder="A blog about technology, software development, and cloud architecture. Written for engineers and technical leaders."><?php echo esc_textarea($o['home_desc']); ?></textarea>
                             <p class="description">Meta description for your homepage. Aim for 140–155 characters.</p>
@@ -143,7 +149,7 @@ trait CS_SEO_Settings_Page {
                         <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[person_image]" value="<?php echo esc_attr($o['person_image']); ?>" placeholder="https://yoursite.com/wp-content/uploads/headshot.jpg">
                         <p class="description">URL of your profile photo for Person JSON-LD schema.</p></td>
                     </tr>
-                    <tr><th>SameAs URLs (one per line):</th>
+                    <tr><th><?php esc_html_e( 'SameAs URLs (one per line):', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td colspan="3">
                             <textarea class="large-text" rows="4" name="<?php echo esc_attr(self::OPT); ?>[sameas]" placeholder="https://www.linkedin.com/in/yourname&#10;https://twitter.com/yourhandle&#10;https://github.com/yourname"><?php echo esc_textarea($o['sameas']); ?></textarea>
                             <p class="description">Your profiles on other platforms — one URL per line. Helps Google connect your identity across the web.</p>
@@ -178,7 +184,7 @@ trait CS_SEO_Settings_Page {
                 <div class="ab-zone-body ab-zone-ai">
                 <table class="form-table" role="presentation">
                     <tr>
-                        <th>AI Provider:</th>
+                        <th><?php esc_html_e( 'AI Provider:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td>
                             <select name="<?php echo esc_attr(self::AI_OPT); ?>[ai_provider]" id="ab-ai-provider" onchange="abProviderChanged()">
                                 <option value="anthropic" <?php selected($ai['ai_provider'] ?? 'anthropic', 'anthropic'); ?>>Anthropic Claude</option>
@@ -187,7 +193,7 @@ trait CS_SEO_Settings_Page {
                         </td>
                     </tr>
                     <tr>
-                        <th>API Key:</th>
+                        <th><?php esc_html_e( 'API Key:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td>
                             <div class="ab-key-row">
                                 <input type="password" class="regular-text"
@@ -214,7 +220,7 @@ trait CS_SEO_Settings_Page {
                         </td>
                     </tr>
                     <tr>
-                        <th>Model:</th>
+                        <th><?php esc_html_e( 'Model:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td>
                             <select name="<?php echo esc_attr(self::AI_OPT); ?>[model]" id="ab-model-select">
                                 <?php
@@ -246,7 +252,7 @@ trait CS_SEO_Settings_Page {
                         </td>
                     </tr>
                     <tr>
-                        <th>Target length:</th>
+                        <th><?php esc_html_e( 'Target length:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td>
                             <input type="number" style="width:70px" name="<?php echo esc_attr(self::AI_OPT); ?>[min_chars]" value="<?php echo esc_attr($ai['min_chars']); ?>" min="100" max="160"> min &nbsp;
                             <input type="number" style="width:70px" name="<?php echo esc_attr(self::AI_OPT); ?>[max_chars]" value="<?php echo esc_attr($ai['max_chars']); ?>" min="100" max="200"> max characters
@@ -254,14 +260,14 @@ trait CS_SEO_Settings_Page {
                         </td>
                     </tr>
                     <tr>
-                        <th>ALT text article excerpt:</th>
+                        <th><?php esc_html_e( 'ALT text article excerpt:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td>
                             <input type="number" style="width:80px" name="<?php echo esc_attr(self::AI_OPT); ?>[alt_excerpt_chars]" value="<?php echo esc_attr((string)($ai['alt_excerpt_chars'] ?? 600)); ?>" min="100" max="2000"> characters
                             <p class="description">How much of the article text to send alongside each image when generating ALT text. More context produces better results for images with generic filenames, but increases API token usage. 600 is a good balance — enough to cover the intro and first heading. Increase to 1200+ for dense technical posts where images appear mid-article. Range: 100–2000.</p>
                         </td>
                     </tr>
                     <tr>
-                        <th>System prompt:</th>
+                        <th><?php esc_html_e( 'System prompt:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td>
                             <textarea class="large-text" rows="10"
                                 id="ab-prompt-field"
@@ -558,13 +564,13 @@ trait CS_SEO_Settings_Page {
                         <p style="color:#555;margin:0 0 16px;">Controls where and how Related Articles and You Might Also Like link blocks appear on your posts. Links are generated using local signals only &mdash; no AI calls, no timeouts.</p>
                         <table class="form-table" style="margin:0;">
                             <tr>
-                                <th style="width:220px;padding:12px 0;">Enable feature</th>
+                                <th style="width:220px;padding:12px 0;"><?php esc_html_e( 'Enable feature', 'cloudscale-seo-ai-optimizer' ); ?></th>
                                 <td style="padding:12px 0;">
                                     <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_enable]" value="1" <?php checked((int)($o['rc_enable'] ?? 1), 1); ?>> Enable Related Articles and You Might Also Like on posts</label>
                                 </td>
                             </tr>
                             <tr>
-                                <th style="padding:12px 0;">Related Articles block</th>
+                                <th style="padding:12px 0;"><?php esc_html_e( 'Related Articles block', 'cloudscale-seo-ai-optimizer' ); ?></th>
                                 <td style="padding:12px 0;">
                                     <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_top_enabled]" value="1" <?php checked((int)($o['rc_top_enabled'] ?? 1), 1); ?>> Show &ldquo;Related Articles&rdquo; block at the top (after AI summary)</label><br>
                                     <span style="display:inline-flex;align-items:center;gap:8px;margin-top:6px;">
@@ -576,7 +582,7 @@ trait CS_SEO_Settings_Page {
                                 </td>
                             </tr>
                             <tr>
-                                <th style="padding:12px 0;">You Might Also Like block</th>
+                                <th style="padding:12px 0;"><?php esc_html_e( 'You Might Also Like block', 'cloudscale-seo-ai-optimizer' ); ?></th>
                                 <td style="padding:12px 0;">
                                     <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_bottom_enabled]" value="1" <?php checked((int)($o['rc_bottom_enabled'] ?? 1), 1); ?>> Show &ldquo;You Might Also Like&rdquo; block at the bottom (before comments)</label><br>
                                     <span style="display:inline-flex;align-items:center;gap:8px;margin-top:6px;">
@@ -588,14 +594,14 @@ trait CS_SEO_Settings_Page {
                                 </td>
                             </tr>
                             <tr>
-                                <th style="padding:12px 0;">Candidate pool size</th>
+                                <th style="padding:12px 0;"><?php esc_html_e( 'Candidate pool size', 'cloudscale-seo-ai-optimizer' ); ?></th>
                                 <td style="padding:12px 0;">
                                     <input type="number" name="<?php echo esc_attr(self::OPT); ?>[rc_pool_size]" value="<?php echo esc_attr((int)($o['rc_pool_size'] ?? 20)); ?>" min="10" max="50" style="width:70px;">
                                     <span style="color:#888;font-size:12px;margin-left:6px;">posts evaluated per source (10&ndash;50)</span>
                                 </td>
                             </tr>
                             <tr>
-                                <th style="padding:12px 0;">Scoring signals</th>
+                                <th style="padding:12px 0;"><?php esc_html_e( 'Scoring signals', 'cloudscale-seo-ai-optimizer' ); ?></th>
                                 <td style="padding:12px 0;">
                                     <label style="margin-right:16px;"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_use_categories]" value="1" <?php checked((int)($o['rc_use_categories'] ?? 1), 1); ?>> Categories</label>
                                     <label style="margin-right:16px;"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[rc_use_tags]" value="1" <?php checked((int)($o['rc_use_tags'] ?? 1), 1); ?>> Tags</label>
@@ -608,7 +614,7 @@ trait CS_SEO_Settings_Page {
                             $excluded_cats = (array)($o['rc_exclude_cats'] ?? []);
                             if (!empty($all_cats)) : ?>
                             <tr>
-                                <th style="padding:12px 0;">Exclude categories</th>
+                                <th style="padding:12px 0;"><?php esc_html_e( 'Exclude categories', 'cloudscale-seo-ai-optimizer' ); ?></th>
                                 <td style="padding:12px 0;">
                                     <div style="display:flex;flex-wrap:wrap;gap:6px 16px;">
                                     <?php foreach ($all_cats as $cat) : ?>
@@ -765,7 +771,7 @@ trait CS_SEO_Settings_Page {
                 <div class="ab-zone-body">
                 <table class="form-table" role="presentation">
                     <tr>
-                        <th>Enable sitemap:</th>
+                        <th><?php esc_html_e( 'Enable sitemap:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td>
                             <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[enable_sitemap]" value="1" <?php checked((int)($o['enable_sitemap'] ?? 0), 1); ?>>
                             Generate sitemap at <a href="<?php echo esc_url(home_url('/sitemap.xml')); ?>" target="_blank"><?php echo esc_html(home_url('/sitemap.xml')); ?></a></label>
@@ -773,7 +779,7 @@ trait CS_SEO_Settings_Page {
                         </td>
                     </tr>
                     <tr>
-                        <th>Include post types:</th>
+                        <th><?php esc_html_e( 'Include post types:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td>
                             <div style="display:flex;gap:16px;flex-wrap:wrap">
                             <?php foreach ($pub_types as $pt): ?>
@@ -792,7 +798,7 @@ trait CS_SEO_Settings_Page {
                         </td>
                     </tr>
                     <tr>
-                        <th>Taxonomy archives:</th>
+                        <th><?php esc_html_e( 'Taxonomy archives:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td>
                             <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[sitemap_taxonomies]" value="1" <?php checked((int)($o['sitemap_taxonomies'] ?? 0), 1); ?>>
                             Include category, tag, and custom taxonomy archive pages</label>
@@ -800,7 +806,7 @@ trait CS_SEO_Settings_Page {
                         </td>
                     </tr>
                     <tr>
-                        <th>Exclude URLs or IDs:</th>
+                        <th><?php esc_html_e( 'Exclude URLs or IDs:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td>
                             <textarea name="<?php echo esc_attr(self::OPT); ?>[sitemap_exclude]"
                                 rows="6" style="width:100%"
@@ -920,7 +926,7 @@ trait CS_SEO_Settings_Page {
 
                 <table class="form-table" role="presentation">
                     <tr>
-                        <th>Block AI training bots:</th>
+                        <th><?php esc_html_e( 'Block AI training bots:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td>
                             <label><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[block_ai_bots]" value="1" <?php checked((int)($o['block_ai_bots'] ?? 1), 1); ?>>
                             Block GPTBot, ChatGPT-User, CCBot, anthropic-ai, Claude-Web, FacebookBot, Bytespider, Applebot-Extended</label>
@@ -997,7 +1003,7 @@ trait CS_SEO_Settings_Page {
                     <input type="hidden" name="<?php echo esc_attr(self::OPT); ?>[_partial]" value="1">
                     <table class="form-table" role="presentation" style="margin-top:0">
                         <tr>
-                            <th style="width:200px">Enable /llms.txt:</th>
+                            <th style="width:200px"><?php esc_html_e( 'Enable /llms.txt:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                             <td>
                                 <label>
                                     <input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[enable_llms_txt]" value="1" <?php checked((int)($o['enable_llms_txt'] ?? 0), 1); ?>>
@@ -1493,7 +1499,7 @@ trait CS_SEO_Settings_Page {
                 <p style="padding:12px 20px 0;color:#50575e;margin:0">The batch runs automatically on selected days at midnight (server time). <strong style="color:#6b3fa0">It only processes posts that do not yet have a meta description</strong> — it never overwrites existing ones.</p>
                 <table class="form-table" role="presentation">
                     <tr>
-                        <th>Enable schedule:</th>
+                        <th><?php esc_html_e( 'Enable schedule:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td>
                             <label>
                                 <input type="checkbox"
@@ -1507,7 +1513,7 @@ trait CS_SEO_Settings_Page {
                         </td>
                     </tr>
                     <tr>
-                        <th>Run on these days:</th>
+                        <th><?php esc_html_e( 'Run on these days:', 'cloudscale-seo-ai-optimizer' ); ?></th>
                         <td>
                             <div style="display:flex;gap:16px;flex-wrap:wrap" id="cs-sched-days">
                             <?php

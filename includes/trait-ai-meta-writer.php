@@ -1,4 +1,10 @@
 <?php
+/**
+ * AI meta description and title generation — bulk and single-post AJAX handlers.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.0.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_AI_Meta_Writer {

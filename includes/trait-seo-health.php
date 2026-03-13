@@ -1,4 +1,10 @@
 <?php
+/**
+ * SEO health dashboard — aggregates meta coverage, title length, and ALT text stats.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.10.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_SEO_Health {

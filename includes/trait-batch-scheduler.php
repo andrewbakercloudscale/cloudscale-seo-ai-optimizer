@@ -1,4 +1,10 @@
 <?php
+/**
+ * Scheduled batch — runs AI meta description generation on a WP-Cron schedule.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.10.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Batch_Scheduler {
