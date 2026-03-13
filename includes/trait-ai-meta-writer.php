@@ -461,6 +461,26 @@ trait CS_SEO_AI_Meta_Writer {
     }
 
     /**
+     * AJAX handler: saves a manually entered meta description for a post.
+     *
+     * @since 4.15.6
+     * @return void
+     */
+    public function ajax_save_desc(): void {
+        $this->ajax_check();
+        $post_id = (int) sanitize_key( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in ajax_check()
+        $desc    = sanitize_textarea_field( wp_unslash( $_POST['desc'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in ajax_check()
+        if ( ! $post_id ) wp_send_json_error( 'Missing post_id' );
+        if ( ! get_post( $post_id ) ) wp_send_json_error( 'Post not found' );
+        update_post_meta( $post_id, self::META_DESC, $desc );
+        wp_send_json_success( [
+            'post_id' => $post_id,
+            'desc'    => $desc,
+            'chars'   => mb_strlen( $desc ),
+        ] );
+    }
+
+    /**
      * AJAX handler: rewrites an existing meta description that is outside the configured character range.
      *
      * @since 4.2.2

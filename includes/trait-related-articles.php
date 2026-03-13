@@ -182,6 +182,7 @@ trait CS_SEO_Related_Articles {
                 'bot_count'  => is_array($bot_raw) ? count($bot_raw) : 0,
                 'generated'  => $gen_at ? human_time_diff($gen_at) . ' ago' : '',
                 'error'      => $error ?: '',
+                'permalink'  => (string) get_permalink($pid),
             ];
         }
 
@@ -277,6 +278,117 @@ trait CS_SEO_Related_Articles {
     /**
      * Resets RC meta for one or all posts so they can be regenerated.
      */
+    /**
+     * AJAX handler: single server-side pass that both generates missing Related
+     * Articles AND syncs counts for existing ones.
+     *
+     * For posts with stored scores: re-applies top/bottom selection with current
+     * count settings (trim or fill).
+     * For posts with no scores (never generated): runs the full generation pipeline.
+     *
+     * Uses a direct DB query so no WP_Query environment issues apply.
+     *
+     * @since 4.17.1
+     * @return void
+     */
+    public function ajax_rc_sync_counts(): void {
+        $this->ajax_check();
+
+        // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+        @set_time_limit( 120 );
+
+        global $wpdb;
+
+        $top_count    = max(1, (int)($this->opts['rc_top_count']    ?? 3));
+        $bottom_count = max(1, (int)($this->opts['rc_bottom_count'] ?? 5));
+
+        // All published posts of type 'post' via direct query — bypasses
+        // the WP_Query filter='all' issue present in this environment.
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+        $post_ids = $wpdb->get_col( $wpdb->prepare(
+            "SELECT ID FROM {$wpdb->posts}
+              WHERE post_status = 'publish'
+                AND post_type   = %s
+              ORDER BY post_date DESC",
+            'post'
+        ) );
+
+        $synced   = 0;
+        $generated = 0;
+
+        foreach ( $post_ids as $raw_pid ) {
+            $pid        = (int) $raw_pid;
+            $scores_raw = maybe_unserialize( get_post_meta( $pid, self::META_RC_SCORES, true ) );
+
+            $top_raw = maybe_unserialize( get_post_meta( $pid, self::META_RC_TOP,    true ) );
+            $bot_raw = maybe_unserialize( get_post_meta( $pid, self::META_RC_BOTTOM, true ) );
+            $top     = is_array( $top_raw ) ? array_values( array_map( 'intval', $top_raw ) ) : [];
+            $bot     = is_array( $bot_raw ) ? array_values( array_map( 'intval', $bot_raw ) ) : [];
+
+            if ( is_array( $scores_raw ) && ! empty( $scores_raw ) ) {
+                // ── Has stored scores: re-apply selection (trim or fill) ──
+                arsort( $scores_raw );
+                $new_top = array_values( array_map( 'intval', array_keys( array_slice( $scores_raw, 0, $top_count, true ) ) ) );
+                $remaining = array_diff_key( $scores_raw, array_flip( $new_top ) );
+                $new_bot   = array_values( array_map( 'intval', array_keys( array_slice( $remaining, 0, $bottom_count, true ) ) ) );
+
+                $new_top = array_values( array_filter( $new_top,
+                    fn( $id ) => $id !== $pid && get_post_status( $id ) === 'publish' ) );
+                $new_bot = array_values( array_filter( $new_bot,
+                    fn( $id ) => $id !== $pid && get_post_status( $id ) === 'publish'
+                              && ! in_array( $id, $new_top, true ) ) );
+
+                if ( $new_top !== $top || $new_bot !== $bot ) {
+                    update_post_meta( $pid, self::META_RC_TOP,       $new_top );
+                    update_post_meta( $pid, self::META_RC_BOTTOM,    $new_bot );
+                    update_post_meta( $pid, self::META_RC_GENERATED, time() );
+                    update_post_meta( $pid, self::META_RC_STATUS,    'complete' );
+                    $synced++;
+                }
+            } elseif ( ! empty( $top ) || ! empty( $bot ) ) {
+                // ── Has output but no scores: trim only (cannot fill without scores) ──
+                $new_top = array_values( array_slice( $top, 0, $top_count ) );
+                $new_bot = array_values( array_slice( $bot, 0, $bottom_count ) );
+
+                if ( $new_top !== $top || $new_bot !== $bot ) {
+                    update_post_meta( $pid, self::META_RC_TOP,       $new_top );
+                    update_post_meta( $pid, self::META_RC_BOTTOM,    $new_bot );
+                    update_post_meta( $pid, self::META_RC_GENERATED, time() );
+                    update_post_meta( $pid, self::META_RC_STATUS,    'complete' );
+                    $synced++;
+                }
+            } else {
+                // ── No output at all: run the full generation pipeline ──
+                try {
+                    $this->rc_step_load( $pid );
+                    $status = get_post_meta( $pid, self::META_RC_STATUS, true );
+                    if ( $status === 'complete' ) continue; // rc_step_validate skipped it
+                    $this->rc_step_validate( $pid );
+                    $status = get_post_meta( $pid, self::META_RC_STATUS, true );
+                    if ( $status === 'complete' ) { $generated++; continue; }
+                    $this->rc_step_candidates( $pid );
+                    $this->rc_step_score( $pid );
+                    $this->rc_step_top( $pid );
+                    $this->rc_step_bottom( $pid );
+                    $this->rc_step_validate_out( $pid );
+                    $this->rc_step_complete( $pid );
+                    $generated++;
+                } catch ( \Throwable $e ) {
+                    update_post_meta( $pid, self::META_RC_STATUS, 'error' );
+                    update_post_meta( $pid, self::META_RC_ERROR,  $e->getMessage() );
+                }
+            }
+        }
+
+        wp_send_json_success( [
+            'synced'       => $synced,
+            'generated'    => $generated,
+            'total'        => count( $post_ids ),
+            'top_count'    => $top_count,
+            'bottom_count' => $bottom_count,
+        ] );
+    }
+
     /**
      * AJAX handler: resets the Related Articles generation state for a post.
      *

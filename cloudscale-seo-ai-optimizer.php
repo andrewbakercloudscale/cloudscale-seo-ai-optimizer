@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale SEO AI Optimizer
  * Plugin URI:  https://andrewbaker.ninja/2026/02/24/cloudscale-seo-ai-optimiser-enterprise-grade-wordpress-seo-completely-free/
  * Description: Lightweight SEO with AI meta descriptions via Claude API. Titles, canonicals, OpenGraph, Twitter Cards, JSON-LD schema, sitemaps, robots.txt, and font display optimization.
- * Version:     4.15.3
+ * Version:     4.17.3
  * Author:      Andrew Baker
  * Author URI:  https://andrewbaker.ninja/
  * License:     GPLv2 or later
@@ -18,7 +18,15 @@ if (!defined('ABSPATH')) exit;
 // PHP version guard — before any PHP 8-only syntax so older versions get a clean message.
 if (version_compare(PHP_VERSION, '8.0', '<')) {
     add_action('admin_notices', function(): void {
-        echo '<div class="notice notice-error"><p><strong>CloudScale SEO AI Optimizer</strong> requires PHP 8.0 or higher. Your server is running PHP ' . esc_html(PHP_VERSION) . '. Please upgrade PHP or contact your host.</p></div>';
+        echo '<div class="notice notice-error"><p>';
+        printf(
+            /* translators: 1: plugin name, 2: required PHP version, 3: server PHP version */
+            esc_html__( '%1$s requires PHP %2$s or higher. Your server is running PHP %3$s. Please upgrade PHP or contact your host.', 'cloudscale-seo-ai-optimizer' ),
+            '<strong>CloudScale SEO AI Optimizer</strong>',
+            '8.0',
+            esc_html( PHP_VERSION )
+        );
+        echo '</p></div>';
     });
     add_action('admin_init', function(): void {
         deactivate_plugins(plugin_basename(__FILE__));
@@ -26,6 +34,7 @@ if (version_compare(PHP_VERSION, '8.0', '<')) {
     return;
 }
 
+require_once __DIR__ . '/includes/class-cloudscale-seo-ai-optimizer-utils.php';
 require_once __DIR__ . '/includes/trait-options.php';
 require_once __DIR__ . '/includes/trait-minifier.php';
 require_once __DIR__ . '/includes/trait-frontend-head.php';
@@ -123,7 +132,7 @@ final class CloudScale_SEO_AI_Optimizer {
     // Related Articles generator version — bump when scoring logic changes
     const RC_VERSION = '1.0';
 
-    const VERSION    = '4.15.3';
+    const VERSION    = '4.17.3';
 
     // Separate option key for AI config — keeps sensitive data isolated.
     const AI_OPT     = 'cs_seo_ai_options';
@@ -153,7 +162,7 @@ final class CloudScale_SEO_AI_Optimizer {
         $this->opts    = $this->get_opts();
         $this->ai_opts = $this->get_ai_opts();
 
-        add_action('plugins_loaded', [$this, 'load_textdomain']);
+        add_action('init', [$this, 'load_textdomain']);
         add_action('admin_menu',     [$this, 'admin_menu']);
         add_action('admin_notices',  [$this, 'admin_notices']);
         add_action('admin_enqueue_scripts', [$this, 'admin_enqueue_assets']);
@@ -218,6 +227,7 @@ final class CloudScale_SEO_AI_Optimizer {
         add_action('wp_ajax_cs_seo_ai_generate_one',  [$this, 'ajax_generate_one']);
         add_action('wp_ajax_cs_seo_ai_generate_all',  [$this, 'ajax_generate_all']);
         add_action('wp_ajax_cs_seo_score_one',        [$this, 'ajax_score_one']);
+        add_action('wp_ajax_cs_seo_save_desc',          [$this, 'ajax_save_desc']);
         add_action('wp_ajax_cs_seo_ai_fix_desc',        [$this, 'ajax_fix_desc']);
         add_action('wp_ajax_cs_seo_ai_fix_title',       [$this, 'ajax_fix_title']);
         add_action('wp_ajax_cs_seo_ai_get_posts',       [$this, 'ajax_get_posts']);
@@ -251,7 +261,8 @@ final class CloudScale_SEO_AI_Optimizer {
         add_action('wp_ajax_cs_catfix_drift_analyse_remaining', [$this, 'ajax_catfix_drift_analyse_remaining']);
 
         // Related Articles
-        add_action('wp_ajax_cs_rc_get_posts', [$this, 'ajax_rc_get_posts']);
+        add_action('wp_ajax_cs_rc_get_posts',    [$this, 'ajax_rc_get_posts']);
+        add_action('wp_ajax_cs_rc_sync_counts', [$this, 'ajax_rc_sync_counts']);
         add_action('wp_ajax_cs_rc_step',      [$this, 'ajax_rc_step']);
         add_action('wp_ajax_cs_rc_reset',     [$this, 'ajax_rc_reset']);
 

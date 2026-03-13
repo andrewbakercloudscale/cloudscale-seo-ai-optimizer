@@ -5,7 +5,10 @@ trait CS_SEO_Admin {
     /**
      * Loads the plugin text domain for translations.
      *
+     * Hooked to `init` (PCP requirement); was previously on `plugins_loaded`.
+     *
      * @since 4.14.5
+     * @since 4.15.5 Moved hook from plugins_loaded to init for PCP compliance.
      * @return void
      */
     public function load_textdomain(): void {
@@ -471,7 +474,8 @@ trait CS_SEO_Admin {
         // If the incoming data has no recognisable fields it's likely a spurious
         // call (e.g. plugin reinstall touching the option). Preserve existing data.
         $known_fields = ['site_name','enable_og','robots_txt','sitemap_post_types','enable_sitemap','enable_llms_txt',
-                         'home_title','person_name','block_ai_bots','noindex_search','title_suffix','defer_js'];
+                         'home_title','person_name','block_ai_bots','noindex_search','title_suffix','defer_js',
+                         'rc_enable','rc_top_count','rc_bottom_count'];
         $has_known = false;
         foreach ($known_fields as $f) {
             if (array_key_exists($f, $in)) { $has_known = true; break; }

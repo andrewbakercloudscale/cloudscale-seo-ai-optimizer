@@ -44,6 +44,7 @@ trait CS_SEO_Frontend_Head {
     public function render_head(): void {
         if (is_admin()) return;
         echo $this->build_seo_block(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- build_seo_block() returns pre-escaped HTML
+        $this->print_schema_tags();
     }
 
     /**
@@ -136,7 +137,6 @@ trait CS_SEO_Frontend_Head {
             $out .= $this->render_og_tags();
         }
 
-        $out .= $this->render_schemas();
         $out .= "<!-- /CloudScale SEO AI Optimizer -->\n";
         return $out;
     }

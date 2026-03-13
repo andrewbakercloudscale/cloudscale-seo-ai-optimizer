@@ -43,12 +43,12 @@ trait CS_SEO_Settings_Page {
         <?php /* ── TAB NAV ── */ ?>
 
         <div class="ab-tabs">
-            <button class="ab-tab active" data-tab="seo"      onclick="abTab('seo',this)">📊 Optimise SEO</button>
-            <button class="ab-tab"        data-tab="aitools"  onclick="abTab('aitools',this)">✨ AI Tools</button>
-            <button class="ab-tab"        data-tab="sitemap"  onclick="abTab('sitemap',this)">🗺 Sitemap &amp; Robots</button>
-            <button class="ab-tab"        data-tab="perf"    onclick="abTab('perf',this)">⚡ Performance</button>
-            <button class="ab-tab"        data-tab="catfix"  onclick="abTab('catfix',this)">🏷 Categories</button>
-            <button class="ab-tab"        data-tab="batch"   onclick="abTab('batch',this)">🔄 Scheduled Batch</button>
+            <button class="ab-tab active" data-tab="seo"      onclick="abTab('seo',this)">📊 <?php esc_html_e( 'Optimise SEO', 'cloudscale-seo-ai-optimizer' ); ?></button>
+            <button class="ab-tab"        data-tab="aitools"  onclick="abTab('aitools',this)">✨ <?php esc_html_e( 'AI Tools', 'cloudscale-seo-ai-optimizer' ); ?></button>
+            <button class="ab-tab"        data-tab="sitemap"  onclick="abTab('sitemap',this)">🗺 <?php esc_html_e( 'Sitemap &amp; Robots', 'cloudscale-seo-ai-optimizer' ); ?></button>
+            <button class="ab-tab"        data-tab="perf"    onclick="abTab('perf',this)">⚡ <?php esc_html_e( 'Performance', 'cloudscale-seo-ai-optimizer' ); ?></button>
+            <button class="ab-tab"        data-tab="catfix"  onclick="abTab('catfix',this)">🏷 <?php esc_html_e( 'Categories', 'cloudscale-seo-ai-optimizer' ); ?></button>
+            <button class="ab-tab"        data-tab="batch"   onclick="abTab('batch',this)">🔄 <?php esc_html_e( 'Scheduled Batch', 'cloudscale-seo-ai-optimizer' ); ?></button>
         </div>
         </div>
 
@@ -61,7 +61,7 @@ trait CS_SEO_Settings_Page {
 
                 <div class="ab-zone-card ab-card-identity">
                 <div class="ab-zone-header" style="justify-content:space-between">
-                    <span><span class="ab-zone-icon">🌐</span> Site Identity</span>
+                    <span><span class="ab-zone-icon">🌐</span> <?php esc_html_e( 'Site Identity', 'cloudscale-seo-ai-optimizer' ); ?></span>
                     <span style="display:flex;align-items:center;gap:8px;">
                         <button type="button" class="button" onclick="abToggleCard('ab-card-identity', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
                         <?php $this->explain_btn('identity', '🌐 Site Identity — What each field does', [
@@ -107,13 +107,13 @@ trait CS_SEO_Settings_Page {
                             <p class="description">Meta description for your homepage. Aim for 140–155 characters.</p>
                         </td></tr>
                 </table>
-                <div style="margin-top:16px;padding:0 20px;"><?php submit_button('Save SEO Settings', 'primary', 'submit', false); ?></div>
+                <div style="margin-top:16px;padding:0 20px;"><?php submit_button( __( 'Save SEO Settings', 'cloudscale-seo-ai-optimizer' ), 'primary', 'submit', false ); ?></div>
                 </div>
                 </div><!-- /ab-card-identity -->
 
                 <div class="ab-zone-card ab-card-person">
                 <div class="ab-zone-header" style="justify-content:space-between">
-                    <span><span class="ab-zone-icon">👤</span> Person Schema</span>
+                    <span><span class="ab-zone-icon">👤</span> <?php esc_html_e( 'Person Schema', 'cloudscale-seo-ai-optimizer' ); ?></span>
                     <span style="display:flex;align-items:center;gap:8px;">
                         <button type="button" class="button" onclick="abToggleCard('ab-card-person', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
                         <?php $this->explain_btn('person', '👤 Person Schema — What each field does', [
@@ -149,7 +149,7 @@ trait CS_SEO_Settings_Page {
                             <p class="description">Your profiles on other platforms — one URL per line. Helps Google connect your identity across the web.</p>
                         </td></tr>
                 </table>
-                <div style="margin-top:16px;padding:0 20px;"><?php submit_button('Save SEO Settings', 'primary', 'submit', false); ?></div>
+                <div style="margin-top:16px;padding:0 20px;"><?php submit_button( __( 'Save SEO Settings', 'cloudscale-seo-ai-optimizer' ), 'primary', 'submit', false ); ?></div>
                 </div>
                 </div><!-- /ab-card-person -->
 
@@ -163,7 +163,7 @@ trait CS_SEO_Settings_Page {
 
                 <div class="ab-zone-card ab-card-ai">
                 <div class="ab-zone-header" style="justify-content:space-between">
-                    <span><span class="ab-zone-icon">✦</span> AI Meta Writer — Anthropic Claude</span>
+                    <span><span class="ab-zone-icon">✦</span> <?php esc_html_e( 'AI Meta Writer', 'cloudscale-seo-ai-optimizer' ); ?></span>
                     <span style="display:flex;align-items:center;gap:8px;">
                         <button type="button" class="button" onclick="abToggleCard('ab-card-ai', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
                         <?php $this->explain_btn('ai', '✦ AI Meta Writer — What each setting does', [
@@ -276,7 +276,7 @@ trait CS_SEO_Settings_Page {
                         </td>
                     </tr>
                 </table>
-                <div style="margin-top:16px;padding:0 20px;"><?php submit_button('Save AI Settings', 'primary', 'submit', false); ?></div>
+                <div style="margin-top:16px;padding:0 20px;"><?php submit_button( __( 'Save AI Settings', 'cloudscale-seo-ai-optimizer' ), 'primary', 'submit', false ); ?></div>
                 </div><!-- /ab-zone-body -->
                 </div><!-- /ab-card-ai -->
             </form>
@@ -288,7 +288,7 @@ trait CS_SEO_Settings_Page {
 
             <div class="ab-zone-card ab-card-update-posts">
                 <div class="ab-zone-header" style="justify-content:space-between">
-                    <span><span class="ab-zone-icon">✦</span> Update Posts with AI Descriptions</span>
+                    <span><span class="ab-zone-icon">✦</span> <?php esc_html_e( 'Update Posts with AI Descriptions', 'cloudscale-seo-ai-optimizer' ); ?></span>
                     <span style="display:flex;align-items:center;gap:8px;margin-left:auto">
                         <button type="button" class="button" onclick="abToggleCard('ab-card-update-posts', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9658; Show Details</button>
                         <button class="button" id="ab-posts-hide-hdr" onclick="abTogglePosts(document.getElementById('ab-posts-hide-hdr'))" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↑ Hide Posts</button>
@@ -387,7 +387,7 @@ trait CS_SEO_Settings_Page {
 
             <div class="ab-zone-card ab-card-alt">
                 <div class="ab-zone-header" style="justify-content:space-between">
-                    <span><span class="ab-zone-icon">🖼</span> AI Image ALT Text Generator</span>
+                    <span><span class="ab-zone-icon">🖼</span> <?php esc_html_e( 'AI Image ALT Text Generator', 'cloudscale-seo-ai-optimizer' ); ?></span>
                     <span style="display:flex;align-items:center;gap:8px;margin-left:auto">
                         <button type="button" class="button" onclick="abToggleCard('ab-card-alt', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9658; Show Details</button>
                         <button class="button" id="ab-alt-hide-hdr" onclick="altTogglePosts(document.getElementById('ab-alt-hide-hdr'))" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↑ Hide Posts</button>
@@ -463,7 +463,7 @@ trait CS_SEO_Settings_Page {
 
             <div class="ab-zone-card ab-card-summary">
                 <div class="ab-zone-header" style="justify-content:space-between">
-                    <span><span class="ab-zone-icon">📋</span> AI Summary Box Generator</span>
+                    <span><span class="ab-zone-icon">📋</span> <?php esc_html_e( 'AI Summary Box Generator', 'cloudscale-seo-ai-optimizer' ); ?></span>
                     <span style="display:flex;align-items:center;gap:8px;margin-left:auto">
                         <button type="button" class="button" onclick="abToggleCard('ab-card-summary', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9658; Show Details</button>
                         <button class="button" id="ab-sum-hide-hdr" onclick="sumTogglePosts(document.getElementById('ab-sum-hide-hdr'))" style="display:none;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">↑ Hide Posts</button>
@@ -623,7 +623,7 @@ trait CS_SEO_Settings_Page {
                             </tr>
                             <?php endif; ?>
                         </table>
-                        <div style="margin-top:16px;"><?php submit_button('Save SEO Settings', 'primary', 'submit', false); ?></div>
+                        <div style="margin-top:16px;"><?php submit_button( __( 'Save SEO Settings', 'cloudscale-seo-ai-optimizer' ), 'primary', 'submit', false ); ?></div>
                     </div>
                 </div><!-- /ab-card-rc-settings -->
 
@@ -655,7 +655,7 @@ trait CS_SEO_Settings_Page {
                         <button type="button" class="button rc-filter-btn"                  data-filter="complete" onclick="rcSetFilter('complete',this)">&#9989; Complete</button>
                         <button type="button" class="button rc-filter-btn"                  data-filter="error"    onclick="rcSetFilter('error',this)">&#10060; Error</button>
                         <span style="flex:1;"></span>
-                        <button type="button" class="button button-primary" id="rc-btn-generate-missing" onclick="rcBatch('missing')">&#9654; Generate Missing</button>
+                        <button type="button" class="button button-primary" id="rc-btn-sync-counts"      onclick="rcSyncCounts()" title="Generates missing Related Articles for new posts and syncs link counts for existing ones — single server-side pass">&#9881; Generate &amp; Sync</button>
                         <button type="button" class="button"               id="rc-btn-refresh-stale"    onclick="rcBatch('stale')">&#8635; Refresh Stale</button>
                         <button type="button" class="button"               id="rc-btn-retry-failed"     onclick="rcBatch('failed')">&#128257; Retry Failed</button>
                         <button type="button" class="button"               id="rc-btn-reset-all"        onclick="rcResetAll()" style="color:#b91c1c;border-color:#b91c1c;">&#128465; Reset All</button>
@@ -708,7 +708,7 @@ trait CS_SEO_Settings_Page {
 
                 <div class="ab-zone-card ab-card-features">
                 <div class="ab-zone-header" style="justify-content:space-between">
-                    <span><span class="ab-zone-icon">⚙</span> Features &amp; Robots</span>
+                    <span><span class="ab-zone-icon">⚙</span> <?php esc_html_e( 'Features &amp; Robots', 'cloudscale-seo-ai-optimizer' ); ?></span>
                     <span style="display:flex;align-items:center;gap:8px;">
                         <button type="button" class="button" onclick="abToggleCard('ab-card-features', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
                         <?php $this->explain_btn('features', '⚙ Features & Robots — What each option does', [
@@ -743,14 +743,14 @@ trait CS_SEO_Settings_Page {
                     <label class="ab-rec"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[noindex_author_archives]" value="1" <?php checked((int)($o['noindex_author_archives'] ?? 0), 1); ?>> noindex author archives</label>
                     <label class="ab-rec"><input type="checkbox" name="<?php echo esc_attr(self::OPT); ?>[noindex_tag_archives]" value="1" <?php checked((int)($o['noindex_tag_archives'] ?? 0), 1); ?>> noindex tag archives</label>
                 </div>
-                <div style="margin-top:16px;"><?php submit_button('Save Features &amp; Robots Settings', 'primary', 'submit', false); ?></div>
+                <div style="margin-top:16px;"><?php submit_button( __( 'Save Features &amp; Robots Settings', 'cloudscale-seo-ai-optimizer' ), 'primary', 'submit', false ); ?></div>
                 </div>
                 </div><!-- /ab-card-features -->
 
 
                 <div class="ab-zone-card ab-card-sitemap-settings">
                 <div class="ab-zone-header" style="justify-content:space-between">
-                    <span><span class="ab-zone-icon">⚙</span> Sitemap Settings</span>
+                    <span><span class="ab-zone-icon">⚙</span> <?php esc_html_e( 'Sitemap Settings', 'cloudscale-seo-ai-optimizer' ); ?></span>
                     <span style="display:flex;align-items:center;gap:8px;">
                         <button type="button" class="button" onclick="abToggleCard('ab-card-sitemap-settings', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
                         <?php $this->explain_btn('sitemap', '⚙ Sitemap Settings — What each option does', [
@@ -809,7 +809,7 @@ trait CS_SEO_Settings_Page {
                         </td>
                     </tr>
                 </table>
-                <div style="margin-top:16px;"><?php submit_button('Save Sitemap Settings', 'primary', 'submit', false); ?></div>
+                <div style="margin-top:16px;"><?php submit_button( __( 'Save Sitemap Settings', 'cloudscale-seo-ai-optimizer' ), 'primary', 'submit', false ); ?></div>
                 </div>
                 </div><!-- /ab-card-sitemap-settings -->
 
@@ -822,7 +822,7 @@ trait CS_SEO_Settings_Page {
 
                 <div class="ab-zone-card ab-card-robots">
                 <div class="ab-zone-header" style="justify-content:space-between">
-                    <span><span class="ab-zone-icon">🤖</span> Robots.txt</span>
+                    <span><span class="ab-zone-icon">🤖</span> <?php esc_html_e( 'Robots.txt', 'cloudscale-seo-ai-optimizer' ); ?></span>
                     <span style="display:flex;align-items:center;gap:8px;">
                         <button type="button" class="button" onclick="abToggleCard('ab-card-robots', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
                         <?php $this->explain_btn('robots', '🤖 Robots.txt — What this all means', [
@@ -940,7 +940,7 @@ trait CS_SEO_Settings_Page {
                         </td>
                     </tr>
                 </table>
-                <div style="margin-top:16px;"><?php submit_button('Save Robots Settings', 'primary', 'submit', false); ?></div>
+                <div style="margin-top:16px;"><?php submit_button( __( 'Save Robots Settings', 'cloudscale-seo-ai-optimizer' ), 'primary', 'submit', false ); ?></div>
                 </div>
                 </div><!-- /ab-card-robots -->
 
@@ -950,7 +950,7 @@ trait CS_SEO_Settings_Page {
 
             <div class="ab-zone-card ab-card-sitemap-preview">
             <div class="ab-zone-header" style="justify-content:space-between;align-items:center">
-                <span><span class="ab-zone-icon">🔍</span> Sitemap Preview</span>
+                <span><span class="ab-zone-icon">🔍</span> <?php esc_html_e( 'Sitemap Preview', 'cloudscale-seo-ai-optimizer' ); ?></span>
                 <div style="display:flex;gap:8px;align-items:center">
                     <?php $this->explain_btn('sitemappreview', '🔍 Sitemap Preview — How to use this', [
                         ['rec'=>'ℹ️ Info','name'=>'What this shows','desc'=>'A table of every URL that will appear in your sitemap.xml when Google crawls it. This is the live data — if a post appears here, it is in your sitemap. If it doesn\'t appear, Google won\'t find it via the sitemap.'],
@@ -1354,7 +1354,7 @@ trait CS_SEO_Settings_Page {
 
             <div class="ab-zone-card ab-card-fonts" style="margin-top:0">
                 <div class="ab-zone-header" style="background:#0066cc;justify-content:space-between">
-                    <span><span class="ab-zone-icon">🔤</span> Font-Display Optimization</span>
+                    <span><span class="ab-zone-icon">🔤</span> <?php esc_html_e( 'Font-Display Optimization', 'cloudscale-seo-ai-optimizer' ); ?></span>
                     <span style="display:flex;align-items:center;gap:8px;">
                         <button type="button" class="button" onclick="abToggleCard('ab-card-fonts', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
                         <?php $this->explain_btn('perf', '⚡ Performance Tab — What each feature does', [
@@ -1412,7 +1412,7 @@ trait CS_SEO_Settings_Page {
                 <input type="hidden" name="<?php echo esc_attr(self::OPT); ?>[minify_html]" value="0">
                 <input type="hidden" name="<?php echo esc_attr(self::OPT); ?>[defer_fonts]" value="0">
                 <div class="ab-zone-header" style="background:#7c3aed;justify-content:space-between">
-                    <span><span class="ab-zone-icon">🚀</span> Render &amp; Minification</span>
+                    <span><span class="ab-zone-icon">🚀</span> <?php esc_html_e( 'Render &amp; Minification', 'cloudscale-seo-ai-optimizer' ); ?></span>
                     <button type="button" class="button" onclick="abToggleCard('ab-card-render', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
                 </div>
                 <div class="ab-zone-body" style="padding:16px 20px">
@@ -1463,7 +1463,7 @@ trait CS_SEO_Settings_Page {
                     </div>
                     </div>
 
-                    <?php submit_button('Save Performance Settings'); ?>
+                    <?php submit_button( __( 'Save Performance Settings', 'cloudscale-seo-ai-optimizer' ) ); ?>
                 </div>
                 </form>
             </div>
@@ -1477,7 +1477,7 @@ trait CS_SEO_Settings_Page {
 
                 <div class="ab-zone-card ab-card-schedule">
                 <div class="ab-zone-header" style="justify-content:space-between">
-                    <span><span class="ab-zone-icon">⏱</span> Scheduled Batch Generation</span>
+                    <span><span class="ab-zone-icon">⏱</span> <?php esc_html_e( 'Scheduled Batch Generation', 'cloudscale-seo-ai-optimizer' ); ?></span>
                     <span style="display:flex;align-items:center;gap:8px;">
                         <button type="button" class="button" onclick="abToggleCard('ab-card-schedule', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
                         <?php $this->explain_btn('schedule', '⏱ Scheduled Batch — How this works', [
@@ -1558,7 +1558,7 @@ trait CS_SEO_Settings_Page {
                         </td>
                     </tr>
                 </table>
-                <div style="margin-top:16px;"><?php submit_button('Save Schedule Settings', 'primary', 'submit', false); ?></div>
+                <div style="margin-top:16px;"><?php submit_button( __( 'Save Schedule Settings', 'cloudscale-seo-ai-optimizer' ), 'primary', 'submit', false ); ?></div>
                 </div><!-- /ab-zone-body -->
                 </div><!-- /ab-card-schedule -->
             </form>
@@ -1567,7 +1567,7 @@ trait CS_SEO_Settings_Page {
 
             <div class="ab-zone-card ab-card-lastrun">
             <div class="ab-zone-header" style="justify-content:space-between">
-                <span><span class="ab-zone-icon">📋</span> Batch Run History (28 days)</span>
+                <span><span class="ab-zone-icon">📋</span> <?php esc_html_e( 'Batch Run History (28 days)', 'cloudscale-seo-ai-optimizer' ); ?></span>
                 <span style="display:flex;align-items:center;gap:8px;">
                     <button type="button" class="button" onclick="abToggleCard('ab-card-lastrun', this)" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3);">&#9660; Hide Details</button>
                     <?php $this->explain_btn('lastrun', '📋 Batch Run History — Reading the results', [
@@ -2055,13 +2055,23 @@ trait CS_SEO_Settings_Page {
             document.querySelectorAll('.ab-tab').forEach(b  => b.classList.remove('active'));
             document.getElementById('ab-pane-' + id).classList.add('active');
             btn.classList.add('active');
+            try { localStorage.setItem('cs_seo_tab', id); } catch(e) {}
             if (id === 'sitemap') abRefreshRobotsPreview();
-            // If drift has already been run this session, re-render without a new API call
             if (id === 'catfix') {
-                // If data is already in memory, re-render it. Otherwise show the CTA quietly.
                 if (cdDrift && cdDrift.length > 0) cdRender(cdTotalPosts);
             }
         }
+
+        // Restore the active tab after a page reload (e.g. after saving settings).
+        (function() {
+            try {
+                const saved = localStorage.getItem('cs_seo_tab');
+                if (saved) {
+                    const btn = document.querySelector('.ab-tab[data-tab="' + saved + '"]');
+                    if (btn) abTab(saved, btn);
+                }
+            } catch(e) {}
+        })();
 
         // ── State ────────────────────────────────────────────────────────────
         const abState = {
@@ -2656,6 +2666,51 @@ trait CS_SEO_Settings_Page {
                 : ' <span style="color:#2271b1;font-size:10px">\u25bc</span>';
         }
 
+        // ── Inline description editor ─────────────────────────────────────────
+        function abEditDesc(postId) {
+            const post = abState.posts.find(p => p.id === postId);
+            if (!post) return;
+            post._editing = true;
+            post._editDraft = post._gen !== undefined ? post._gen : (post.desc || '');
+            abRenderTable();
+            const ta = document.getElementById('ab-desc-ta-' + postId);
+            if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+        }
+
+        function abDescInput(postId, value) {
+            const post = abState.posts.find(p => p.id === postId);
+            if (post) post._editDraft = value;
+        }
+
+        function abCancelDesc(postId) {
+            const post = abState.posts.find(p => p.id === postId);
+            if (post) { post._editing = false; post._editDraft = undefined; }
+            abRenderTable();
+        }
+
+        function abSaveDesc(postId) {
+            const post = abState.posts.find(p => p.id === postId);
+            if (!post) return;
+            const desc   = post._editDraft !== undefined ? post._editDraft : '';
+            const status = document.getElementById('ab-desc-save-status-' + postId);
+            if (status) status.textContent = '⟳ Saving…';
+            abPost('cs_seo_save_desc', {post_id: postId, desc: desc}).then(data => {
+                if (data.success) {
+                    post.desc     = data.data.desc;
+                    post.has_desc = data.data.chars > 0;
+                    post._gen     = undefined;
+                    post._editing = false;
+                    post._editDraft = undefined;
+                    abUpdateSummary();
+                    abRenderTable();
+                } else {
+                    if (status) status.textContent = '✗ ' + (data.data || 'Error');
+                }
+            }).catch(e => {
+                if (status) status.textContent = '✗ ' + e.message;
+            });
+        }
+
         // ── Render table ─────────────────────────────────────────────────────
         function abScoreBadge(post) {
             const s = (post._seo_score !== undefined) ? post._seo_score : post.seo_score;
@@ -2726,6 +2781,20 @@ trait CS_SEO_Settings_Page {
                 const genDesc = p._gen
                     ? '<div class="ab-desc-gen">✦ ' + abEsc(p._gen) + '</div>'
                     : '';
+                let descCell;
+                if (p._editing) {
+                    descCell =
+                        '<textarea id="ab-desc-ta-' + p.id + '" style="width:100%;font-size:12px;min-height:58px;resize:vertical;box-sizing:border-box;margin:4px 0 6px" oninput="abDescInput(' + p.id + ',this.value)">' + abEsc(p._editDraft || '') + '</textarea>' +
+                        '<div style="display:flex;gap:6px;align-items:center">' +
+                        '<button class="button button-primary" style="font-size:11px;height:24px;line-height:22px;padding:0 10px" onclick="abSaveDesc(' + p.id + ')">Save</button>' +
+                        '<button class="button" style="font-size:11px;height:24px;line-height:22px;padding:0 10px" onclick="abCancelDesc(' + p.id + ')">Cancel</button>' +
+                        '<span id="ab-desc-save-status-' + p.id + '" style="font-size:11px;color:#888"></span>' +
+                        '</div>';
+                } else {
+                    const editBtn = p.no_post ? '' :
+                        ' <button class="button" style="font-size:10px;height:20px;line-height:18px;padding:0 7px;margin-left:5px" onclick="abEditDesc(' + p.id + ')">✏</button>';
+                    descCell = abBadge(p) + editBtn + existDesc + genDesc;
+                }
                 const canGen = !p._processing && !p.no_post;
                 // ALT badge — update after generation using alts_saved
                 const missingAlt = (p.missing_alt || 0) - (p._alts_saved || 0);
@@ -2781,7 +2850,7 @@ trait CS_SEO_Settings_Page {
                     (p.type && !p.is_homepage ? '<br><small style="color:#888">' + p.type + '</small>' : '') +
                     noPostNote + '</td>' +
                     '<td style="text-align:center;font-size:12px;color:#555;white-space:nowrap">' + (p.date || '—') + '</td>' +
-                    '<td>' + abBadge(p) + existDesc + genDesc + '</td>' +
+                    '<td>' + descCell + '</td>' +
                     '<td style="text-align:center">' + titleBadge + '</td>' +
                     '<td style="text-align:center">' + altCell + '</td>' +
                     '<td style="text-align:center" class="ab-score-cell">' + abScoreBadge(p) + '</td>' +
@@ -4693,7 +4762,7 @@ trait CS_SEO_Settings_Page {
                 tbody.innerHTML = posts.map(p => {
                     const err = p.error ? '<br><small style="color:#b91c1c;">' + p.error.substring(0, 80) + '</small>' : '';
                     return '<tr id="rc-row-' + p.id + '">' +
-                        '<td><a href="?post=' + p.id + '&action=edit" target="_blank" style="font-weight:500;">' + p.title + '</a></td>' +
+                        '<td><a href="' + (p.permalink || '') + '" target="_blank" style="font-weight:500;">' + p.title + '</a></td>' +
                         '<td style="text-align:center;">' + rcBadge(p.status, p.last_step) + err + '</td>' +
                         '<td style="text-align:center;color:#6366f1;font-weight:600;">' + (p.top_count || '—') + '</td>' +
                         '<td style="text-align:center;color:#0e7490;font-weight:600;">' + (p.bot_count || '—') + '</td>' +
@@ -4769,19 +4838,23 @@ trait CS_SEO_Settings_Page {
                 done = d.data.done;
             }
 
-            // Fetch final state for this post to update counts — search current page first, then page 1
+            // Fetch final state for this post to update the row counts.
+            // Use rcCurrentFilter (never 'all' which returns 0 in some environments).
+            const fetchFilter = rcCurrentFilter && rcCurrentFilter !== 'all' ? rcCurrentFilter : 'complete';
             for (const pg of [rcCurrentPage, 1]) {
                 const fd2 = new FormData();
                 fd2.append('action', 'cs_rc_get_posts');
                 fd2.append('nonce',  rcNonce);
                 fd2.append('page',   pg);
-                fd2.append('filter', 'all');
-                const r2 = await fetch(ajaxurl, { method: 'POST', body: fd2 });
-                const d2 = await r2.json();
-                if (d2.success) {
-                    const p = (d2.data.posts || []).find(x => x.id === postId);
-                    if (p) { rcUpdateRow(postId, p.status, p.top_count, p.bot_count, p.generated, p.error); break; }
-                }
+                fd2.append('filter', fetchFilter);
+                try {
+                    const r2 = await fetch(ajaxurl, { method: 'POST', body: fd2 });
+                    const d2 = await r2.json();
+                    if (d2.success) {
+                        const p = (d2.data.posts || []).find(x => x.id === postId);
+                        if (p) { rcUpdateRow(postId, p.status, p.top_count, p.bot_count, p.generated, p.error); break; }
+                    }
+                } catch(e) {}
             }
         }
 
@@ -4805,44 +4878,121 @@ trait CS_SEO_Settings_Page {
             fd.append('nonce',  rcNonce);
             fd.append('mode',   'all');
             await fetch(ajaxurl, { method: 'POST', body: fd });
-            await rcLoadTable(1, 'all');
+            await rcLoadTable(1, rcCurrentFilter || 'complete');
+        }
+
+        // ── Sync Counts (server-side trim, no pipeline) ───────────────────────
+        async function rcSyncCounts() {
+            const btn = document.getElementById('rc-btn-sync-counts');
+            if (btn) { btn.disabled = true; btn.textContent = '⟳ Running…'; }
+            const url = (typeof ajaxurl !== 'undefined' ? ajaxurl : null) || csSeoAdmin.ajaxUrl;
+            try {
+                const fd = new FormData();
+                fd.append('action', 'cs_rc_sync_counts');
+                fd.append('nonce',  rcNonce);
+                const r = await fetch(url, { method: 'POST', body: fd });
+                const d = await r.json();
+                if (d.success) {
+                    const parts = [];
+                    if (d.data.generated > 0) parts.push(d.data.generated + ' generated');
+                    if (d.data.synced    > 0) parts.push(d.data.synced    + ' synced');
+                    const summary = parts.length ? parts.join(', ') : 'nothing to update';
+                    alert('✓ Done — ' + summary + ' (' + d.data.top_count + ' top / ' + d.data.bottom_count + ' bottom)');
+                    await rcLoadTable(rcCurrentPage, rcCurrentFilter);
+                } else {
+                    alert('Failed: ' + (d.data?.message || 'unknown error'));
+                }
+            } catch(e) {
+                alert('Network error: ' + e.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '⚙ Generate & Sync'; }
+            }
         }
 
         // ── Batch generation
         async function rcBatch(mode) {
             if (rcBatchRunning) return;
 
-            // Build queue based on mode
-            // Fetch all posts matching the mode filter, then queue their IDs
-            const filterMap = { missing: 'pending', stale: 'all', failed: 'error' };
-            const filter    = filterMap[mode] || 'pending';
+            const url = (typeof ajaxurl !== 'undefined' ? ajaxurl : null) || csSeoAdmin.ajaxUrl;
 
-            // Load up to 200 posts to batch-process
-            const fd = new FormData();
-            fd.append('action', 'cs_rc_get_posts');
-            fd.append('nonce',  rcNonce);
-            fd.append('page',   1);
-            fd.append('filter', filter);
-            const r  = await fetch(ajaxurl, { method: 'POST', body: fd });
-            const d  = await r.json();
-            if (!d.success) { alert('Could not load posts: ' + (d.data?.message || 'error')); return; }
+            // ── Phase 1: collect IDs ──────────────────────────────────────────
+            // Read from DOM first. If the table loaded with filter='all' and returned
+            // zero posts (a known issue in some environments), force-reload with the
+            // mode-appropriate filter so the tbody is populated before we scan it.
+            const modeFilter = { missing: 'pending', stale: 'complete', failed: 'error' };
+            const targetFilter  = modeFilter[mode] || 'complete';
+            const prevFilter    = rcCurrentFilter;
+            const prevPage      = rcCurrentPage;
 
-            let ids = (d.data.posts || []).map(p => p.id);
-            if (mode === 'missing') ids = ids.filter(id => { const row = document.getElementById('rc-row-' + id); return !row || row.querySelector('td:nth-child(2)')?.textContent?.trim() === 'Pending'; });
+            let domIds = Array.from(
+                document.querySelectorAll('#rc-posts-tbody tr[id^="rc-row-"]')
+            ).map(r => parseInt(r.id.replace('rc-row-', ''))).filter(n => n > 0);
 
-            if (!ids.length) { alert('No posts to process for this mode.'); return; }
+            // Force-reload if the table is empty OR showing a different filter.
+            if (!domIds.length || rcCurrentFilter !== targetFilter) {
+                await rcLoadTable(1, targetFilter);
+                domIds = Array.from(
+                    document.querySelectorAll('#rc-posts-tbody tr[id^="rc-row-"]')
+                ).map(r => parseInt(r.id.replace('rc-row-', ''))).filter(n => n > 0);
+            }
 
-            rcBatchQueue   = ids;
+            let allIds = [...domIds];
+
+            // Fetch any additional pages (rcTotalPages updated by the load above).
+            for (let pg = 2; pg <= rcTotalPages; pg++) {
+                const fd = new FormData();
+                fd.append('action', 'cs_rc_get_posts');
+                fd.append('nonce',  rcNonce);
+                fd.append('page',   pg);
+                fd.append('filter', rcCurrentFilter);
+                try {
+                    const r = await fetch(url, { method: 'POST', body: fd });
+                    const d = await r.json();
+                    if (d.success) allIds = allIds.concat((d.data.posts || []).map(p => p.id));
+                } catch(e) {}
+            }
+
+            allIds = [...new Set(allIds)];
+
+            // For 'missing' mode keep only rows currently showing Pending status.
+            if (mode === 'missing') {
+                allIds = allIds.filter(id => {
+                    const row = document.getElementById('rc-row-' + id);
+                    if (!row) return true;
+                    const badge = row.querySelector('td:nth-child(2)');
+                    return !badge || badge.textContent.trim() === 'Pending';
+                });
+            }
+
+            if (!allIds.length) {
+                // Restore the table to what it was showing before we force-reloaded.
+                if (rcCurrentFilter !== prevFilter) await rcLoadTable(prevPage, prevFilter);
+                alert('No posts found to process for this mode.');
+                return;
+            }
+
+            // ── Phase 2: process ─────────────────────────────────────────────
+            document.getElementById('rc-batch-label').textContent = 'Starting — ' + allIds.length + ' posts';
             rcBatchRunning = true;
             rcBatchStop    = false;
             rcBatchDone    = 0;
-            rcBatchTotal   = ids.length;
+            rcBatchTotal   = allIds.length;
 
             document.getElementById('rc-batch-bar').style.display = 'block';
             rcUpdateBatchProgress();
 
-            for (const postId of rcBatchQueue) {
+            for (const postId of allIds) {
                 if (rcBatchStop) break;
+                // Stale and failed modes reset first so the step handler does
+                // not short-circuit on status === 'complete'.
+                if (mode === 'stale' || mode === 'failed') {
+                    const fdR = new FormData();
+                    fdR.append('action',  'cs_rc_reset');
+                    fdR.append('nonce',   rcNonce);
+                    fdR.append('post_id', postId);
+                    fdR.append('mode',    'one');
+                    try { await fetch(url, { method: 'POST', body: fdR }); } catch(e) {}
+                }
                 await rcRunOne(postId);
                 rcBatchDone++;
                 rcUpdateBatchProgress();
@@ -4877,7 +5027,7 @@ trait CS_SEO_Settings_Page {
                 const obs = new MutationObserver(() => {
                     if (rcPane.classList.contains('active') && !window.__rcTabLoaded) {
                         window.__rcTabLoaded = true;
-                        rcLoadTable(1, 'all');
+                        rcLoadTable(1, 'complete');
                     }
                     if (!rcPane.classList.contains('active')) {
                         window.__rcTabLoaded = false;
@@ -4887,7 +5037,7 @@ trait CS_SEO_Settings_Page {
                 // If already on AI Tools tab on load
                 if (rcPane.classList.contains('active')) {
                     window.__rcTabLoaded = true;
-                    rcLoadTable(1, 'all');
+                    rcLoadTable(1, 'complete');
                 }
             }
         })();

@@ -1,9 +1,22 @@
 <?php
+/**
+ * AI engine — central dispatcher for Anthropic Claude and Google Gemini API calls.
+ *
+ * Also provides the shared ajax_check() guard used by all AJAX handlers.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.0.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_AI_Engine {
-    // =========================================================================
 
+    /**
+     * Verifies capability and nonce for every AJAX handler — call first in every handler.
+     *
+     * @since 4.0.0
+     * @return void
+     */
     private function ajax_check(): void {
         if (!current_user_can('manage_options')) wp_send_json_error('Forbidden', 403);
         if (!check_ajax_referer('cs_seo_nonce', 'nonce', false)) wp_send_json_error('Bad nonce', 403);
@@ -11,7 +24,16 @@ trait CS_SEO_AI_Engine {
 
     /**
      * Central AI dispatcher — routes to Anthropic or Gemini and returns the response text.
-     * $extra_messages: additional turns to append after the initial user_msg (for multi-turn correction).
+     *
+     * @since 4.0.0
+     * @param string     $provider       'anthropic' or 'gemini'.
+     * @param string     $key            API key for the selected provider.
+     * @param string     $model          Model ID string.
+     * @param string     $system         System prompt.
+     * @param string     $user_msg       Initial user message.
+     * @param array|null $extra_messages Additional turns to append after the initial user message (multi-turn correction).
+     * @param int        $max_tokens     Maximum tokens to generate.
+     * @return string Response text from the AI.
      */
     private function dispatch_ai(string $provider, string $key, string $model, string $system, string $user_msg, ?array $extra_messages, int $max_tokens): string {
         if ($provider === 'gemini') {

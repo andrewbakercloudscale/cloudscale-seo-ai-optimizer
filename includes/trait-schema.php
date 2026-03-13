@@ -1,32 +1,60 @@
 <?php
+/**
+ * JSON-LD structured data output (WebSite, Person, Article, BreadcrumbList schemas).
+ *
+ * Schema tags are printed via wp_print_inline_script_tag() on wp_head to satisfy
+ * PCP compliance — no raw <script> strings are echoed from PHP.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.0.0
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Schema {
-    private function render_schemas(): string {
-        $out     = '';
+    /**
+     * Prints all applicable JSON-LD structured data blocks via wp_print_inline_script_tag().
+     *
+     * Called from render_head() after the rest of the SEO head block is echoed.
+     * Using wp_print_inline_script_tag() avoids echoing raw <script> strings, which
+     * is required for WordPress.org PCP compliance.
+     *
+     * @since 4.15.4
+     * @return void
+     */
+    private function print_schema_tags(): void {
         $noindex = $this->is_noindexed();
 
         if ((int) $this->opts['enable_schema_website'] && (is_front_page() || is_home())) {
-            $out .= $this->schema_tag($this->schema_website());
+            $this->print_schema_tag($this->schema_website());
         }
         if ((int) $this->opts['enable_schema_person'] && !$noindex) {
-            $out .= $this->schema_tag($this->schema_person());
+            $this->print_schema_tag($this->schema_person());
         }
         if ((int) $this->opts['enable_schema_breadcrumbs'] && !$noindex) {
             $bc = $this->schema_breadcrumbs();
-            if ($bc) $out .= $this->schema_tag($bc);
+            if ($bc) $this->print_schema_tag($bc);
         }
         if ((int) $this->opts['enable_schema_article'] && is_singular('post') && !$noindex) {
             $art = $this->schema_article();
-            if ($art) $out .= $this->schema_tag($art);
+            if ($art) $this->print_schema_tag($art);
         }
-        return $out;
     }
 
-    private function schema_tag(array $schema): string {
-        return '<script type="application/ld+json">'
-            . wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
-            . "</script>\n";
+    /**
+     * Outputs a single JSON-LD schema block using the WordPress API.
+     *
+     * wp_print_inline_script_tag() (WP 5.7+) is the correct API for arbitrary
+     * script types — it sets type="application/ld+json" and escapes correctly.
+     *
+     * @since 4.15.4
+     * @param array $schema Associative array conforming to schema.org structure.
+     * @return void
+     */
+    private function print_schema_tag(array $schema): void {
+        wp_print_inline_script_tag(
+            (string) wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            ['type' => 'application/ld+json']
+        );
     }
 
     private function schema_website(): array {

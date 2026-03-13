@@ -1,7 +1,20 @@
 <?php
+/**
+ * Default option values and option-retrieval helpers.
+ *
+ * @package CloudScale_SEO_AI_Optimizer
+ * @since   4.12.2
+ */
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Options {
+
+    /**
+     * Returns the full set of default plugin option values.
+     *
+     * @since 4.0.0
+     * @return array<string,mixed>
+     */
     public static function defaults(): array {
         $site = get_bloginfo('name');
         return [
@@ -58,6 +71,12 @@ trait CS_SEO_Options {
         ];
     }
 
+    /**
+     * Returns the full set of default AI option values.
+     *
+     * @since 4.0.0
+     * @return array<string,mixed>
+     */
     public static function ai_defaults(): array {
         return [
             'ai_provider'      => 'anthropic',
@@ -74,10 +93,22 @@ trait CS_SEO_Options {
         ];
     }
 
+    /**
+     * Returns the default robots.txt content shipped with the plugin.
+     *
+     * @since 4.0.0
+     * @return string
+     */
     public static function default_robots_txt(): string {
         return "User-agent: Googlebot\nAllow: /\nDisallow: /wp-admin/\nDisallow: /wp-login.php\nDisallow: /xmlrpc.php\nDisallow: /?s=\nDisallow: /search/\nDisallow: /*?prp_page_paginated_recent_posts\n\nUser-agent: *\nAllow: /\nDisallow: /wp-admin/\nDisallow: /wp-login.php\nDisallow: /xmlrpc.php\nDisallow: /?s=\nDisallow: /search/\nDisallow: /*?prp_page_paginated_recent_posts";
     }
 
+    /**
+     * Returns the default AI meta description prompt text.
+     *
+     * @since 4.0.0
+     * @return string
+     */
     private static function default_prompt(): string {
         return 'You are an expert SEO copywriter. Site context will be injected automatically from the site settings below.
 
@@ -90,11 +121,23 @@ Write a single meta description for the article provided. Rules:
 - Output ONLY the meta description text — no quotes, no labels, nothing else';
     }
 
+    /**
+     * Loads saved plugin options merged with defaults.
+     *
+     * @since 4.0.0
+     * @return array<string,mixed>
+     */
     private function get_opts(): array {
         $saved = get_option(self::OPT, []);
         return array_merge(self::defaults(), is_array($saved) ? $saved : []);
     }
 
+    /**
+     * Loads saved AI options merged with defaults.
+     *
+     * @since 4.0.0
+     * @return array<string,mixed>
+     */
     private function get_ai_opts(): array {
         $saved = get_option(self::AI_OPT, []);
         return array_merge(self::ai_defaults(), is_array($saved) ? $saved : []);

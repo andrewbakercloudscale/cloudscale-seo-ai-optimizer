@@ -3,7 +3,7 @@ Contributors: andrewbaker007
 Tags: seo, meta description, ai, opengraph, schema
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 4.15.3
+Stable tag: 4.17.3
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -199,6 +199,76 @@ Yes. The Scheduled Batch tab lets you select which days of the week to run autom
 8. Scheduled Batch configuration with day selector and last run status
 
 == Changelog ==
+
+= 4.17.3 =
+* Settings page now returns to the active tab after saving — active tab is saved to localStorage and restored on page reload
+
+= 4.17.2 =
+* Fix: Generate & Sync now correctly decreases link counts for posts where _cs_rc_scores was deleted by earlier reset attempts — added a third code path that directly trims top/bottom arrays without requiring scores or re-running the pipeline
+* Fix: button label showed "&amp;" literal after completion — changed to textContent with plain "&"
+
+= 4.17.1 =
+* Merged "Generate Missing" and "Sync Counts" into one "Generate & Sync" button — single server-side pass that runs the full pipeline for posts with no scores and re-applies count settings for posts that already have scores
+
+= 4.17.0 =
+* Related Articles Post Status table: post title links now open the live post URL (so related links are visible) instead of the editor
+
+= 4.16.9 =
+* Fix: post title links in Related Articles Post Status table now open the post editor instead of the category editor (was using a relative URL that inherited the settings page context)
+
+= 4.16.8 =
+* Fix: clicking Generate Missing when all posts are complete no longer leaves the table showing "No posts found." — the table restores to its previous filter/page after the alert
+
+= 4.16.7 =
+* Sync Counts now fills upward as well as trimming — re-applies the stored candidate scores to fill additional slots when the count setting is increased, so no full regeneration is needed
+
+= 4.16.6 =
+* Fix: Related Articles settings (rc_top_count, rc_bottom_count, rc_enable) were silently discarded on save — the options sanitizer's known-fields guard did not include any RC keys so every RC form submission was rejected as spurious
+
+= 4.16.5 =
+* New: "Sync Counts" button in Related Articles Post Status — single server-side pass that trims all complete posts' stored links to match current Top/Bottom count settings using a direct DB query, bypassing all WP_Query environment issues
+
+= 4.16.4 =
+* Fix: Generate Missing now force-reloads with filter=pending before collecting IDs — previously it used the complete-post DOM rows and then filtered them all out, yielding 0 posts
+
+= 4.16.3 =
+* Fix: rcRunOne final state fetch now uses rcCurrentFilter instead of hardcoded filter=all (which returns 0 in some environments), so row counts update live during a batch run
+* Fix: Reset All reloads with current filter rather than filter=all
+* Batch bar now shows post count at start so you can confirm the batch is running
+
+= 4.16.2 =
+* Fix: Related Articles table autoload now uses filter=complete instead of filter=all (all-posts query returns 0 in some environments)
+* Fix: rcBatch auto-reloads the table with the target filter before collecting IDs if the DOM is empty, guaranteeing posts are found
+
+= 4.16.1 =
+* Fix: rcBatch now reads post IDs from the visible DOM table rows instead of a pre-fetch API call; eliminates "No posts to process" caused by cs_rc_get_posts returning 0 for certain filter/query combinations
+
+= 4.16.0 =
+* Fix: Refresh Stale now queries filter='complete' instead of filter='all' — semantically correct (re-runs previously completed posts) and resolves "No posts to process" caused by the all-posts query returning nothing in some environments
+
+= 4.15.9 =
+* Refactor: rcBatch rewritten to use a page-1 probe for total count then process page-by-page, eliminating the pre-fetch bulk-collect approach that returned 0 posts in some environments
+
+= 4.15.8 =
+* Fix: Refresh Stale and Retry Failed now actually regenerate posts — previously the step handler returned immediately for complete posts without running any steps; each post is now reset to pending before re-running
+
+= 4.15.7 =
+* Fix: Related Articles batch (Refresh Stale, Generate Missing, Retry Failed) now fetches all pages before building the queue — previously only the first 50 posts were ever processed
+
+= 4.15.6 =
+* AI Tools post table: ✏ Edit button on each row opens an inline textarea to manually enter or edit the meta description, with Save and Cancel
+
+= 4.15.5 =
+* PCP medium fixes: load_textdomain moved from plugins_loaded to init
+* PHP version notice now uses i18n functions with translators comment
+* DocBlocks added to all methods in trait-options.php
+* File-level DocBlocks added to trait-schema.php and trait-ai-engine.php
+* dispatch_ai() and ajax_check() DocBlocks completed with @since, @param, @return
+* Created includes/class-cloudscale-seo-ai-optimizer-utils.php Utils class
+* Settings page: tab labels, zone headers, and all submit_button labels wrapped in i18n functions
+
+= 4.15.4 =
+* PCP compliance: JSON-LD structured data now output via wp_print_inline_script_tag() instead of echoed <script> strings — eliminates the only remaining critical PCP violation
 
 = 4.15.3 =
 * Fix: PHP Warning "Undefined array key message" in batch scheduler log display — timeout and sum_ok entries have no message key
@@ -629,6 +699,66 @@ Yes. The Scheduled Batch tab lets you select which days of the week to run autom
 * Per post generation from post editor metabox
 
 == Upgrade Notice ==
+
+= 4.17.3 =
+Settings page now stays on the current tab after saving.
+
+= 4.17.2 =
+Fix: Generate & Sync now correctly trims link counts downward in all cases.
+
+= 4.17.1 =
+Generate Missing and Sync Counts merged into one Generate & Sync button.
+
+= 4.17.0 =
+Related Articles table post links now open the live post for previewing related links.
+
+= 4.16.9 =
+Fix: Related Articles table post links now open the correct post editor.
+
+= 4.16.8 =
+Fix: table no longer blanks out when Generate Missing finds nothing to process.
+
+= 4.16.7 =
+Sync Counts can now fill additional slots when you increase the link count setting.
+
+= 4.16.6 =
+Fix: Related Articles link count settings now save correctly.
+
+= 4.16.5 =
+New: Sync Counts button instantly normalises all Related Articles link counts to match your current settings.
+
+= 4.16.4 =
+Fix: Generate Missing now correctly finds pending posts regardless of which filter the table is currently showing.
+
+= 4.16.3 =
+Fix: Related Articles batch now correctly updates row counts live and reloads with the right filter.
+
+= 4.16.2 =
+Fix: Refresh Stale batch now reliably finds and processes posts.
+
+= 4.16.1 =
+Fix: batch operations now read directly from the visible table rows, resolving persistent "No posts to process" issue.
+
+= 4.16.0 =
+Fix: Refresh Stale now correctly finds and reprocesses completed posts.
+
+= 4.15.9 =
+Refresh Stale batch rewritten — more robust page-by-page processing, fixes "No posts to process" in certain environments.
+
+= 4.15.8 =
+Bug fix: Refresh Stale now genuinely regenerates all posts with current settings.
+
+= 4.15.7 =
+Bug fix: Related Articles batch now processes all posts, not just the first 50.
+
+= 4.15.6 =
+New: manually edit any post's meta description inline from the AI Tools table.
+
+= 4.15.5 =
+Code quality and i18n improvements; no functional changes.
+
+= 4.15.4 =
+PCP compliance fix: JSON-LD schema output now uses WordPress API, eliminating the critical echoed script tag violation.
 
 = 4.15.3 =
 Bug fix: eliminates PHP warning from batch scheduler log display.
