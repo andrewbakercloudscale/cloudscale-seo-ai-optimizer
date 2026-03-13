@@ -3,6 +3,20 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_Admin {
     /**
+     * Loads the plugin text domain for translations.
+     *
+     * @since 4.14.5
+     * @return void
+     */
+    public function load_textdomain(): void {
+        load_plugin_textdomain(
+            'cloudscale-seo-ai-optimizer',
+            false,
+            dirname( plugin_basename( __FILE__ ) ) . '/../languages'
+        );
+    }
+
+    /**
      * Displays an admin notice after the physical robots.txt has been renamed on activation.
      *
      * @since 4.10.0

@@ -3,6 +3,83 @@
 All notable changes to CloudScale SEO AI Optimizer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.14.5] - 2026-03-12
+### Fixed
+- High: `load_plugin_textdomain()` was never called; text domain now registered on `plugins_loaded`
+- High: Raw HTML echo in robots.txt writable status wrapped with `wp_kses_post()`
+- Medium: Eight bare `echo` of hardcoded ternary CSS/attribute values wrapped with `esc_attr()`
+- Medium: Batch log entry count echo cast to `(int)`
+### Changed
+- CHANGELOG.md updated to cover 4.13.x–4.14.x releases
+
+## [4.14.4] - 2026-03-12
+### Fixed
+- Category Drift: `cdRenderDrift()` now uses `post_ids` for matching on page reload, preventing reversion to stale unanalysed count
+
+## [4.14.3] - 2026-03-12
+### Changed
+- Category Drift: debug fields removed from server response; status line cleaned to `(N move groups, M posts matched)`
+
+## [4.14.2] - 2026-03-12
+### Fixed
+- Category Drift: PHP title→ID lookup now normalises smart/curly apostrophes, en-dashes, em-dashes, and HTML entities before comparing — resolves 0-match failures on posts with non-ASCII punctuation in titles
+
+## [4.14.1] - 2026-03-12
+### Changed
+- Category Drift: unmatched titles now always shown in status line (not only when totalIds === 0)
+
+## [4.14.0] - 2026-03-12
+### Added
+- Category Drift: debug info (unmatched AI titles, known title keys) added to server response to diagnose title→ID mismatches
+
+## [4.13.9] - 2026-03-12
+### Fixed
+- Category Drift: combined ID + title matching restores correct unanalysed count after fixing regression introduced in 4.13.8
+
+## [4.13.8] - 2026-03-12
+### Fixed
+- Category Drift: `stillUnassigned` now uses post_ids (ID-based exact match) instead of title fuzzy match for counting remaining unanalysed posts
+
+## [4.13.7] - 2026-03-12
+### Added
+- Category Drift: PHP server-side title→ID resolution; each move group now returns `post_ids` for reliable client-side matching
+- Category Drift: visible `(N move groups, M posts matched)` status line shown after each Analyse run
+
+## [4.13.6] - 2026-03-12
+### Fixed
+- Category Drift: `▼ N unanalysed posts` toggle button text now updates after analysis (was static from initial render)
+
+## [4.13.5] - 2026-03-12
+### Fixed
+- Category Drift: `cdMatchPost` was defined inside `cdRenderDrift()` making it invisible to `cdAnalyseRemaining()` — caused silent ReferenceError leaving the Analyse button permanently disabled after each run
+
+## [4.13.4] - 2026-03-12
+### Fixed
+- Version bump only; no functional changes from 4.13.3
+
+## [4.13.3] - 2026-03-12
+### Changed
+- Category Drift: elapsed timer moved inside Analyse button text (`🤖 Analysing N posts… (8s)`) for more visible feedback
+
+## [4.13.2] - 2026-03-12
+### Added
+- Category Drift: Stop button with AbortController on both `cdLoad()` (Run Analysis) and `cdAnalyseRemaining()` (Analyse N remaining)
+- Category Drift: elapsed time counter on Run Analysis; post count shown in Analyse button label during run
+
+## [4.13.1] - 2026-03-12
+### Fixed
+- PHP operator-precedence bug in `defer_font_css()` noscript href — preg_match result was concatenated before ternary, making href always empty; also added `esc_attr()` to href output
+### Changed
+- i18n: `esc_html__()` / `esc_html_e()` added to user-visible strings in admin notice, metabox labels/buttons, and frontend summary box
+- `admin_page_css()`, `llms_preview_js()`, `sitemap_preview_js()` extracted to new `trait-settings-assets.php` (reduces trait-settings-page.php by ~300 lines)
+
+## [4.13.0] - 2026-03-12
+### Added
+- CHANGELOG.md created in Keep-a-Changelog format
+### Changed
+- Dashboard widget title wrapped with `wp_kses_post()` and `esc_html()` for the version span
+- `@since`, `@param`, `@return` DocBlocks added to all public methods across all 23 trait files
+
 ## [4.12.9] - 2026-03-12
 ### Security
 - Removed `wp_ajax_nopriv_` registration from `ajax_download_fonts` (admin-only handler)

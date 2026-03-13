@@ -857,9 +857,62 @@ trait CS_SEO_Category_Fixer {
         $clean = preg_replace('/```\s*$/', '', $clean);
         $moves = json_decode(trim($clean), true);
         if (!is_array($moves)) {
-            wp_send_json(['success' => false, 'error' => 'AI returned invalid JSON.']);
+            wp_send_json(['success' => false, 'error' => 'AI returned invalid JSON. Raw: ' . substr($raw, 0, 200)]);
             return;
         }
+
+        // Normalise a title string for comparison: decode HTML entities, convert
+        // curly/smart punctuation to ASCII equivalents, then lowercase and trim.
+        $normalise = static function( string $t ): string {
+            $t = html_entity_decode( $t, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+            $t = str_replace(
+                [ "\u{2018}", "\u{2019}", "\u{201A}", "\u{201B}", // left/right single quotes
+                  "\u{201C}", "\u{201D}", "\u{201E}", "\u{201F}", // left/right double quotes
+                  "\u{2013}", "\u{2014}", "\u{2015}",             // en-dash, em-dash, horizontal bar
+                  "\u{2026}", "\u{00A0}" ],                       // ellipsis, non-breaking space
+                [ "'", "'", "'", "'",
+                  '"', '"', '"', '"',
+                  '-', '-', '-',
+                  '...', ' ' ],
+                $t
+            );
+            return strtolower( trim( $t ) );
+        };
+
+        // Build a title→ID map so we can resolve AI-returned titles to post IDs.
+        $title_to_id = [];
+        foreach ($post_ids as $pid) {
+            $bare = $normalise( get_the_title( $pid ) );
+            $title_to_id[ $bare ] = $pid;
+        }
+
+        $debug_unmatched = [];
+        foreach ( $moves as &$move ) {
+            $move['post_ids'] = [];
+            foreach ( (array) ( $move['titles'] ?? [] ) as $mt ) {
+                // Strip any [also in:] annotation the AI may have left in the title.
+                $mt_clean = preg_replace( '/\s*\[also in:.*?\]/i', '', $mt );
+                $mt_bare  = $normalise( $mt_clean );
+                if ( isset( $title_to_id[ $mt_bare ] ) ) {
+                    $move['post_ids'][] = $title_to_id[ $mt_bare ];
+                    continue;
+                }
+                // Substring fallback.
+                $found = false;
+                foreach ( $title_to_id as $stored => $pid ) {
+                    if ( str_contains( $stored, $mt_bare ) || str_contains( $mt_bare, $stored ) ) {
+                        $move['post_ids'][] = $pid;
+                        $found = true;
+                        break;
+                    }
+                }
+                if ( ! $found ) {
+                    $debug_unmatched[] = $mt;
+                }
+            }
+            $move['post_ids'] = array_values( array_unique( $move['post_ids'] ) );
+        }
+        unset( $move );
 
         // Merge into cache
         $cache = get_option('cs_seo_drift_cache', []);

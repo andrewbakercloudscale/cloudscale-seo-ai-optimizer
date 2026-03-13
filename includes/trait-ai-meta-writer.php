@@ -714,6 +714,7 @@ trait CS_SEO_AI_Meta_Writer {
                 foreach ($img_tags[0] as $img_tag) {
                     if (preg_match('/alt=["\']([^"\']*)["\']/i', $img_tag, $m) && $m[1] === '') $missing_alt++;
                 }
+                $hp_score_raw = get_post_meta($front_page_id, self::META_SEO_SCORE, true);
                 $homepage = [
                     'id'              => $front_page_id,
                     'title'           => get_the_title($front_page_id),
@@ -726,6 +727,8 @@ trait CS_SEO_AI_Meta_Writer {
                     'desc_chars'      => mb_strlen($desc),
                     'missing_alt'     => $missing_alt,
                     'is_homepage'     => true,
+                    'seo_score'       => $hp_score_raw !== '' ? (int) $hp_score_raw : null,
+                    'seo_notes'       => (string) get_post_meta($front_page_id, self::META_SEO_NOTES, true),
                 ];
             }
         } elseif ($show_on_front === 'posts') {

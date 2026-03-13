@@ -47,8 +47,8 @@ trait CS_SEO_Settings_Page {
             <button class="ab-tab"        data-tab="aitools"  onclick="abTab('aitools',this)">✨ AI Tools</button>
             <button class="ab-tab"        data-tab="sitemap"  onclick="abTab('sitemap',this)">🗺 Sitemap &amp; Robots</button>
             <button class="ab-tab"        data-tab="perf"    onclick="abTab('perf',this)">⚡ Performance</button>
-            <button class="ab-tab"        data-tab="batch"   onclick="abTab('batch',this)">🔄 Scheduled Batch</button>
             <button class="ab-tab"        data-tab="catfix"  onclick="abTab('catfix',this)">🏷 Categories</button>
+            <button class="ab-tab"        data-tab="batch"   onclick="abTab('batch',this)">🔄 Scheduled Batch</button>
         </div>
         </div>
 
@@ -195,20 +195,20 @@ trait CS_SEO_Settings_Page {
                                     id="ab-anthropic-key-field"
                                     value="<?php echo esc_attr($ai['anthropic_key']); ?>"
                                     placeholder="sk-ant-api03-..."
-                                    style="<?php echo ($ai['ai_provider'] ?? 'anthropic') === 'gemini' ? 'display:none' : ''; ?>">
+                                    style="<?php echo esc_attr( ($ai['ai_provider'] ?? 'anthropic') === 'gemini' ? 'display:none' : '' ); ?>">
                                 <input type="password" class="regular-text"
                                     name="<?php echo esc_attr(self::AI_OPT); ?>[gemini_key]"
                                     id="ab-gemini-key-field"
                                     value="<?php echo esc_attr($ai['gemini_key'] ?? ''); ?>"
                                     placeholder="AIza..."
-                                    style="<?php echo ($ai['ai_provider'] ?? 'anthropic') !== 'gemini' ? 'display:none' : ''; ?>">
+                                    style="<?php echo esc_attr( ($ai['ai_provider'] ?? 'anthropic') !== 'gemini' ? 'display:none' : '' ); ?>">
                                 <button type="button" class="button" onclick="abTestKey()">Test Key</button>
                                 <span id="ab-key-status" class="ab-key-status"></span>
                             </div>
-                            <p class="description" id="ab-key-hint-anthropic" style="<?php echo ($ai['ai_provider'] ?? 'anthropic') === 'gemini' ? 'display:none' : ''; ?>">
+                            <p class="description" id="ab-key-hint-anthropic" style="<?php echo esc_attr( ($ai['ai_provider'] ?? 'anthropic') === 'gemini' ? 'display:none' : '' ); ?>">
                                 Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>. Stored in wp_options — never output to frontend.
                             </p>
-                            <p class="description" id="ab-key-hint-gemini" style="<?php echo ($ai['ai_provider'] ?? 'anthropic') !== 'gemini' ? 'display:none' : ''; ?>">
+                            <p class="description" id="ab-key-hint-gemini" style="<?php echo esc_attr( ($ai['ai_provider'] ?? 'anthropic') !== 'gemini' ? 'display:none' : '' ); ?>">
                                 Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>. Stored in wp_options — never output to frontend.
                             </p>
                         </td>
@@ -353,7 +353,7 @@ trait CS_SEO_Settings_Page {
                     <button class="button ab-action-btn ab-fix-btn" id="ab-ai-fix" onclick="abFixAll()" disabled>⚑ Fix Long/Short</button>
                     <button class="button ab-action-btn" id="ab-ai-fix-titles" onclick="abFixTitles()" disabled style="background:#7c3aed;color:#fff;border-color:#6d28d9">✎ Fix Titles</button>
                     <button class="button ab-action-btn ab-static-btn" id="ab-ai-static" onclick="abRegenStatic()" disabled>🖼 Regenerate Static</button>
-                    <button class="button ab-action-btn" id="ab-ai-score-all" onclick="abScoreAll()" disabled style="background:#0e6b6b;border-color:#0a5050;color:#fff;font-weight:600">📊 Score All</button>
+                    <button class="button ab-action-btn" id="ab-ai-score-all" onclick="abScoreAll()" disabled style="background:#0e6b6b;border-color:#0a5050;color:#fff;font-weight:600">📊 Calculate SEO Scores</button>
                     <span id="ab-toolbar-status" style="font-size:12px;color:#50575e;"></span>
                     <button class="button" id="ab-load-posts-again" onclick="abLoadPosts()" style="margin-left:auto">↻ Reload</button>
                     <button class="button" id="ab-posts-hide" onclick="abTogglePosts(this)">↑ Hide Posts</button>
@@ -410,7 +410,7 @@ trait CS_SEO_Settings_Page {
                     $alt_has_key = $provider === 'gemini'
                         ? !empty(trim((string)($this->ai_opts['gemini_key'] ?? '')))
                         : !empty(trim((string)($this->ai_opts['anthropic_key'] ?? '')));
-                    echo $alt_has_key ? 'display:none' : '';
+                    echo esc_attr( $alt_has_key ? 'display:none' : '' );
                 ?>">
                     <div class="ab-warn-icon">⚠️</div>
                     <div class="ab-warn-body">
@@ -478,7 +478,7 @@ trait CS_SEO_Settings_Page {
                 </div>
                 <div class="ab-zone-body" style="padding:20px 24px 24px;display:none;">
 
-                <div class="ab-api-key-warning" id="ab-sum-api-warn" style="<?php echo $alt_has_key ? 'display:none' : ''; ?>">
+                <div class="ab-api-key-warning" id="ab-sum-api-warn" style="<?php echo esc_attr( $alt_has_key ? 'display:none' : '' ); ?>">
                     <div class="ab-warn-icon">⚠️</div>
                     <div class="ab-warn-body">
                         <strong>No AI API key saved — summary generation is disabled.</strong>
@@ -873,7 +873,7 @@ trait CS_SEO_Settings_Page {
                         <strong>A physical robots.txt file exists on your server</strong><br>
                         WordPress (and this plugin) cannot control your robots.txt while a real file exists on disk — the web server serves the file directly, bypassing WordPress entirely. To let the plugin manage your robots.txt, the file needs to be renamed.<br><br>
                         <strong>Current file location:</strong> <code><?php echo esc_html($robots_path); ?></code>
-                        &nbsp;·&nbsp; <strong>Writable:</strong> <?php echo $physical_writable ? '<span style="color:#1a7a34">Yes</span>' : '<span style="color:#c3372b">No</span>'; ?><br><br>
+                        &nbsp;·&nbsp; <strong>Writable:</strong> <?php echo wp_kses_post( $physical_writable ? '<span style="color:#1a7a34">Yes</span>' : '<span style="color:#c3372b">No</span>' ); ?><br><br>
                         <?php if ($physical_contents): ?>
                         <strong>Current file contents:</strong><br>
                         <pre style="background:#f6f7f7;border:1px solid #c3c4c7;border-radius:4px;padding:10px;font-size:12px;line-height:1.6;max-height:200px;overflow-y:auto;margin:6px 0 12px"><?php echo esc_html($physical_contents); ?></pre>
@@ -1515,7 +1515,7 @@ trait CS_SEO_Settings_Page {
                             $sched_days  = (array)($ai['schedule_days'] ?? []);
                             $sched_on    = (int)($ai['schedule_enabled'] ?? 0);
                             foreach ($day_labels as $val => $label): ?>
-                                <label style="<?php echo $sched_on ? '' : 'opacity:0.4'; ?>">
+                                <label style="<?php echo esc_attr( $sched_on ? '' : 'opacity:0.4' ); ?>">
                                     <input type="checkbox"
                                         class="cs-sched-day"
                                         name="<?php echo esc_attr(self::AI_OPT); ?>[schedule_days][]"
@@ -1597,7 +1597,7 @@ trait CS_SEO_Settings_Page {
             ?>
                 <div style="padding:16px 20px;max-height:500px;overflow-y:auto">
                 <?php foreach ($history as $idx => $batch): ?>
-                    <div style="<?php echo $idx > 0 ? 'margin-top:12px;padding-top:12px;border-top:1px solid #e5e5e5;' : ''; ?>">
+                    <div style="<?php echo esc_attr( $idx > 0 ? 'margin-top:12px;padding-top:12px;border-top:1px solid #e5e5e5;' : '' ); ?>">
                         <p style="margin:0 0 4px">
                             <strong><?php echo esc_html($batch['day'] ?? ''); ?> <?php echo esc_html($batch['date'] ?? ''); ?></strong> —
                             <span style="color:#1a7a34"><?php echo (int)($batch['done'] ?? 0); ?> generated</span>,
@@ -1607,7 +1607,7 @@ trait CS_SEO_Settings_Page {
                         </p>
                         <?php if (!empty($batch['log'])): ?>
                         <details style="margin-top:4px">
-                            <summary style="cursor:pointer;font-size:12px;color:#50575e">Show post log (<?php echo count($batch['log']); ?> entries)</summary>
+                            <summary style="cursor:pointer;font-size:12px;color:#50575e">Show post log (<?php echo (int) count( $batch['log'] ); ?> entries)</summary>
                             <div style="background:#1a1a2e;color:#e0e0f0;font-family:'Courier New',monospace;font-size:11px;padding:10px;border-radius:4px;margin-top:8px;max-height:200px;overflow-y:auto">
                             <?php foreach ($batch['log'] as $entry): ?>
                                 <?php if ($entry['status'] === 'ok'): ?>
@@ -2073,6 +2073,8 @@ trait CS_SEO_Settings_Page {
             generated:     0,
             stopped:       false,
             running:       false,
+            sortKey:       null,
+            sortDir:       'desc',
         };
 
         const abNonce     = csSeoAdmin.nonce;
@@ -2636,6 +2638,24 @@ trait CS_SEO_Settings_Page {
             abLoadPosts(abState.page + dir);
         }
 
+        // ── Sort ─────────────────────────────────────────────────────────────
+        function abSortBy(key) {
+            if (abState.sortKey === key) {
+                abState.sortDir = abState.sortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                abState.sortKey = key;
+                abState.sortDir = (key === 'date' || key === 'score' || key === 'alt') ? 'desc' : 'asc';
+            }
+            abRenderTable();
+        }
+
+        function abSortIcon(key) {
+            if (abState.sortKey !== key) return ' <span style="color:#ccc;font-size:10px">\u21c5</span>';
+            return abState.sortDir === 'asc'
+                ? ' <span style="color:#2271b1;font-size:10px">\u25b2</span>'
+                : ' <span style="color:#2271b1;font-size:10px">\u25bc</span>';
+        }
+
         // ── Render table ─────────────────────────────────────────────────────
         function abScoreBadge(post) {
             const s = (post._seo_score !== undefined) ? post._seo_score : post.seo_score;
@@ -2668,7 +2688,38 @@ trait CS_SEO_Settings_Page {
                 wrap.innerHTML = '<p style="color:#50575e">No posts found.</p>';
                 return;
             }
-            let rows = abState.posts.map(p => {
+            let sorted = abState.posts.slice();
+            if (abState.sortKey) {
+                const pinIdx = sorted.findIndex(p => p.is_homepage);
+                const pinned = pinIdx !== -1 ? sorted.splice(pinIdx, 1)[0] : null;
+                sorted.sort((a, b) => {
+                    let av, bv;
+                    if (abState.sortKey === 'title') {
+                        av = (a.title || '').toLowerCase();
+                        bv = (b.title || '').toLowerCase();
+                    } else if (abState.sortKey === 'date') {
+                        av = a.date || '';
+                        bv = b.date || '';
+                    } else if (abState.sortKey === 'desc') {
+                        av = (a._gen || a.has_desc) ? 1 : 0;
+                        bv = (b._gen || b.has_desc) ? 1 : 0;
+                    } else if (abState.sortKey === 'title_chars') {
+                        av = a.title_chars || 0;
+                        bv = b.title_chars || 0;
+                    } else if (abState.sortKey === 'alt') {
+                        av = a.missing_alt || 0;
+                        bv = b.missing_alt || 0;
+                    } else {
+                        av = (a._seo_score !== undefined ? a._seo_score : a.seo_score) ?? -1;
+                        bv = (b._seo_score !== undefined ? b._seo_score : b.seo_score) ?? -1;
+                    }
+                    if (av < bv) return abState.sortDir === 'asc' ? -1 : 1;
+                    if (av > bv) return abState.sortDir === 'asc' ? 1 : -1;
+                    return 0;
+                });
+                if (pinned) sorted.unshift(pinned);
+            }
+            let rows = sorted.map(p => {
                 const existDesc = p.desc
                     ? '<div class="ab-desc-text">' + abEsc(p.desc) + '</div>'
                     : '';
@@ -2727,8 +2778,9 @@ trait CS_SEO_Settings_Page {
                     : abEsc(abDecodeTitle(p.title));
                 return '<tr id="ab-row-' + p.id + '" style="' + rowStyle + '">' +
                     '<td><strong>' + typeLabel + titleLink + '</strong>' +
-                    (p.date ? '<br><small style="color:#888">' + p.type + ' · ' + p.date + '</small>' : '') +
+                    (p.type && !p.is_homepage ? '<br><small style="color:#888">' + p.type + '</small>' : '') +
                     noPostNote + '</td>' +
+                    '<td style="text-align:center;font-size:12px;color:#555;white-space:nowrap">' + (p.date || '—') + '</td>' +
                     '<td>' + abBadge(p) + existDesc + genDesc + '</td>' +
                     '<td style="text-align:center">' + titleBadge + '</td>' +
                     '<td style="text-align:center">' + altCell + '</td>' +
@@ -2737,14 +2789,15 @@ trait CS_SEO_Settings_Page {
                 '</tr>';
             }).join('');
 
-            wrap.innerHTML = '<table class="ab-posts" style="min-width:760px">' +
+            wrap.innerHTML = '<table class="ab-posts" style="min-width:820px">' +
                 '<thead><tr>' +
-                '<th style="width:29%">Post</th>' +
-                '<th style="width:34%">Description</th>' +
-                '<th style="width:8%;text-align:center">Title</th>' +
-                '<th style="width:8%;text-align:center">ALT</th>' +
-                '<th style="width:9%;text-align:center">SEO Score</th>' +
-                '<th style="width:12%">Action</th>' +
+                '<th style="width:22%;cursor:pointer;user-select:none" onclick="abSortBy(\'title\')">Post' + abSortIcon('title') + '</th>' +
+                '<th style="width:9%;text-align:center;cursor:pointer;user-select:none" onclick="abSortBy(\'date\')">Date' + abSortIcon('date') + '</th>' +
+                '<th style="width:28%;cursor:pointer;user-select:none" onclick="abSortBy(\'desc\')">Description' + abSortIcon('desc') + '</th>' +
+                '<th style="width:7%;text-align:center;cursor:pointer;user-select:none" onclick="abSortBy(\'title_chars\')">Title' + abSortIcon('title_chars') + '</th>' +
+                '<th style="width:7%;text-align:center;cursor:pointer;user-select:none" onclick="abSortBy(\'alt\')">ALT' + abSortIcon('alt') + '</th>' +
+                '<th style="width:9%;text-align:center;cursor:pointer;user-select:none" onclick="abSortBy(\'score\')">SEO Score' + abSortIcon('score') + '</th>' +
+                '<th style="width:10%">Action</th>' +
                 '</tr></thead>' +
                 '<tbody>' + rows + '</tbody></table>';
         }
@@ -2848,10 +2901,11 @@ trait CS_SEO_Settings_Page {
             }
             const targets = allPosts.filter(p => !p.no_post);
             let done = 0, errors = 0;
-            for (const post of targets) {
+            for (let si = 0; si < targets.length; si++) {
+                const post = targets[si];
                 if (abState.stopped) { abLog('Stopped after ' + done + ' posts scored', 'skip'); break; }
-                abSetStatus('Scoring "' + post.title.slice(0,50) + '"…');
-                abSetProgress(done, targets.length);
+                abSetStatus('Scoring "' + post.title.slice(0, 50) + '" (' + (si + 1) + ' of ' + targets.length + ')');
+                abSetProgress(si, targets.length);
                 try {
                     const data = await abPost('cs_seo_score_one', {post_id: post.id});
                     if (data.success) {
@@ -2967,6 +3021,47 @@ trait CS_SEO_Settings_Page {
             abSetStatus('Done — ' + done + ' generated, ' + skipped + ' skipped, ' + errors + ' errors');
             abLog('Run complete: ' + done + ' generated, ' + skipped + ' skipped, ' + errors + ' errors', done > 0 ? 'ok' : 'info');
             if (done > 0) abPost('cs_seo_rebuild_health', {}).catch(() => {});
+
+            // Phase 2 (Generate Missing only): score any posts still missing an SEO score.
+            if (!overwrite && !abState.stopped) {
+                abLog('Phase 2: fetching post list to find unscored posts...', 'info');
+                let scoreAllPosts = [];
+                for (let pg = 1; pg <= abState.totalPages; pg++) {
+                    if (abState.stopped) break;
+                    try {
+                        const d2 = await abPost('cs_seo_ai_get_posts', {page: pg});
+                        if (d2.success) scoreAllPosts = scoreAllPosts.concat(d2.data.posts);
+                    } catch(e) {}
+                }
+                const toScore = scoreAllPosts.filter(p => {
+                    if (p.no_post) return false;
+                    const local = abState.posts.find(lp => lp.id === p.id);
+                    const score = local ? (local._seo_score !== undefined ? local._seo_score : local.seo_score) : p.seo_score;
+                    return !score;
+                });
+                abLog('Phase 2: ' + toScore.length + ' post(s) need scoring', 'info');
+                let scoresDone = 0, scoresErr = 0;
+                for (let si = 0; si < toScore.length; si++) {
+                    const post = toScore[si];
+                    if (abState.stopped) { abLog('Stopped during scoring phase after ' + scoresDone + ' scored', 'skip'); break; }
+                    abSetStatus('Scoring: "' + post.title.slice(0, 50) + '" (' + (si + 1) + ' of ' + toScore.length + ')');
+                    try {
+                        const data = await abPost('cs_seo_score_one', {post_id: post.id});
+                        if (data.success) {
+                            const local = abState.posts.find(p => p.id === post.id);
+                            if (local) { local._seo_score = data.data.seo_score; local._seo_notes = data.data.seo_notes || ''; }
+                            const cell = document.querySelector('#ab-row-' + post.id + ' .ab-score-cell');
+                            if (cell && local) cell.innerHTML = abScoreBadge(local);
+                            scoresDone++;
+                        } else { scoresErr++; }
+                    } catch(e) { scoresErr++; }
+                    await abSleep(300);
+                }
+                if (toScore.length > 0) {
+                    abLog('Phase 2 complete: ' + scoresDone + ' scored' + (scoresErr > 0 ? ', ' + scoresErr + ' errors' : ''), scoresDone > 0 ? 'ok' : 'info');
+                    abSetStatus('Done — ' + scoresDone + ' posts scored');
+                }
+            }
 
             document.getElementById('ab-ai-gen-missing').disabled = false;
             document.getElementById('ab-ai-gen-all').disabled      = false;
@@ -4262,9 +4357,14 @@ trait CS_SEO_Settings_Page {
             }));
             const unCount = unanalysed.length;
 
-            // Show loading state with post count and an inline Stop button
+            // Show loading state — elapsed counter lives inside the button text so it's visible
             btn.disabled = true;
-            btn.innerHTML = `&#129302; Analysing ${unCount} post${unCount !== 1 ? 's' : ''}&hellip;`;
+            let elapsed = 0;
+            const updateBtnText = () => {
+                btn.innerHTML = `&#129302; Analysing ${unCount} post${unCount !== 1 ? 's' : ''}&hellip; (${elapsed}s)`;
+            };
+            updateBtnText();
+            const timer = setInterval(() => { elapsed++; updateBtnText(); }, 1000);
 
             const stopBtn = document.createElement('button');
             stopBtn.type = 'button';
@@ -4286,9 +4386,11 @@ trait CS_SEO_Settings_Page {
             let d;
             try {
                 const r = await fetch(ajaxurl, {method:'POST', body:fd, signal: controller.signal});
+                clearInterval(timer);
                 stopBtn.remove();
                 d = await r.json();
             } catch(e) {
+                clearInterval(timer);
                 stopBtn.remove();
                 btn.disabled = false;
                 if (e.name === 'AbortError') {
@@ -4323,7 +4425,10 @@ trait CS_SEO_Settings_Page {
                 newMoves.forEach((m, midx) => {
                     const globalMidx = (c.moves.length - newMoves.length) + midx;
                     const groupId = `cd-move-${catIdx}-${globalMidx}`;
-                    const matchedPosts = (m.titles || []).map(t => cdMatchPost(t, allPosts)).filter(Boolean);
+                    // Prefer server-resolved post_ids; fall back to fuzzy title match.
+                    const matchedPosts = (m.post_ids && m.post_ids.length)
+                        ? m.post_ids.map(id => allPosts.find(p => p.id === id)).filter(Boolean)
+                        : (m.titles || []).map(t => cdMatchPost(t, allPosts)).filter(Boolean);
                     matchedPosts.forEach(p => newAssignedIds.add(p.id));
                     const postItems = matchedPosts.map(p =>
                         `<li style="padding:4px 0;border-bottom:1px solid #f0eaff;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${p.title}</a></li>`
@@ -4344,12 +4449,48 @@ trait CS_SEO_Settings_Page {
                 });
             }
 
-            // Update the analyse button to reflect remaining unanalysed count
+            // Update the analyse button and unanalysed toggle to reflect remaining count.
+            // Check both ID (exact, for new moves) AND title (fuzzy, for older moves without post_ids).
+            const allAssignedIds = new Set(cdDrift[catIdx].moves.flatMap(m => m.post_ids || []));
             const allAssignedTitles = cdDrift[catIdx].moves.flatMap(m => m.titles || []);
-            const stillUnassigned = allPosts.filter(p => !allAssignedTitles.some(t => {
-                const n = t.toLowerCase().trim(), h = p.title.toLowerCase().trim();
-                return h.includes(n) || n.includes(h);
-            }));
+            const stillUnassigned = allPosts.filter(p => {
+                if (allAssignedIds.has(p.id)) return false;
+                return !allAssignedTitles.some(t => {
+                    const n = t.toLowerCase().trim(), h = p.title.toLowerCase().trim();
+                    return h.includes(n) || n.includes(h);
+                });
+            });
+
+            // Update the ▼ N unanalysed posts toggle button above the post list
+            const postsDiv = document.getElementById(`cd-posts-${catIdx}`);
+            if (postsDiv && postsDiv.previousElementSibling) {
+                const toggleBtn = postsDiv.previousElementSibling;
+                if (stillUnassigned.length > 0) {
+                    toggleBtn.innerHTML = `&#9660; ${stillUnassigned.length} unanalysed post${stillUnassigned.length !== 1 ? 's' : ''}`;
+                } else {
+                    toggleBtn.innerHTML = `&#9660; All ${allPosts.length} posts analysed`;
+                }
+            }
+
+            // Show a brief result line so the user can see what happened
+            const totalMatched = allPosts.length - stillUnassigned.length;
+            let resultEl = btn.parentNode.querySelector('.cd-analyse-result');
+            if (!resultEl) {
+                resultEl = document.createElement('span');
+                resultEl.className = 'cd-analyse-result';
+                resultEl.style.cssText = 'margin-left:8px;font-size:11px;color:#555;';
+                btn.parentNode.appendChild(resultEl);
+            }
+            if (newMoves.length === 0) {
+                resultEl.textContent = '(AI returned no moves)';
+                resultEl.style.color = '#888';
+            } else {
+                const totalIds = newMoves.reduce((n, m) => n + (m.post_ids || []).length, 0);
+                const msg = `${newMoves.length} move group${newMoves.length !== 1 ? 's' : ''}, ${totalIds} post${totalIds !== 1 ? 's' : ''} matched`;
+                resultEl.textContent = `(${msg})`;
+                resultEl.style.color = totalIds > 0 ? '#1a7a34' : '#c3372b';
+            }
+
             if (stillUnassigned.length > 0) {
                 btn.disabled = false;
                 btn.innerHTML = `&#129302; Analyse ${stillUnassigned.length} remaining`;
@@ -4373,16 +4514,18 @@ trait CS_SEO_Settings_Page {
                  + `<br><span style="font-size:11px;color:#888;">${cLabel} confidence</span>`;
         }
 
+        // Match an AI title string to a real post object (fuzzy: substring both ways).
+        // Defined at outer scope so cdAnalyseRemaining can call it too.
+        function cdMatchPost(titleStr, posts) {
+            const needle = titleStr.toLowerCase().trim();
+            return posts.find(p => {
+                const hay = p.title.toLowerCase().trim();
+                return hay.includes(needle) || needle.includes(hay);
+            }) || null;
+        }
+
         function cdRenderDrift() {
             const wrap = document.getElementById('cd-wrap');
-            // Match an AI title string to a real post object (fuzzy: substring match both ways)
-            function cdMatchPost(titleStr, posts) {
-                const needle = titleStr.toLowerCase().trim();
-                return posts.find(p => {
-                    const hay = p.title.toLowerCase().trim();
-                    return hay.includes(needle) || needle.includes(hay);
-                }) || null;
-            }
 
             const rows = cdDrift.map((c, idx) => {
                 const allPosts = c.posts || [];
@@ -4396,7 +4539,10 @@ trait CS_SEO_Settings_Page {
                 const movesHtml = moves.length
                     ? moves.map((m, midx) => {
                         const groupId = `cd-move-${idx}-${midx}`;
-                        const matchedPosts = (m.titles || []).map(t => cdMatchPost(t, allPosts)).filter(Boolean);
+                        // Prefer server-resolved post_ids (exact); fall back to fuzzy title match.
+                        const matchedPosts = (m.post_ids && m.post_ids.length)
+                            ? m.post_ids.map(id => allPosts.find(p => p.id === id)).filter(Boolean)
+                            : (m.titles || []).map(t => cdMatchPost(t, allPosts)).filter(Boolean);
                         matchedPosts.forEach(p => assignedIds.add(p.id));
 
                         const postItems = matchedPosts.map(p =>
