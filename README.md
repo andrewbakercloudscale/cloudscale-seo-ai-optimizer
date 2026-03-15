@@ -1,4 +1,4 @@
-# CloudScale SEO AI Optimizer
+# WordPress SEO AI Optimizer
 
 ![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue) ![PHP](https://img.shields.io/badge/PHP-8.0%2B-purple) ![License](https://img.shields.io/badge/License-GPLv2-green) ![Version](https://img.shields.io/badge/Version-4.10.34-orange)
 
