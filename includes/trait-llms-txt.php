@@ -44,6 +44,12 @@ trait CS_SEO_LLMS_Txt {
         exit;
     }
 
+    /**
+     * Builds the llms.txt document content, using a transient cache for performance.
+     *
+     * @since 4.17.0
+     * @return string The complete llms.txt document as a plain-text string.
+     */
     private function build_llms_txt(): string {
         $cached = get_transient('cs_seo_llms_txt');
         if ($cached !== false) return $cached;

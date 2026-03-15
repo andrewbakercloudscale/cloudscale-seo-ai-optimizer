@@ -52,7 +52,7 @@ trait CS_SEO_Schema {
      */
     private function print_schema_tag(array $schema): void {
         wp_print_inline_script_tag(
-            (string) wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            (string) wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG),
             ['type' => 'application/ld+json']
         );
     }

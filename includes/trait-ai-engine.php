@@ -73,12 +73,11 @@ trait CS_SEO_AI_Engine {
         if (is_wp_error($response)) throw new \RuntimeException( 'HTTP error: ' . $response->get_error_message() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
         $code = wp_remote_retrieve_response_code($response);
         if ($code === 429 || $code === 529) {
-            $wait = $code === 529 ? 20 : 10;
-            sleep($wait);
-            $response = wp_remote_post('https://api.anthropic.com/v1/messages', [
-                'timeout' => 45, 'headers' => $headers, 'body' => $body,
-            ]);
-            if (is_wp_error($response)) throw new \RuntimeException( 'HTTP error after retry: ' . $response->get_error_message() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+            // Do not sleep() inside an AJAX handler — return immediately so the
+            // JS caller can back off and retry. The error label includes the code
+            // so the client can distinguish rate-limit retries from real errors.
+            $label = $code === 529 ? '529 - Service Overloaded' : '429 - Rate Limited';
+            throw new \RuntimeException( "Response: {$label} — retry after a short delay" ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
         }
         $code = wp_remote_retrieve_response_code($response);
         $body = json_decode(wp_remote_retrieve_body($response), true);
@@ -118,7 +117,7 @@ trait CS_SEO_AI_Engine {
                 $contents[]  = ['role' => $gemini_role, 'parts' => [['text' => $m['content']]]];
             }
         }
-        $url     = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$key}";
+        $url     = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $model ) . ':generateContent?key=' . rawurlencode( $key );
         $payload = [
             'systemInstruction' => ['parts' => [['text' => $system]]],
             'contents'          => $contents,
@@ -134,13 +133,10 @@ trait CS_SEO_AI_Engine {
             'body'    => $body,
         ]);
         if (is_wp_error($response)) throw new \RuntimeException( 'HTTP error: ' . $response->get_error_message() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
-        // Gemini uses 429 for quota exceeded — retry once.
+        // Gemini uses 429 for quota exceeded — return immediately so the JS caller
+        // can back off and retry rather than blocking the PHP worker with sleep().
         if (wp_remote_retrieve_response_code($response) === 429) {
-            sleep(10);
-            $response = wp_remote_post($url, [
-                'timeout' => 45, 'headers' => ['Content-Type' => 'application/json'], 'body' => $body,
-            ]);
-            if (is_wp_error($response)) throw new \RuntimeException( 'HTTP error after retry: ' . $response->get_error_message() ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+            throw new \RuntimeException( 'Response: 429 - Rate Limited — retry after a short delay' ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
         }
         $code = wp_remote_retrieve_response_code($response);
         $body = json_decode(wp_remote_retrieve_body($response), true);
@@ -162,16 +158,4 @@ trait CS_SEO_AI_Engine {
         return trim($body['candidates'][0]['content']['parts'][0]['text'] ?? '');
     }
 
-    /**
-     * Single AI call that generates meta description, fixes the SEO title, and
-     * writes ALT text for any images — all in one request.
-     *
-     * Returns an array:
-     *   description  string
-     *   title        string|null   null = already in range, leave as-is
-     *   title_was    string|null
-     *   title_chars  int
-     *   title_status 'in_range'|'fixed'|'fixed_imperfect'
-     *   alts_saved   int
-     */
 }

@@ -137,7 +137,7 @@ trait CS_SEO_AI_Alt_Text {
      */
     public function ajax_alt_generate_one(): void {
         $this->ajax_check();
-        $post_id = (int) sanitize_key( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in ajax_check()
         if (!$post_id) wp_send_json_error('Missing post_id');
         $force = (int) sanitize_text_field( wp_unslash( $_POST['force'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce verified in ajax_check() above
 
@@ -245,7 +245,7 @@ trait CS_SEO_AI_Alt_Text {
                 $updated++;
             } catch (\Throwable $e) {
                 // Skip this image on error — continue with remaining images.
-                $warnings[] = sprintf( '%s: %s', esc_url( $src ), $e->getMessage() );
+                $warnings[] = sprintf( '%s: %s', esc_url( $src ), esc_html( $e->getMessage() ) );
             }
         }
 
@@ -289,7 +289,7 @@ trait CS_SEO_AI_Alt_Text {
                         $updated++;
                     }
                 } catch (\Throwable $e) {
-                    $warnings[] = sprintf( 'Featured image %s: %s', esc_url( $thumb_url ), $e->getMessage() );
+                    $warnings[] = sprintf( 'Featured image %s: %s', esc_url( $thumb_url ), esc_html( $e->getMessage() ) );
                 }
             }
         }

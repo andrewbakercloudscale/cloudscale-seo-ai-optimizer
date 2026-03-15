@@ -1,0 +1,12 @@
+.git
+.gitignore
+.claude
+.claude-flow
+.distignore
+repo/
+build.sh
+deploy-wordpress.sh
+backup-s3.sh
+purge-cloudflare.sh
+rollback-wordpress.sh
+*.zip

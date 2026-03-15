@@ -301,10 +301,13 @@ trait CS_SEO_HTTPS_Fixer {
                         $where = $wpdb->prepare("`{$col}` LIKE %s", '%' . $wpdb->esc_like('http://') . '%');
                     }
 
-                    // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,PluginCheck.Security.DirectDB.UnescapedDBParameter -- table/col from $wpdb object; where built via $wpdb->prepare()
+                    // $table is a $wpdb object property (trusted WP constant). $where is built exclusively
+                    // from $wpdb->prepare() calls above — it is a safe SQL fragment, not user-controlled input.
+                    // String concatenation is used because $wpdb->prepare() has no identifier placeholder
+                    // in WP < 6.2 (this plugin supports WP 6.0+). LIMIT 500 prevents memory exhaustion.
+                    // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
                     $affected_rows = $wpdb->get_results(
-                        // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,PluginCheck.Security.DirectDB.UnescapedDBParameter -- table/col from $wpdb object; where built via $wpdb->prepare()
-                        "SELECT * FROM `{$table}` WHERE {$where}",
+                        'SELECT * FROM `' . esc_sql( $table ) . '` WHERE ' . $where . ' LIMIT 500',
                         ARRAY_A
                     );
 

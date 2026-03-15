@@ -20,9 +20,12 @@ trait CS_SEO_Sitemap {
         // /sitemap-1.xml etc.   → child sitemaps with up to 200 URLs each
         add_rewrite_rule('^sitemap\.xml$',       'index.php?cs_seo_sitemap=index', 'top');
         add_rewrite_rule('^sitemap-(\d+)\.xml$', 'index.php?cs_seo_sitemap=page&cs_seo_sitemap_pg=$matches[1]', 'top');
+        add_rewrite_rule('^sitemap\.txt$',       'index.php?cs_seo_sitemap_txt=1', 'top');
         add_rewrite_tag('%cs_seo_sitemap%',    '(index|page)');
         add_rewrite_tag('%cs_seo_sitemap_pg%', '\d+');
+        add_rewrite_tag('%cs_seo_sitemap_txt%', '1');
         add_action('template_redirect', [$this, 'maybe_render_sitemap']);
+        add_action('template_redirect', [$this, 'maybe_render_sitemap_txt']);
     }
 
     /**
@@ -45,6 +48,25 @@ trait CS_SEO_Sitemap {
             // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
             echo $this->build_sitemap_page($pg);
         }
+        exit;
+    }
+
+    /**
+     * Outputs a plain-text sitemap (one URL per line) at /sitemap.txt.
+     *
+     * @since 4.19.5
+     * @return void
+     */
+    public function maybe_render_sitemap_txt(): void {
+        if (!get_query_var('cs_seo_sitemap_txt')) return;
+        status_header(200);
+        // phpcs:ignore WordPress.PHP.DiscouragedFunctions.header_header -- text/plain has no WordPress wrapper; required for sitemap.txt plain-text response.
+        header('Content-Type: text/plain; charset=utf-8');
+        // phpcs:ignore WordPress.PHP.DiscouragedFunctions.header_header -- Public caching directive; nocache_headers() would send the opposite instruction.
+        header('Cache-Control: public, max-age=3600');
+        $urls = $this->get_all_sitemap_urls();
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plain-text output; HTML escaping would corrupt URLs.
+        echo implode("\n", array_column($urls, 'loc')) . "\n";
         exit;
     }
 

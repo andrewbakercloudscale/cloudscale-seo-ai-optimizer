@@ -12,13 +12,25 @@ trait CS_SEO_Category_Fixer {
     // Category Fixer AJAX
     // =========================================================================
 
+    /**
+     * Verifies the AJAX nonce and checks manage_options capability; dies on failure.
+     *
+     * Delegates to ajax_check() from trait-ai-engine.php which verifies the same
+     * cs_seo_nonce nonce and manage_options capability.
+     *
+     * @since 4.0.0
+     * @return void
+     */
     private function catfix_nonce_check(): void {
-        check_ajax_referer('cs_seo_nonce', 'nonce');
-        if (!current_user_can('manage_options')) wp_die();
+        $this->ajax_check();
     }
 
     /**
-     * Tokenise a string into lowercase words, stripping punctuation.
+     * Tokenises a string into lowercase words, stripping punctuation and common stop words.
+     *
+     * @since 4.0.0
+     * @param string $text The input string to tokenise.
+     * @return array Array of lowercase word tokens with stop words removed.
      */
     private function catfix_tokens(string $text): array {
         $text = strtolower(wp_strip_all_tags($text));
@@ -33,8 +45,12 @@ trait CS_SEO_Category_Fixer {
     }
 
     /**
-     * Score a category against a set of token bags. Returns 0-100.
-     * Token bags: ['title'=>[], 'summary'=>[], 'tags'=>[], 'slug'=>[]]
+     * Scores a category against a set of token bags.
+     *
+     * @since 4.0.0
+     * @param string $cat_name The category name to score.
+     * @param array  $bags     Token bags keyed by source: 'title', 'summary', 'tags', 'slug'.
+     * @return int Score from 0 to 100.
      */
     private function catfix_score(string $cat_name, array $bags): int {
         $cat_tokens = $this->catfix_tokens($cat_name);
@@ -51,7 +67,11 @@ trait CS_SEO_Category_Fixer {
     }
 
     /**
-     * Analyse one post: returns proposed category ids, scores, reason, fingerprint.
+     * Analyses a single post and returns proposed category IDs with scores, reason, and fingerprint.
+     *
+     * @since 4.0.0
+     * @param int $post_id The post ID to analyse.
+     * @return array Associative array with keys 'proposed_ids', 'scores', 'reason', 'fingerprint', or empty on failure.
      */
     private function catfix_analyse_post(int $post_id): array {
         $post = get_post($post_id);

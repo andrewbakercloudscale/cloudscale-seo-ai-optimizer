@@ -38,16 +38,11 @@ trait CS_SEO_SEO_Health {
     }
 
     /**
-     * Rebuild the SEO health cache option.
+     * Rebuilds the SEO health cache by counting posts with complete SEO, ALT, links, and summaries.
      *
      * Runs five EXISTS-subquery counts against postmeta — no slow meta_query joins.
      * For the Images metric, validates the stored ALT content hash against the
      * current post content before counting, clearing stale flags on the fly.
-     *
-     * @return array{total:int, seo:int, images:int, links:int, summaries:int, built_at:int}
-     */
-    /**
-     * Rebuilds the SEO health cache by counting posts with complete SEO, ALT, links, and summaries.
      *
      * @since 4.11.26
      * @return array Health cache array with keys: total, seo, images, links, summaries, built_at.
@@ -56,11 +51,11 @@ trait CS_SEO_SEO_Health {
         global $wpdb;
 
         // 1. Total published posts and pages.
-        $total = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional; results stored in cs_seo_health_cache option
-            "SELECT COUNT(*) FROM {$wpdb->posts}
-             WHERE post_status = 'publish'
-               AND post_type IN ('post','page')"
-        );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional; results stored in cs_seo_health_cache option
+        $total = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_status = %s AND post_type IN (%s, %s)",
+            'publish', 'post', 'page'
+        ) );
 
         // 2. Posts/pages with a non-empty meta description.
         $seo = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional; results stored in cs_seo_health_cache option

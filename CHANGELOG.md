@@ -3,9 +3,16 @@
 All notable changes to CloudScale SEO AI Optimizer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.19.5] - 2026-03-15
+### Added
+- `sitemap.txt` endpoint — plain-text sitemap (one URL per line) now served at `/sitemap.txt` alongside the existing XML sitemap; reuses the cached URL list built for `sitemap.xml`
+
 ## [4.19.4] - 2026-03-14
-### Changed
-- Version bump
+### Fixed
+- Critical: `debug_log()` missing from main class — font optimizer and OG letterbox AJAX handlers threw fatal `Call to undefined method` errors; method added and delegated to `Utils::log()` for a single logging code path
+- Medium: Orphaned duplicate DocBlock before `ajax_fix_title()` and `ajax_get_posts()` in `trait-ai-meta-writer.php` removed
+- Medium: Missing DocBlocks added to `call_ai_generate_desc()`, `collect_images_needing_alt()`, `call_ai_generate_all()`, trait-level declarations, and main class `__construct()` / `register_rest_meta()`
+- Medium: `@package` tag added to `trait-settings-assets.php` file DocBlock
 
 ## [4.19.3] - 2026-03-14
 ### Fixed

@@ -112,7 +112,14 @@ trait CS_SEO_Metabox {
         <?php else: ?>
         <p style="color:#888;font-size:12px;"><em><?php
             /* translators: %s: link to the AI Meta Writer settings section */
-            printf( esc_html__( 'Add an Anthropic API key in %s to enable per-post generation.', 'cloudscale-seo-ai-optimizer' ), '<a href="' . esc_url( admin_url( 'options-general.php?page=cs-seo-optimizer#ai' ) ) . '">' . esc_html__( 'SEO Settings → AI Meta Writer', 'cloudscale-seo-ai-optimizer' ) . '</a>' );
+            echo wp_kses(
+                sprintf(
+                    /* translators: %s: link to the AI Meta Writer settings section */
+                    __( 'Add an Anthropic API key in %s to enable per-post generation.', 'cloudscale-seo-ai-optimizer' ),
+                    '<a href="' . esc_url( admin_url( 'options-general.php?page=cs-seo-optimizer#ai' ) ) . '">' . esc_html__( 'SEO Settings → AI Meta Writer', 'cloudscale-seo-ai-optimizer' ) . '</a>'
+                ),
+                array( 'a' => array( 'href' => array() ) )
+            );
         ?></em></p>
         <?php endif; ?>
         <?php
@@ -282,10 +289,17 @@ trait CS_SEO_Metabox {
     }
 
     /**
-     * When the featured image (_thumbnail_id) is changed, clear our custom OG image
-     * so og_image_data() falls through to the new featured image automatically.
+     * When the featured image (_thumbnail_id) is changed, clears the custom OG image so
+     * og_image_data() falls through to the new featured image automatically.
+     *
+     * @since 4.0.0
+     * @param int    $meta_id    The ID of the updated meta row.
+     * @param int    $post_id    The post ID whose meta was updated.
+     * @param string $meta_key   The meta key that was updated.
+     * @param mixed  $meta_value The new meta value.
+     * @return void
      */
-    public function on_thumbnail_updated(int $meta_id, int $post_id, string $meta_key, $meta_value): void {
+    public function on_thumbnail_updated(int $meta_id, int $post_id, string $meta_key, mixed $meta_value): void {
         if ($meta_key !== '_thumbnail_id') return;
         // Only clear if our custom OG image field is set — if it's empty, nothing to do.
         $custom = get_post_meta($post_id, self::META_OGIMG, true);

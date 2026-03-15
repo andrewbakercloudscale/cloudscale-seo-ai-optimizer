@@ -83,27 +83,27 @@ trait CS_SEO_Settings_Page {
                 <div class="ab-zone-body">
                 <table class="form-table" role="presentation">
                     <tr>
-                        <th><label>Site name:</label></th>
-                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[site_name]" value="<?php echo esc_attr((string)($o['site_name'] ?? '')); ?>" placeholder="My Tech Blog">
+                        <th><label for="cs_seo_site_name">Site name:</label></th>
+                        <td><input id="cs_seo_site_name" class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[site_name]" value="<?php echo esc_attr((string)($o['site_name'] ?? '')); ?>" placeholder="My Tech Blog">
                         <p class="description">Used in JSON-LD schema and OG tags. e.g. My Tech Blog</p></td>
-                        <th><label>Locale:</label></th>
-                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[site_lang]" value="<?php echo esc_attr((string)($o['site_lang'] ?? '')); ?>" placeholder="en-US">
+                        <th><label for="cs_seo_site_lang">Locale:</label></th>
+                        <td><input id="cs_seo_site_lang" class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[site_lang]" value="<?php echo esc_attr((string)($o['site_lang'] ?? '')); ?>" placeholder="en-US">
                         <p class="description">BCP 47 language tag. e.g. en-US, en-GB, fr-FR</p></td>
                     </tr>
                     <tr>
-                        <th><label>Title suffix:</label></th>
-                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[title_suffix]" value="<?php echo esc_attr((string)($o['title_suffix'] ?? '')); ?>" placeholder=" | My Tech Blog">
+                        <th><label for="cs_seo_title_suffix">Title suffix:</label></th>
+                        <td><input id="cs_seo_title_suffix" class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[title_suffix]" value="<?php echo esc_attr((string)($o['title_suffix'] ?? '')); ?>" placeholder=" | My Tech Blog">
                         <p class="description">Appended to every page title. e.g. " | My Blog"</p></td>
-                        <th><label>Twitter handle:</label></th>
-                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[twitter_handle]" value="<?php echo esc_attr((string)($o['twitter_handle'] ?? '')); ?>" placeholder="@yourhandle">
+                        <th><label for="cs_seo_twitter_handle">Twitter handle:</label></th>
+                        <td><input id="cs_seo_twitter_handle" class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[twitter_handle]" value="<?php echo esc_attr((string)($o['twitter_handle'] ?? '')); ?>" placeholder="@yourhandle">
                         <p class="description">Your Twitter/X handle including the @ symbol.</p></td>
                     </tr>
                     <tr>
-                        <th><label>Home title:</label></th>
-                        <td><input class="regular-text" style="width:100%" name="<?php echo esc_attr(self::OPT); ?>[home_title]" value="<?php echo esc_attr((string)($o['home_title'] ?? '')); ?>" placeholder="My Blog – Tech Writer & Developer">
+                        <th><label for="cs_seo_home_title">Home title:</label></th>
+                        <td><input id="cs_seo_home_title" class="regular-text" style="width:100%" name="<?php echo esc_attr(self::OPT); ?>[home_title]" value="<?php echo esc_attr((string)($o['home_title'] ?? '')); ?>" placeholder="My Blog – Tech Writer & Developer">
                         <p class="description">Full SEO title for your homepage.</p></td>
-                        <th><label>Default OG image URL:</label></th>
-                        <td><input class="regular-text" style="width:100%" name="<?php echo esc_attr(self::OPT); ?>[default_og_image]" value="<?php echo esc_attr($o['default_og_image']); ?>" placeholder="https://yoursite.com/wp-content/uploads/og-default.jpg">
+                        <th><label for="cs_seo_default_og_image">Default OG image URL:</label></th>
+                        <td><input id="cs_seo_default_og_image" class="regular-text" style="width:100%" name="<?php echo esc_attr(self::OPT); ?>[default_og_image]" value="<?php echo esc_attr($o['default_og_image']); ?>" placeholder="https://yoursite.com/wp-content/uploads/og-default.jpg">
                         <p class="description">Fallback image for social sharing. 1200×630px ideal.</p></td>
                     </tr>
                     <tr><th><?php esc_html_e( 'Home description:', 'cloudscale-seo-ai-optimizer' ); ?></th>
@@ -133,19 +133,19 @@ trait CS_SEO_Settings_Page {
                 <div class="ab-zone-body">
                 <table class="form-table" role="presentation">
                     <tr>
-                        <th><label>Name:</label></th>
-                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[person_name]" value="<?php echo esc_attr((string)($o['person_name'] ?? '')); ?>" placeholder="Jane Smith">
+                        <th><label for="cs_seo_person_name">Name:</label></th>
+                        <td><input id="cs_seo_person_name" class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[person_name]" value="<?php echo esc_attr((string)($o['person_name'] ?? '')); ?>" placeholder="Jane Smith">
                         <p class="description">Your full name as it appears in Google.</p></td>
-                        <th><label>Job title:</label></th>
-                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[person_job_title]" value="<?php echo esc_attr((string)($o['person_job_title'] ?? '')); ?>" placeholder="Software Engineer">
+                        <th><label for="cs_seo_person_job_title">Job title:</label></th>
+                        <td><input id="cs_seo_person_job_title" class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[person_job_title]" value="<?php echo esc_attr((string)($o['person_job_title'] ?? '')); ?>" placeholder="Software Engineer">
                         <p class="description">Your current job title.</p></td>
                     </tr>
                     <tr>
-                        <th><label>URL:</label></th>
-                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[person_url]" value="<?php echo esc_attr((string)($o['person_url'] ?? '')); ?>" placeholder="https://yoursite.com">
+                        <th><label for="cs_seo_person_url">URL:</label></th>
+                        <td><input id="cs_seo_person_url" class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[person_url]" value="<?php echo esc_attr((string)($o['person_url'] ?? '')); ?>" placeholder="https://yoursite.com">
                         <p class="description">Canonical URL for your personal profile.</p></td>
-                        <th><label>Person image URL:</label></th>
-                        <td><input class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[person_image]" value="<?php echo esc_attr($o['person_image']); ?>" placeholder="https://yoursite.com/wp-content/uploads/headshot.jpg">
+                        <th><label for="cs_seo_person_image">Person image URL:</label></th>
+                        <td><input id="cs_seo_person_image" class="regular-text" name="<?php echo esc_attr(self::OPT); ?>[person_image]" value="<?php echo esc_attr($o['person_image']); ?>" placeholder="https://yoursite.com/wp-content/uploads/headshot.jpg">
                         <p class="description">URL of your profile photo for Person JSON-LD schema.</p></td>
                     </tr>
                     <tr><th><?php esc_html_e( 'SameAs URLs (one per line):', 'cloudscale-seo-ai-optimizer' ); ?></th>
@@ -244,7 +244,7 @@ trait CS_SEO_Settings_Page {
                                     <option value="<?php echo esc_attr($v); ?>"
                                         data-provider="<?php echo esc_attr($group); ?>"
                                         <?php selected($ai['model'], $v); ?>
-                                        <?php echo $hidden; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+                                        <?php echo esc_attr($hidden); ?>
                                         ><?php echo esc_html($l); ?></option>
                                 <?php endforeach; ?>
                             </select>
@@ -369,13 +369,13 @@ trait CS_SEO_Settings_Page {
                 <div class="ab-api-key-warning" id="ab-api-warn">
                     <div class="ab-warn-icon">⚠️</div>
                     <div class="ab-warn-body">
-                        <strong>No Anthropic API key saved — AI generation is disabled.</strong>
-                        To use the AI buttons you need to:
+                        <strong><?php esc_html_e( 'No Anthropic API key saved — AI generation is disabled.', 'cloudscale-seo-ai-optimizer' ); ?></strong>
+                        <?php esc_html_e( 'To use the AI buttons you need to:', 'cloudscale-seo-ai-optimizer' ); ?>
                         <ol style="margin:6px 0 0 16px;padding:0">
-                            <li>Get a free API key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></li>
-                            <li>Paste it into the <strong>API Key</strong> field in the <strong>✦ AI Meta Writer</strong> section above</li>
-                            <li>Click <strong>Save AI Settings</strong></li>
-                            <li>Return here and reload the page</li>
+                            <li><?php echo wp_kses( __( 'Get a free API key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>', 'cloudscale-seo-ai-optimizer' ), array( 'a' => array( 'href' => array(), 'target' => array() ) ) ); ?></li>
+                            <li><?php echo wp_kses( __( 'Paste it into the <strong>API Key</strong> field in the <strong>✦ AI Meta Writer</strong> section above', 'cloudscale-seo-ai-optimizer' ), array( 'strong' => array() ) ); ?></li>
+                            <li><?php echo wp_kses( __( 'Click <strong>Save AI Settings</strong>', 'cloudscale-seo-ai-optimizer' ), array( 'strong' => array() ) ); ?></li>
+                            <li><?php esc_html_e( 'Return here and reload the page', 'cloudscale-seo-ai-optimizer' ); ?></li>
                         </ol>
                     </div>
                 </div>
@@ -383,10 +383,10 @@ trait CS_SEO_Settings_Page {
 
                 <?php /* ── Summary cards ── */ ?>
                 <div class="ab-summary-row" id="ab-summary" style="display:none">
-                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-total">0</div><div class="ab-summary-lbl">Total Posts</div></div>
-                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-has" style="color:#1a7a34">0</div><div class="ab-summary-lbl">Have Description</div></div>
-                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-missing" style="color:#6b3fa0">0</div><div class="ab-summary-lbl">Unprocessed</div></div>
-                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-generated" style="color:#2271b1">0</div><div class="ab-summary-lbl">Generated This Session</div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-total">0</div><div class="ab-summary-lbl"><?php esc_html_e( 'Total Posts', 'cloudscale-seo-ai-optimizer' ); ?></div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-has" style="color:#1a7a34">0</div><div class="ab-summary-lbl"><?php esc_html_e( 'Have Description', 'cloudscale-seo-ai-optimizer' ); ?></div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-missing" style="color:#6b3fa0">0</div><div class="ab-summary-lbl"><?php esc_html_e( 'Unprocessed', 'cloudscale-seo-ai-optimizer' ); ?></div></div>
+                    <div class="ab-summary-card"><div class="ab-summary-num" id="sum-generated" style="color:#2271b1">0</div><div class="ab-summary-lbl"><?php esc_html_e( 'Generated This Session', 'cloudscale-seo-ai-optimizer' ); ?></div></div>
                 </div>
 
                 <?php /* ── Toolbar ── */ ?>
@@ -454,8 +454,8 @@ trait CS_SEO_Settings_Page {
                 ?>">
                     <div class="ab-warn-icon">⚠️</div>
                     <div class="ab-warn-body">
-                        <strong>No AI API key saved — ALT text generation is disabled.</strong>
-                        Add an Anthropic API key in the <strong>✦ AI Meta Writer</strong> section above and save.
+                        <strong><?php esc_html_e( 'No AI API key saved — ALT text generation is disabled.', 'cloudscale-seo-ai-optimizer' ); ?></strong>
+                        <?php echo wp_kses( __( 'Add an Anthropic API key in the <strong>✦ AI Meta Writer</strong> section above and save.', 'cloudscale-seo-ai-optimizer' ), array( 'strong' => array() ) ); ?>
                     </div>
                 </div>
 
@@ -524,8 +524,8 @@ trait CS_SEO_Settings_Page {
                 </div>
 
                 <div class="ab-ai-toolbar" id="ab-sum-toolbar" style="display:none">
-                    <button class="button button-primary ab-action-btn" id="ab-sum-gen-all" <?php echo $alt_has_key ? '' : 'disabled'; ?>>✦ Generate Missing</button>
-                    <button class="button ab-action-btn" id="ab-sum-force-all" style="background:#b45309;border-color:#92400e;color:#fff;font-weight:600" <?php echo $alt_has_key ? '' : 'disabled'; ?>>🔄 Force Regenerate All</button>
+                    <button class="button button-primary ab-action-btn" id="ab-sum-gen-all" <?php disabled( ! $alt_has_key ); ?>>✦ Generate Missing</button>
+                    <button class="button ab-action-btn" id="ab-sum-force-all" style="background:#b45309;border-color:#92400e;color:#fff;font-weight:600" <?php disabled( ! $alt_has_key ); ?>>🔄 Force Regenerate All</button>
                     <span id="ab-sum-status" style="font-size:12px;color:#50575e;"></span>
                     <button class="button" id="ab-sum-stop" style="display:none">◻ Stop</button>
                 </div>
@@ -869,9 +869,9 @@ trait CS_SEO_Settings_Page {
                 <div style="background:#f0f6fc;border:1px solid #c2d9f0;border-radius:4px;padding:10px 14px;margin:12px 20px;font-size:12px;font-family:monospace">
                     <strong>File detection:</strong><br>
                     ABSPATH: <code><?php echo esc_html(ABSPATH); ?></code><br>
-                    Looking for: <code><?php echo esc_html(ABSPATH . 'robots.txt'); ?></code> → <?php echo $physical_exists ? '<span style="color:#1a7a34">found</span>' : '<span style="color:#1a7a34">not found</span>'; ?><br>
+                    Looking for: <code><?php echo esc_html(ABSPATH . 'robots.txt'); ?></code> → <?php echo wp_kses( $physical_exists ? '<span style="color:#1a7a34">found</span>' : '<span style="color:#1a7a34">not found</span>', array( 'span' => array( 'style' => array() ) ) ); ?><br>
                     <?php if (!$physical_exists): ?>
-                    Also checking: <code><?php echo esc_html($alt_path); ?></code> → <?php echo $alt_exists ? '<span style="color:#e67e00">found here!</span>' : '<span style="color:#1a7a34">not found</span>'; ?>
+                    Also checking: <code><?php echo esc_html($alt_path); ?></code> → <?php echo wp_kses( $alt_exists ? '<span style="color:#e67e00">found here!</span>' : '<span style="color:#1a7a34">not found</span>', array( 'span' => array( 'style' => array() ) ) ); ?>
                     <?php endif; ?>
                 </div>
 
@@ -1262,7 +1262,7 @@ trait CS_SEO_Settings_Page {
                                     if (r.success) {
                                         var row = document.getElementById('ab-domain-row-ab-https-urls-' + domain.replace(/[^a-z0-9]/gi, '-'));
                                         if (row) {
-                                            row.innerHTML = '<div style="color:#1a7a34;font-size:12px;padding:4px 0">\u2705 Deleted ' + r.data.deleted + ' comment' + (r.data.deleted !== 1 ? 's' : '') + ' from ' + esc(domain) + '</div>';
+                                            row.innerHTML = '<div style="color:#1a7a34;font-size:12px;padding:4px 0">\u2705 Deleted ' + esc(r.data.deleted) + ' comment' + (r.data.deleted !== 1 ? 's' : '') + ' from ' + esc(domain) + '</div>';
                                         }
                                     } else {
                                         btn.disabled = false;
@@ -1291,7 +1291,7 @@ trait CS_SEO_Settings_Page {
                                     if (r.success) {
                                         var row = document.getElementById('ab-domain-row-ab-https-urls-' + domain.replace(/[^a-z0-9]/gi, '-'));
                                         if (row) {
-                                            row.innerHTML = '<div style="color:#1a7a34;font-size:12px;padding:4px 0">\u2705 Deleted ' + r.data.deleted + ' item' + (r.data.deleted !== 1 ? 's' : '') + ' containing ' + esc(domain) + '</div>';
+                                            row.innerHTML = '<div style="color:#1a7a34;font-size:12px;padding:4px 0">\u2705 Deleted ' + esc(r.data.deleted) + ' item' + (r.data.deleted !== 1 ? 's' : '') + ' containing ' + esc(domain) + '</div>';
                                         }
                                     } else {
                                         btn.disabled = false;
@@ -1555,7 +1555,7 @@ trait CS_SEO_Settings_Page {
                                         name="<?php echo esc_attr(self::AI_OPT); ?>[schedule_days][]"
                                         value="<?php echo esc_attr($val); ?>"
                                         <?php checked(in_array($val, $sched_days, true), true); ?>
-                                        <?php echo $sched_on ? '' : 'disabled'; ?>>
+                                        <?php echo esc_attr( $sched_on ? '' : 'disabled' ); ?>>
                                     <?php echo esc_html($label); ?>
                                 </label>
                             <?php endforeach; ?>
@@ -1577,16 +1577,16 @@ trait CS_SEO_Settings_Page {
                                         }
                                     }
                                     if ($found) {
-                                        echo 'Next scheduled run: <strong>' . esc_html(gmdate('D d M Y H:i:s', $found)) . '</strong> (server time)';
+                                        echo wp_kses( 'Next scheduled run: <strong>' . esc_html( gmdate( 'D d M Y H:i:s', $found ) ) . '</strong> (server time)', array( 'strong' => array() ) );
                                     } else {
-                                        echo 'No matching days selected.';
+                                        esc_html_e( 'No matching days selected.', 'cloudscale-seo-ai-optimizer' );
                                     }
                                 } elseif ($cron_next && (int)($ai['schedule_enabled'] ?? 0)) {
-                                    echo '<span style="color:#c3372b">No days selected — tick at least one day above.</span>';
+                                    echo wp_kses( '<span style="color:#c3372b">No days selected — tick at least one day above.</span>', array( 'span' => array( 'style' => array() ) ) );
                                 } elseif ((int)($ai['schedule_enabled'] ?? 0)) {
-                                    echo '<span style="color:#c3372b">No cron event found — try saving settings again.</span>';
+                                    echo wp_kses( '<span style="color:#c3372b">No cron event found — try saving settings again.</span>', array( 'span' => array( 'style' => array() ) ) );
                                 } else {
-                                    echo 'Schedule is disabled.';
+                                    esc_html_e( 'Schedule is disabled.', 'cloudscale-seo-ai-optimizer' );
                                 } ?>
                             </p>
                         </td>
@@ -1616,14 +1616,14 @@ trait CS_SEO_Settings_Page {
             <div class="ab-zone-body">
             <?php
                 $history = get_option('cs_seo_batch_history', []);
-                // Migrate legacy single-run option if present.
-                if (empty($history)) {
-                    $legacy = get_option('cs_seo_last_batch', null);
-                    if ($legacy) {
-                        $history = [$legacy];
-                        update_option('cs_seo_batch_history', $history, false);
-                        delete_option('cs_seo_last_batch');
-                    }
+                // One-time migration: cs_seo_last_batch → cs_seo_batch_history.
+                // Runs at most once: the legacy option is deleted on success so subsequent
+                // renders return null from WP object cache and skip the write entirely.
+                if (empty($history) && get_option('cs_seo_last_batch', null)) {
+                    $legacy  = get_option('cs_seo_last_batch');
+                    $history = [$legacy];
+                    update_option('cs_seo_batch_history', $history, false);
+                    delete_option('cs_seo_last_batch');
                 }
                 if (!empty($history) && is_array($history)):
                     // Show newest first.
@@ -2353,7 +2353,7 @@ trait CS_SEO_Settings_Page {
                             warn.innerHTML = '<div style="font-size:22px">✅</div>' +
                                 '<div><strong>Done!</strong> robots.txt has been renamed to robots.txt.bak. ' +
                                 'The plugin is now managing your robots.txt. ' +
-                                'Purge your Cloudflare cache, then <a href="' + window.location.href + '">reload this page</a> to confirm.</div>';
+                                'Purge your Cloudflare cache, then <a href="' + (window.location.href.startsWith('https://') || window.location.href.startsWith('http://') ? window.location.href : '#') + '">reload this page</a> to confirm.</div>';
                         }
                     } else {
                         btn.disabled = false;
@@ -2397,7 +2397,7 @@ trait CS_SEO_Settings_Page {
                     btn.disabled = false;
                     btn.textContent = '↻ Reload';
                     if (!data.success) {
-                        wrap.innerHTML = '<div style="background:#fef0f0;border:1px solid #f5bcbb;border-radius:4px;padding:12px;color:#c3372b"><strong>Preview failed:</strong> ' + (data.data || 'Unknown error') + '<br><small>Check that your API key is set and the plugin settings have been saved.</small></div>';
+                        wrap.innerHTML = '<div style="background:#fef0f0;border:1px solid #f5bcbb;border-radius:4px;padding:12px;color:#c3372b"><strong>Preview failed:</strong> ' + abEsc(data.data || 'Unknown error') + '<br><small>Check that your API key is set and the plugin settings have been saved.</small></div>';
                         return;
                     }
                     const d        = data.data;
@@ -2414,10 +2414,10 @@ trait CS_SEO_Settings_Page {
 
                     let rows = entries.map(e =>
                         '<tr>' +
-                        '<td><a class="ab-sitemap-url" href="' + e.loc + '" target="_blank">' + e.loc + '</a>' +
-                        (e.title ? '<br><small style="color:#50575e;font-size:11px">' + e.title + '</small>' : '') + '</td>' +
-                        '<td><span class="' + typeClass(e.type) + '">' + (typeLabels[e.type] || e.type) + '</span></td>' +
-                        '<td style="color:#50575e;font-size:12px;white-space:nowrap">' + (e.lastmod || '—') + '</td>' +
+                        '<td><a class="ab-sitemap-url" href="' + safeHref(e.loc) + '" target="_blank">' + abEsc(e.loc) + '</a>' +
+                        (e.title ? '<br><small style="color:#50575e;font-size:11px">' + abEsc(e.title) + '</small>' : '') + '</td>' +
+                        '<td><span class="' + typeClass(e.type) + '">' + abEsc(typeLabels[e.type] || e.type) + '</span></td>' +
+                        '<td style="color:#50575e;font-size:12px;white-space:nowrap">' + abEsc(e.lastmod || '—') + '</td>' +
                         '</tr>'
                     ).join('');
 
@@ -2440,7 +2440,7 @@ trait CS_SEO_Settings_Page {
 
                     wrap.innerHTML =
                         '<p class="ab-sitemap-count"><strong>' + total + '</strong> total URLs across <strong>' + pages + '</strong> sitemap file' + (pages > 1 ? 's' : '') +
-                        ' &nbsp;·&nbsp; <a href="' + csSeoAdmin.sitemapIndexUrl + '" target="_blank">View sitemap index ↗</a></p>' +
+                        ' &nbsp;·&nbsp; <a href="' + safeHref(csSeoAdmin.sitemapIndexUrl) + '" target="_blank">View sitemap index ↗</a></p>' +
                         '<table class="ab-sitemap-tbl">' +
                         '<thead><tr><th>URL</th><th>Type</th><th>Last Modified</th></tr></thead>' +
                         '<tbody>' + rows + '</tbody></table>' +
@@ -2449,8 +2449,7 @@ trait CS_SEO_Settings_Page {
                 .catch(e => {
                     btn.disabled = false;
                     btn.textContent = '⬇ Load Preview';
-                    wrap.innerHTML = '<div style="background:#fef0f0;border:1px solid #f5bcbb;border-radius:4px;padding:12px;color:#c3372b"><strong>Network error:</strong> ' + e.message + '</div>';
-                    wrap.innerHTML = '<p style="color:#c3372b">Error: ' + e.message + '</p>';
+                    wrap.innerHTML = '<p style="color:#c3372b">Error: ' + abEsc(e.message) + '</p>';
                 });
         }
 
@@ -2482,7 +2481,12 @@ trait CS_SEO_Settings_Page {
         }
 
         function abEsc(s) {
-            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+        function safeHref(url) {
+            var s = String(url).replace(/\s/g,'').toLowerCase();
+            if (s.indexOf('javascript:') === 0 || s.indexOf('data:') === 0 || s.indexOf('vbscript:') === 0) return '#';
+            return abEsc(url);
         }
 
         // Title popup — store titles in a plain object to avoid HTML attribute escaping issues
@@ -2879,13 +2883,13 @@ trait CS_SEO_Settings_Page {
                       (p._processing ? '<span class="ab-spinner">⟳</span>' : '✦') + ' Generate</button>';
 
                 const titleLink = p.edit_link
-                    ? '<a href="' + p.edit_link + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="Edit post">' + abEsc(abDecodeTitle(p.title)) + '</a>'
+                    ? '<a href="' + safeHref(p.edit_link) + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="Edit post">' + abEsc(abDecodeTitle(p.title)) + '</a>'
                     : abEsc(abDecodeTitle(p.title));
                 return '<tr id="ab-row-' + p.id + '" style="' + rowStyle + '">' +
                     '<td><strong>' + typeLabel + titleLink + '</strong>' +
-                    (p.type && !p.is_homepage ? '<br><small style="color:#888">' + p.type + '</small>' : '') +
+                    (p.type && !p.is_homepage ? '<br><small style="color:#888">' + abEsc(p.type) + '</small>' : '') +
                     noPostNote + '</td>' +
-                    '<td style="text-align:center;font-size:12px;color:#555;white-space:nowrap">' + (p.date || '—') + '</td>' +
+                    '<td style="text-align:center;font-size:12px;color:#555;white-space:nowrap">' + abEsc(p.date || '—') + '</td>' +
                     '<td>' + descCell + '</td>' +
                     '<td style="text-align:center">' + titleBadge + '</td>' +
                     '<td style="text-align:center">' + altCell + '</td>' +
@@ -3553,12 +3557,12 @@ trait CS_SEO_Settings_Page {
                 const toggleId = 'ab-alt-toggle-' + p.id;
 
                 const altTitleLink = p.edit_link
-                    ? '<a href="' + p.edit_link + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="Edit post">' + abEsc(abDecodeTitle(p.title)) + '</a>'
+                    ? '<a href="' + safeHref(p.edit_link) + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="Edit post">' + abEsc(abDecodeTitle(p.title)) + '</a>'
                     : abEsc(abDecodeTitle(p.title));
                 return '<tr id="ab-alt-row-' + p.id + '" style="border-top:2px solid #e0e0e0">' +
                     '<td style="padding:8px 10px;vertical-align:middle">' +
                         '<strong>' + altTitleLink + '</strong>' +
-                        '<br><small style="color:#888">' + p.type + ' · ' + p.date + ' · ' + imgCount + ' image(s)</small>' +
+                        '<br><small style="color:#888">' + abEsc(p.type) + ' · ' + abEsc(p.date) + ' · ' + abEsc(imgCount) + ' image(s)</small>' +
                     '</td>' +
                     '<td style="padding:8px 10px;vertical-align:middle">' + statusBadge + '</td>' +
                     '<td style="padding:8px 10px;vertical-align:middle;white-space:nowrap">' +
@@ -3822,7 +3826,7 @@ trait CS_SEO_Settings_Page {
                         ? '<span class="ab-badge ab-badge-ok">✓ Has Summary</span>'
                         : '<span class="ab-badge ab-badge-none">Missing</span>';
                 const sumTitleLink = p.edit_link
-                    ? '<a href="' + p.edit_link + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="Edit post">' + abEsc(p.title) + '</a>'
+                    ? '<a href="' + safeHref(p.edit_link) + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="Edit post">' + abEsc(p.title) + '</a>'
                     : abEsc(p.title);
                 return '<tr>' +
                     '<td style="padding:6px 10px;font-size:13px;color:#1d2327">' + sumTitleLink + '</td>' +
@@ -3926,7 +3930,7 @@ trait CS_SEO_Settings_Page {
 
         function cfPills(names, colour) {
             if (!names || !names.length) return '<span style="color:#aaa;font-size:12px;">None</span>';
-            return names.map(n => `<span style="display:inline-block;background:${colour};color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 2px;white-space:nowrap;">${n}</span>`).join('');
+            return names.map(n => `<span style="display:inline-block;background:${colour};color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 2px;white-space:nowrap;">${abEsc(String(n))}</span>`).join('');
         }
 
         function cfConfBadge(score) {
@@ -3949,9 +3953,9 @@ trait CS_SEO_Settings_Page {
                 const rowStyle = p.status === 'applied' ? 'opacity:.55;' : p.status === 'skipped' ? 'opacity:.4;' : '';
                 const changedCols = p.changed
                     ? [
-                        p.add_names.map(n => `<span style="display:inline-block;background:#1a7a34;color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 2px;white-space:nowrap;">+ ${n}</span>`).join(''),
-                        p.remove_names.map(n => `<span style="display:inline-block;background:#d63638;color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 2px;white-space:nowrap;">− ${n}</span>`).join(''),
-                        p.unchanged_names.map(n => `<span style="display:inline-block;background:#787c82;color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 2px;white-space:nowrap;">${n}</span>`).join(''),
+                        p.add_names.map(n => `<span style="display:inline-block;background:#1a7a34;color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 2px;white-space:nowrap;">+ ${abEsc(n)}</span>`).join(''),
+                        p.remove_names.map(n => `<span style="display:inline-block;background:#d63638;color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 2px;white-space:nowrap;">− ${abEsc(n)}</span>`).join(''),
+                        p.unchanged_names.map(n => `<span style="display:inline-block;background:#787c82;color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 2px;white-space:nowrap;">${abEsc(n)}</span>`).join(''),
                       ].join('')
                     : cfPills(p.proposed_names, '#2d6a4f');
                 const effectivelyMatched = !p.changed || (p.add_names.length === 0 && p.remove_names.length === 0);
@@ -3960,13 +3964,13 @@ trait CS_SEO_Settings_Page {
                     : effectivelyMatched
                         ? `<span style="display:inline-block;background:#d0f0d0;color:#1a7a34;border:1px solid #a8d5a8;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:600;">✓ Matched</span>
                            <button class="button button-small" onclick="cfSkipOne(${p.post_id})">Skip</button>
-                           <button class="button button-small" title="${p.reason}" onclick="cfReanalyse(${p.post_id})">&#8635;</button>`
+                           <button class="button button-small" title="${abEsc(p.reason)}" onclick="cfReanalyse(${p.post_id})">&#8635;</button>`
                         : `<button class="button button-small" style="background:#2d6a4f;color:#fff;border-color:#2d6a4f;" onclick="cfApplyOne(${p.post_id})">Apply</button>
                            <button class="button button-small" onclick="cfSkipOne(${p.post_id})">Skip</button>
-                           <button class="button button-small" title="${p.reason}" onclick="cfReanalyse(${p.post_id})">&#8635;</button>`;
+                           <button class="button button-small" title="${abEsc(p.reason)}" onclick="cfReanalyse(${p.post_id})">&#8635;</button>`;
                 return `<tr data-pid="${p.post_id}" data-changed="${p.changed?1:0}" data-conf="${p.confidence}" data-status="${p.status}" style="border-bottom:1px solid #f0f0f0;${rowStyle}">
                     <td style="padding:8px 10px;"><input type="checkbox" class="cf-chk" data-pid="${p.post_id}"></td>
-                    <td style="padding:8px 10px;"><a href="/wp-admin/post.php?post=${p.post_id}&action=edit" target="_blank">${p.title}</a></td>
+                    <td style="padding:8px 10px;"><a href="/wp-admin/post.php?post=${p.post_id}&action=edit" target="_blank">${abEsc(p.title)}</a></td>
                     <td style="padding:8px 10px;">${cfPills(p.current_names, '#555')}</td>
                     <td style="padding:8px 10px;">${changedCols}</td>
                     <td style="padding:8px 10px;">${cfConfBadge(p.confidence)}</td>
@@ -4232,15 +4236,15 @@ trait CS_SEO_Settings_Page {
             const rows = chData.map(c => {
                 const postRows = c.posts.length
                     ? c.posts.map(p =>
-                        `<li style="margin:2px 0;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${p.title}</a></li>`
+                        `<li style="margin:2px 0;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${abEsc(p.title)}</a></li>`
                       ).join('')
                     : '<li style="color:#888;font-size:12px;">No published posts</li>';
                 const expandId = `ch-posts-${c.id}`;
                 const postToggle = `<button class="button button-small" onclick="chToggle(${c.id})" id="ch-btn-${c.id}" style="font-size:11px;">&#9660; Show posts</button>`;
-                const editLink   = `<a href="${c.edit_url}" target="_blank" class="button button-small" style="font-size:11px;">Edit</a>`;
+                const editLink   = `<a href="${safeHref(c.edit_url)}" target="_blank" class="button button-small" style="font-size:11px;">Edit</a>`;
                 const rowBg = c.grade === 'uncategorized' ? '#fff8e1' : (c.grade === 'empty' ? '#fff5f5' : '#fff');
                 return `<tr style="border-bottom:1px solid #f0f0f0;background:${rowBg};">
-                    <td style="padding:10px 12px;font-weight:600;font-size:13px;">${c.name}</td>
+                    <td style="padding:10px 12px;font-weight:600;font-size:13px;">${abEsc(c.name)}</td>
                     <td style="padding:10px 12px;text-align:center;font-size:13px;">${c.count}</td>
                     <td style="padding:10px 12px;">${chGradeBadge(c.grade)}</td>
                     <td style="padding:10px 12px;white-space:nowrap;">${postToggle} ${editLink}</td>
@@ -4323,7 +4327,7 @@ trait CS_SEO_Settings_Page {
             let parts = [];
             if (catchAll) parts.push(`<strong>${catchAll}</strong> catch-all ${catchAll === 1 ? 'category' : 'categories'}`);
             if (drifting) parts.push(`<strong>${drifting}</strong> drifting ${drifting === 1 ? 'category' : 'categories'}`);
-            const cacheNote = cachedAt ? ` <span style="font-size:11px;opacity:0.75;">(cached &mdash; ${cachedAt})</span>` : '';
+            const cacheNote = cachedAt ? ` <span style="font-size:11px;opacity:0.75;">(cached &mdash; ${abEsc(cachedAt)})</span>` : '';
             summary.innerHTML = '<div style="background:#fef9ec;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;color:#92400e;font-size:13px;">'
                 + '&#129302; AI identified ' + parts.join(' and ') + ' across ' + totalPosts + ' posts.' + cacheNote + '</div>';
             cdRenderDrift();
@@ -4414,7 +4418,7 @@ trait CS_SEO_Settings_Page {
                 clearInterval(timer);
                 const d = await r.json();
                 if (!d.success) {
-                    wrap.innerHTML = `<p style="color:#c3372b;font-size:13px;">&#9888; ${d.error || 'Error running drift analysis.'}</p>`;
+                    wrap.innerHTML = `<p style="color:#c3372b;font-size:13px;">&#9888; ${abEsc(d.error || 'Error running drift analysis.')}</p>`;
                     cta.style.display = 'block';
                     return;
                 }
@@ -4429,7 +4433,7 @@ trait CS_SEO_Settings_Page {
                         '<button type="button" class="button button-small">Try again</button></p>';
                     cta.style.display = 'block';
                 } else {
-                    wrap.innerHTML = `<p style="color:#c3372b;font-size:13px;">&#9888; ${e.message}</p>`;
+                    wrap.innerHTML = `<p style="color:#c3372b;font-size:13px;">&#9888; ${abEsc(e.message)}</p>`;
                     cta.style.display = 'block';
                 }
             } finally {
@@ -4525,7 +4529,7 @@ trait CS_SEO_Settings_Page {
                         : (m.titles || []).map(t => cdMatchPost(t, allPosts)).filter(Boolean);
                     matchedPosts.forEach(p => newAssignedIds.add(p.id));
                     const postItems = matchedPosts.map(p =>
-                        `<li style="padding:4px 0;border-bottom:1px solid #f0eaff;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${p.title}</a></li>`
+                        `<li style="padding:4px 0;border-bottom:1px solid #f0eaff;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${abEsc(p.title)}</a></li>`
                     ).join('');
                     const postCount = matchedPosts.length;
                     const toggleBtn = postCount > 0
@@ -4640,7 +4644,7 @@ trait CS_SEO_Settings_Page {
                         matchedPosts.forEach(p => assignedIds.add(p.id));
 
                         const postItems = matchedPosts.map(p =>
-                            `<li style="padding:4px 0;border-bottom:1px solid #f0eaff;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${p.title}</a></li>`
+                            `<li style="padding:4px 0;border-bottom:1px solid #f0eaff;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${abEsc(p.title)}</a></li>`
                         ).join('');
                         const postCount = matchedPosts.length;
                         const toggleBtn = postCount > 0
@@ -4651,7 +4655,7 @@ trait CS_SEO_Settings_Page {
                             : '';
 
                         return `<div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px dashed #d8c8f0;">
-                            <div style="font-weight:600;font-size:12px;color:#fff;background:#6b3fa0;border-radius:4px;padding:3px 8px;display:inline-block;margin-bottom:3px;">&#8594; ${m.to}</div>
+                            <div style="font-weight:600;font-size:12px;color:#fff;background:#6b3fa0;border-radius:4px;padding:3px 8px;display:inline-block;margin-bottom:3px;">&#8594; ${abEsc(m.to)}</div>
                             <div style="font-size:11px;color:#666;font-style:italic;margin-bottom:4px;">${m.because || ''}</div>
                             ${toggleBtn}${postList}
                         </div>`;
@@ -4669,7 +4673,7 @@ trait CS_SEO_Settings_Page {
                         ? `&#9660; ${uCount} unanalysed post${uCount !== 1 ? 's' : ''}`
                         : `&#9660; All ${uCount} posts analysed`;
                     const items = listSrc.map(p =>
-                        `<li style="padding:5px 0;border-bottom:1px solid #ede8f5;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${p.title}</a></li>`
+                        `<li style="padding:5px 0;border-bottom:1px solid #ede8f5;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${abEsc(p.title)}</a></li>`
                     ).join('');
                     const analyseBtn = unassigned.length
                         ? `<div style="margin-top:8px;"><button class="button button-small" onclick="cdAnalyseRemaining(this, ${idx})" style="font-size:11px;background:#6b3fa0;border-color:#6b3fa0;color:#fff;">&#129302; Analyse ${uCount} remaining</button></div>`
@@ -4683,13 +4687,13 @@ trait CS_SEO_Settings_Page {
                 const actionStr = (c.action || '').toLowerCase();
                 const actionColor = actionStr.startsWith('delete') ? '#d63638' : actionStr === 'rename' ? '#e67e00' : '#1a7a34';
                 const actionHtml = c.action
-                    ? `<div style="margin-top:8px;"><span style="font-size:11px;font-weight:600;background:${actionColor};color:#fff;border-radius:4px;padding:2px 8px;">${c.action}</span></div>`
+                    ? `<div style="margin-top:8px;"><span style="font-size:11px;font-weight:600;background:${actionColor};color:#fff;border-radius:4px;padding:2px 8px;">${abEsc(c.action)}</span></div>`
                     : '';
 
                 const rowBg = c.verdict === 'catch-all' ? '#fff5f5' : '#fffbf0';
                 return `<tr style="border-bottom:2px solid #e0d0f0;vertical-align:top;background:${rowBg};">
                     <td style="padding:12px;font-weight:600;font-size:13px;min-width:130px;">
-                        ${c.cat_name}
+                        ${abEsc(c.cat_name)}
                         <div style="font-size:11px;font-weight:400;color:#888;margin-top:2px;">${totalCount} posts total</div>
                         ${actionHtml}
                     </td>
@@ -4773,7 +4777,7 @@ trait CS_SEO_Settings_Page {
             try {
                 const r = await fetch(ajaxurl, { method: 'POST', body: fd });
                 const d = await r.json();
-                if (!d.success) { tbody.innerHTML = '<tr><td colspan="6" style="color:#b91c1c;padding:24px;text-align:center;">Error: ' + (d.data?.message || 'Unknown') + '</td></tr>'; return; }
+                if (!d.success) { tbody.innerHTML = '<tr><td colspan="6" style="color:#b91c1c;padding:24px;text-align:center;">Error: ' + abEsc(d.data?.message || 'Unknown') + '</td></tr>'; return; }
 
                 rcTotalPages = d.data.total_pages || 1;
                 const posts  = d.data.posts || [];
@@ -4785,9 +4789,9 @@ trait CS_SEO_Settings_Page {
                 }
 
                 tbody.innerHTML = posts.map(p => {
-                    const err = p.error ? '<br><small style="color:#b91c1c;">' + p.error.substring(0, 80) + '</small>' : '';
+                    const err = p.error ? '<br><small style="color:#b91c1c;">' + abEsc(p.error.substring(0, 80)) + '</small>' : '';
                     return '<tr id="rc-row-' + p.id + '">' +
-                        '<td><a href="' + (p.permalink || '') + '" target="_blank" style="font-weight:500;">' + p.title + '</a></td>' +
+                        '<td><a href="' + safeHref(p.permalink || '') + '" target="_blank" style="font-weight:500;">' + abEsc(p.title) + '</a></td>' +
                         '<td style="text-align:center;">' + rcBadge(p.status, p.last_step) + err + '</td>' +
                         '<td style="text-align:center;color:#6366f1;font-weight:600;">' + (p.top_count || '—') + '</td>' +
                         '<td style="text-align:center;color:#0e7490;font-weight:600;">' + (p.bot_count || '—') + '</td>' +
@@ -4829,7 +4833,7 @@ trait CS_SEO_Settings_Page {
         function rcUpdateRow(postId, status, topCount, botCount, generated, errorMsg) {
             const row = document.getElementById('rc-row-' + postId);
             if (!row) return;
-            row.querySelector('td:nth-child(2)').innerHTML = rcBadge(status) + (errorMsg ? '<br><small style="color:#b91c1c;">' + errorMsg.substring(0, 80) + '</small>' : '');
+            row.querySelector('td:nth-child(2)').innerHTML = rcBadge(status) + (errorMsg ? '<br><small style="color:#b91c1c;">' + abEsc(errorMsg.substring(0, 80)) + '</small>' : '');
             row.querySelector('td:nth-child(3)').textContent = topCount || '\u2014';
             row.querySelector('td:nth-child(3)').style.color = topCount ? '#6366f1' : '';
             row.querySelector('td:nth-child(3)').style.fontWeight = topCount ? '600' : '';

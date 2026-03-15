@@ -149,7 +149,7 @@ trait CS_SEO_Auto_Pipeline {
             [
                 'blocking'  => false,
                 'timeout'   => 0.01,
-                'sslverify' => false,
+                'sslverify' => apply_filters( 'https_local_ssl_verify', false ), // Same pattern as WordPress core spawn_cron() — loopback to own admin-ajax.php.
                 'body'      => [
                     'action'  => 'cs_seo_pipeline_run',
                     'post_id' => $post_id,
@@ -373,7 +373,17 @@ trait CS_SEO_Auto_Pipeline {
         $suggestions = json_decode( $raw, true );
         if ( ! is_array( $suggestions ) || empty( $suggestions ) ) return;
 
-        $this->apply_internal_links( $post_id, $suggestions );
+        // Validate AI-returned URLs are on this site — prevents prompt-injection
+        // from causing off-site URLs to be written into post content.
+        $home_host   = wp_parse_url( home_url(), PHP_URL_HOST );
+        $suggestions = array_filter( $suggestions, function( $s ) use ( $home_host ) {
+            $url  = $s['url'] ?? '';
+            $host = wp_parse_url( $url, PHP_URL_HOST );
+            return $host === $home_host || $host === null; // null = relative URL, allowed
+        } );
+        if ( empty( $suggestions ) ) return;
+
+        $this->apply_internal_links( $post_id, array_values( $suggestions ) );
     }
 
     /**
@@ -410,8 +420,9 @@ trait CS_SEO_Auto_Pipeline {
                     if ( strpos( $block['innerHTML'], 'href=' ) !== false ) continue;
 
                     $escaped  = preg_quote( $anchor, '/' );
-                    $link     = '<a href="' . esc_url( $url ) . '">' . esc_html( $anchor ) . '</a>';
-                    $new_html = (string) preg_replace( '/' . $escaped . '/', $link, $block['innerHTML'], 1 );
+                    $link     = '<a href="' . esc_url( $url ) . '">' . esc_html( $anchor ) . '</a>'; // $anchor is sanitize_text_field'd; esc_html encodes & and other chars for valid HTML in post_content
+                    // Use preg_replace_callback to avoid '$' backreference expansion in the replacement string.
+                    $new_html = (string) preg_replace_callback( '/' . $escaped . '/', static function() use ( $link ) { return $link; }, $block['innerHTML'], 1 );
                     if ( $new_html === $block['innerHTML'] ) continue;
 
                     $block['innerHTML'] = $new_html;
@@ -441,8 +452,9 @@ trait CS_SEO_Auto_Pipeline {
                 $url    = esc_url_raw( $s['url'] ?? '' );
                 if ( ! $anchor || ! $url ) continue;
                 if ( strpos( $new_content, $anchor ) === false ) continue;
-                $link        = '<a href="' . esc_url( $url ) . '">' . esc_html( $anchor ) . '</a>';
-                $new_content = (string) preg_replace( '/' . preg_quote( $anchor, '/' ) . '/', $link, $new_content, 1 );
+                $link        = '<a href="' . esc_url( $url ) . '">' . $anchor . '</a>'; // $anchor is sanitize_text_field'd; no esc_html to avoid double-encoding on storage
+                // Use preg_replace_callback to avoid '$' backreference expansion in the replacement string.
+                $new_content = (string) preg_replace_callback( '/' . preg_quote( $anchor, '/' ) . '/', static function() use ( $link ) { return $link; }, $new_content, 1 );
                 $changed     = true;
             }
             if ( $changed ) {
@@ -468,7 +480,7 @@ trait CS_SEO_Auto_Pipeline {
         $result = $this->call_ai_generate_summary( $post_id );
         update_post_meta( $post_id, self::META_SUM_WHAT, sanitize_text_field( $result['what'] ) );
         update_post_meta( $post_id, self::META_SUM_WHY,  sanitize_text_field( $result['why'] ) );
-        update_post_meta( $post_id, self::META_SUM_KEY,  sanitize_text_field( $result['key'] ) );
+        update_post_meta( $post_id, self::META_SUM_KEY,  sanitize_text_field( $result['takeaway'] ) );
     }
 
     /**
@@ -658,7 +670,7 @@ trait CS_SEO_Auto_Pipeline {
                 });
             }
         });
-        <?php wp_add_inline_script( 'cs-seo-metabox-js', ob_get_clean() );
+        <?php $cs_seo_js = ob_get_clean(); if ( wp_script_is( 'cs-seo-metabox-js', 'registered' ) ) { wp_add_inline_script( 'cs-seo-metabox-js', $cs_seo_js ); }
     }
 
     // =========================================================================
@@ -673,7 +685,7 @@ trait CS_SEO_Auto_Pipeline {
      */
     public function ajax_auto_rerun(): void {
         check_ajax_referer( 'cs_seo_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) wp_die();
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
 
         // phpcs:disable WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- nonce checked above
         $post_id = (int) ( $_POST['post_id'] ?? 0 );

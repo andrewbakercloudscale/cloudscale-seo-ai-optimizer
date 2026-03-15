@@ -1,6 +1,6 @@
 <?php
 /**
- * AI meta description and title generation — bulk and single-post AJAX handlers.
+ * AI meta description, title, and alt-text generation — bulk and single-post AJAX handlers.
  *
  * @package CloudScale_SEO_AI_Optimizer
  * @since   4.0.0
@@ -8,6 +8,14 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 trait CS_SEO_AI_Meta_Writer {
+    /**
+     * Calls the configured AI provider to generate SEO title, description, and focus keyword for a post.
+     *
+     * @since 4.0.0
+     * @param int $post_id The post ID to generate meta for.
+     * @return array Associative array with keys 'description', 'title', 'title_was', 'title_chars', 'title_status', 'alts_saved', 'seo_score', 'seo_notes'.
+     * @throws \RuntimeException If the post is not found or no API key is configured.
+     */
     private function call_ai_generate_all(int $post_id): array {
         $post = get_post($post_id);
         if (!$post) throw new \RuntimeException( "Post {$post_id} not found" ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
@@ -24,7 +32,7 @@ trait CS_SEO_AI_Meta_Writer {
         if (!$key) throw new \RuntimeException($provider === 'gemini' ? 'No Gemini API key configured' : 'No Anthropic API key configured'); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
 
         // ── Build context ─────────────────────────────────────────────────────
-        $content = $this->text_from_html((string) $post->post_content);
+        $content = CloudScale_SEO_AI_Optimizer_Utils::text_from_html((string) $post->post_content);
         $content = mb_substr($content, 0, 6000);
 
         $site_context_parts = [];
@@ -187,9 +195,15 @@ trait CS_SEO_AI_Meta_Writer {
     }
 
     /**
-     * Call the configured AI provider and return a generated description for a single post.
-     * Works with both Anthropic and Gemini — routes through dispatch_ai().
-     * Used by the scheduled batch and fix-description flow.
+     * Calls the configured AI provider to generate a meta description for a single post.
+     *
+     * Works with both Anthropic and Gemini providers — routes through dispatch_ai().
+     * Used by the scheduled batch processor and the fix-description AJAX flow.
+     *
+     * @since 4.0.0
+     * @param int $post_id The post ID to generate a description for.
+     * @return string The AI-generated meta description.
+     * @throws \RuntimeException If the post is not found or no API key is configured.
      */
     private function call_ai_generate_desc(int $post_id): string {
         $post = get_post($post_id);
@@ -206,7 +220,7 @@ trait CS_SEO_AI_Meta_Writer {
 
         if (!$key) throw new \RuntimeException($provider === 'gemini' ? 'No Gemini API key configured' : 'No Anthropic API key configured'); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
 
-        $content  = $this->text_from_html((string) $post->post_content);
+        $content  = CloudScale_SEO_AI_Optimizer_Utils::text_from_html((string) $post->post_content);
         $content  = mb_substr($content, 0, 6000);
 
         // Collect images that need ALT text — bundle into the same API call.
@@ -305,8 +319,11 @@ trait CS_SEO_AI_Meta_Writer {
     }
 
     /**
-     * Collect images in a post that have empty ALT attributes.
-     * Returns array of ['img_tag'=>..., 'src'=>..., 'filename'=>..., 'attach_id'=>...].
+     * Collects all images in a post that have empty or missing ALT attributes.
+     *
+     * @since 4.0.0
+     * @param int $post_id The post ID to scan.
+     * @return array Array of associative arrays with keys 'img_tag', 'src', 'filename', 'attach_id'.
      */
     private function collect_images_needing_alt(int $post_id): array {
         $post = get_post($post_id);
@@ -331,7 +348,13 @@ trait CS_SEO_AI_Meta_Writer {
     }
 
     /**
-     * Save ALT texts returned by the combined API call into post content and attachment meta.
+     * Saves ALT texts returned by the combined AI API call into post content and attachment meta.
+     *
+     * @since 4.0.0
+     * @param int   $post_id The post ID to update.
+     * @param array $images  Array of image data from collect_images_needing_alt().
+     * @param array $alts    Array of AI-generated ALT text strings, indexed to match $images.
+     * @return void
      */
     private function save_alts_from_combined(int $post_id, array $images, array $alts): void {
         $post = get_post($post_id);
@@ -360,7 +383,7 @@ trait CS_SEO_AI_Meta_Writer {
      */
     public function ajax_generate_one(): void {
         $this->ajax_check();
-        $post_id = (int) sanitize_key( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in ajax_check()
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in ajax_check()
         if (!$post_id) wp_send_json_error('Missing post_id');
 
         try {
@@ -372,10 +395,10 @@ trait CS_SEO_AI_Meta_Writer {
             }
             wp_send_json_success([
                 'post_id'      => $post_id,
-                'description'  => $result['description'],
+                'description'  => sanitize_text_field( $result['description'] ),
                 'chars'        => mb_strlen($result['description']),
                 'alts_saved'   => $result['alts_saved'],
-                'title'        => $result['title'],
+                'title'        => sanitize_text_field( (string) $result['title'] ),
                 'title_was'    => $result['title_was'],
                 'title_chars'  => $result['title_chars'],
                 'title_status' => $result['title_status'],
@@ -388,7 +411,13 @@ trait CS_SEO_AI_Meta_Writer {
     }
 
     /**
-     * Fix an existing description that is too short or too long.
+     * Calls the AI provider to rewrite an existing description that is outside the target length range.
+     *
+     * @since 4.0.0
+     * @param int    $post_id       The post ID to fix the description for.
+     * @param string $existing_desc The current description that needs rewriting.
+     * @return string The AI-generated replacement meta description.
+     * @throws \RuntimeException If the post is not found or no API key is configured.
      */
     private function call_ai_fix_desc(int $post_id, string $existing_desc): string {
         $post = get_post($post_id);
@@ -407,7 +436,7 @@ trait CS_SEO_AI_Meta_Writer {
 
         $len       = mb_strlen($existing_desc);
         $direction = $len > $max ? 'too long' : 'too short';
-        $content   = $this->text_from_html((string) $post->post_content);
+        $content   = CloudScale_SEO_AI_Optimizer_Utils::text_from_html((string) $post->post_content);
         $content   = mb_substr($content, 0, 6000);
 
         $site_context_parts = [];
@@ -474,7 +503,7 @@ trait CS_SEO_AI_Meta_Writer {
      */
     public function ajax_save_desc(): void {
         $this->ajax_check();
-        $post_id = (int) sanitize_key( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in ajax_check()
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in ajax_check()
         $desc    = sanitize_textarea_field( wp_unslash( $_POST['desc'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in ajax_check()
         if ( ! $post_id ) wp_send_json_error( 'Missing post_id' );
         if ( ! get_post( $post_id ) ) wp_send_json_error( 'Post not found' );
@@ -494,7 +523,7 @@ trait CS_SEO_AI_Meta_Writer {
      */
     public function ajax_fix_desc(): void {
         $this->ajax_check();
-        $post_id = (int) sanitize_key( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in ajax_check()
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in ajax_check()
         if (!$post_id) wp_send_json_error('Missing post_id');
 
         $min = max(100, (int) $this->ai_opts['min_chars']);
@@ -535,11 +564,6 @@ trait CS_SEO_AI_Meta_Writer {
     }
 
     /**
-     * Fix a single post title that is outside the 50-60 character ideal range.
-     * Saves the AI-generated title as the custom SEO title (META_TITLE), leaving
-     * the original WordPress post title untouched.
-     */
-    /**
      * AJAX handler: rewrites an existing SEO title that is outside the 50–60 character range.
      *
      * @since 4.10.24
@@ -547,7 +571,7 @@ trait CS_SEO_AI_Meta_Writer {
      */
     public function ajax_fix_title(): void {
         $this->ajax_check();
-        $post_id = (int) sanitize_key( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
         if (!$post_id) wp_send_json_error('Missing post_id');
 
         $post = get_post($post_id);
@@ -594,7 +618,7 @@ trait CS_SEO_AI_Meta_Writer {
 
         $len       = mb_strlen($current_title);
         $direction = $len > 60 ? 'too long' : 'too short';
-        $content   = $this->text_from_html((string) $post->post_content);
+        $content   = CloudScale_SEO_AI_Optimizer_Utils::text_from_html((string) $post->post_content);
         $content   = mb_substr($content, 0, 2000);
 
         $system   = 'You write concise, compelling SEO title tags for blog posts. '
@@ -663,11 +687,11 @@ trait CS_SEO_AI_Meta_Writer {
             wp_send_json_success([
                 'post_id'      => $post_id,
                 'status'       => 'generated',
-                'description'  => $result['description'],
+                'description'  => sanitize_text_field( $result['description'] ),
                 'chars'        => mb_strlen($result['description']),
                 'message'      => 'Generated: ' . mb_strlen($result['description']) . ' chars',
-                'title'        => $result['title'],
-                'title_was'    => $result['title_was'],
+                'title'        => sanitize_text_field( (string) $result['title'] ),
+                'title_was'    => sanitize_text_field( (string) $result['title_was'] ),
                 'title_chars'  => $result['title_chars'],
                 'title_status' => $result['title_status'],
                 'alts_saved'   => $result['alts_saved'],
@@ -689,7 +713,7 @@ trait CS_SEO_AI_Meta_Writer {
      */
     public function ajax_regen_static(): void {
         $this->ajax_check();
-        $post_id = (int) sanitize_key( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in ajax_check()
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in ajax_check()
         if (!$post_id) wp_send_json_error('Missing post_id');
 
         // Clear stale custom OG image — fall through to featured image.
@@ -704,14 +728,11 @@ trait CS_SEO_AI_Meta_Writer {
         wp_send_json_success([
             'post_id'     => $post_id,
             'had_custom'  => $had_custom,
-            'image_url'   => $image_url,
+            'image_url'   => esc_url_raw( $image_url ),
             'source'      => $thumb_id ? 'featured_image' : ($image_url ? 'site_default' : 'none'),
         ]);
     }
 
-    /**
-     * Return paginated list of posts with their current SEO desc status.
-     */
     /**
      * AJAX handler: returns all published posts with their description status and SEO score.
      *
@@ -883,7 +904,7 @@ trait CS_SEO_AI_Meta_Writer {
         if ($provider === 'gemini') {
             // Gemini: use generateContent endpoint with a minimal prompt
             $model = 'gemini-2.0-flash';
-            $url   = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$key}";
+            $url   = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $model ) . ':generateContent?key=' . rawurlencode( $key );
             $response = wp_remote_post($url, [
                 'timeout' => 15,
                 'headers' => ['Content-Type' => 'application/json'],

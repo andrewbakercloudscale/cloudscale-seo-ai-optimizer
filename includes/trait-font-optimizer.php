@@ -313,7 +313,7 @@ trait CS_SEO_Font_Optimizer {
             $noscript_href = $noscript_m[1];
         }
         // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet -- This is a noscript fallback for an already-enqueued style
-        $html .= '<noscript><link rel="stylesheet" href="' . esc_attr( $noscript_href ) . '" /></noscript>';
+        $html .= '<noscript><link rel="stylesheet" href="' . esc_url( $noscript_href ) . '" /></noscript>';
         
         return $html;
     }
@@ -444,7 +444,7 @@ trait CS_SEO_Font_Optimizer {
         check_ajax_referer('cs_seo_nonce', 'nonce');
         if (!current_user_can('manage_options')) {
             self::debug_log('[CloudScale SEO] AJAX Handler: font_scan - permission denied');
-            wp_die();
+            wp_send_json_error('Forbidden', 403);
         }
         
         $results = $this->scan_enqueued_css();
@@ -536,7 +536,7 @@ trait CS_SEO_Font_Optimizer {
         check_ajax_referer('cs_seo_nonce', 'nonce');
         if (!current_user_can('manage_options')) {
             self::debug_log('[CloudScale SEO] AJAX Handler: font_fix - permission denied');
-            wp_die();
+            wp_send_json_error('Forbidden', 403);
         }
         
         $results = $this->scan_enqueued_css();
@@ -555,13 +555,22 @@ trait CS_SEO_Font_Optimizer {
             self::debug_log('[CloudScale SEO] AJAX Handler: font_fix - processing ' . basename($file['path']));
             
             $console_lines[] = ['type' => 'info', 'text' => 'Processing: ' . basename($file['path'])];
+            // Boundary check: only process files inside WP_CONTENT_DIR.
+            $real_path    = realpath($file['path']);
+            $content_real = realpath(WP_CONTENT_DIR);
+            if ( ! $real_path || ! $content_real || strpos($real_path, $content_real . DIRECTORY_SEPARATOR) !== 0 ) {
+                self::debug_log('[CloudScale SEO] AJAX Handler: font_fix SKIP - path outside WP_CONTENT_DIR: ' . basename($file['path']));
+                $console_lines[] = ['type' => 'err', 'text' => '  ✗ SKIPPED: File is outside wp-content (not allowed)'];
+                $failed_count++;
+                continue;
+            }
             if (!$file['writable']) {
                 self::debug_log('[CloudScale SEO] AJAX Handler: font_fix ERROR - ' . basename($file['path']) . ' not writable');
                 $console_lines[] = ['type' => 'err', 'text' => '  ✗ ERROR: File not writable (permission denied)'];
                 $failed_count++;
                 continue;
             }
-            
+
             $fix_result = $this->fix_css_fonts($file['path'], 'swap', true);
             if ($fix_result['success']) {
                 self::debug_log('[CloudScale SEO] AJAX Handler: font_fix SUCCESS - fixed ' . $file['missing_count'] . ' fonts in ' . basename($file['path']));
@@ -606,8 +615,11 @@ trait CS_SEO_Font_Optimizer {
             wp_die();
         }
         
-        $file_path = isset($_POST['file_path']) ? sanitize_text_field(wp_unslash($_POST['file_path'])) : '';
-        if (!$file_path) {
+        // sanitize_text_field strips HTML/extra whitespace; wp_normalize_path resolves traversal sequences.
+        // The realpath()+WP_CONTENT_DIR boundary check is the primary path-traversal guard.
+        $file_path = isset($_POST['file_path']) ? wp_normalize_path(sanitize_text_field(wp_unslash($_POST['file_path']))) : '';
+        $content_dir_real = realpath( WP_CONTENT_DIR ) ?: WP_CONTENT_DIR;
+        if (!$file_path || strpos(realpath($file_path) ?: '', $content_dir_real . DIRECTORY_SEPARATOR) !== 0) {
             self::debug_log('[CloudScale SEO] AJAX Handler: font_undo - no file path provided');
             wp_send_json(['success' => false, 'error' => 'No file specified']);
         }
