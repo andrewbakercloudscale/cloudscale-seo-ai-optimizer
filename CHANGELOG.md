@@ -3,6 +3,15 @@
 All notable changes to CloudScale SEO AI Optimizer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.19.4] - 2026-03-14
+### Changed
+- Version bump
+
+## [4.19.3] - 2026-03-14
+### Fixed
+- PCP: `post__not_in` phpcs:ignore comments moved to same line as violation in trait-auto-pipeline.php, trait-ai-meta-writer.php, and trait-sitemap.php — PHPCS only recognises inline suppression
+- Standards reference `references/performance.md` updated with `post__not_in` guidance
+
 ## [4.19.2] - 2026-03-14
 ### Fixed
 - Critical: Echoed `<script>` tag in `render_auto_run_metabox()` replaced with `wp_add_inline_script('cs-seo-metabox-js', ...)` via `ob_start` capture
