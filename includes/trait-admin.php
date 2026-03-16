@@ -184,16 +184,21 @@ trait CS_SEO_Admin {
                 toggleBtns.forEach(function(btn) {
                     btn.addEventListener("click", function() {
                         var cardId = btn.getAttribute("data-card-id");
-                        var card = document.getElementById(cardId);
+                        var card = document.querySelector("." + cardId);
                         if (!card) return;
                         var body = card.querySelector(".ab-zone-body");
                         if (!body) return;
-                        if (body.style.display === "none") {
-                            body.style.display = "";
-                            btn.innerHTML = "&#9660; Hide Details";
-                        } else {
-                            body.style.display = "none";
-                            btn.innerHTML = "&#9658; Show Details";
+                        var isHidden = body.style.display === "none";
+                        body.style.display = isHidden ? "" : "none";
+                        btn.innerHTML = isHidden ? "&#9660; Hide Details" : "&#9658; Show Details";
+                        if (isHidden && !card.dataset.loaded) {
+                            card.dataset.loaded = "1";
+                            var autoLoaders = {
+                                "ab-card-update-posts": function() { if (typeof abLoadPosts === "function") abLoadPosts(); },
+                                "ab-card-alt":          function() { if (typeof altLoad    === "function") altLoad(); },
+                                "ab-card-summary":      function() { if (typeof sumLoad    === "function") sumLoad(); },
+                            };
+                            if (autoLoaders[cardId]) autoLoaders[cardId]();
                         }
                     });
                 });
@@ -419,8 +424,7 @@ trait CS_SEO_Admin {
                 })
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
-                    if (d.success) { location.reload(); }
-                    else { status.textContent = '✗ Failed'; }
+                    if (d.success) { location.reload(); } else { status.textContent = '✗ Failed'; }
                 })
                 .catch(function() { status.textContent = '✗ Error'; });
             });
@@ -451,8 +455,7 @@ trait CS_SEO_Admin {
                 })
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
-                    if (d.success) { location.reload(); }
-                    else { status.textContent = '✗ Failed'; btn.disabled = false; }
+                    if (d.success) { location.reload(); } else { status.textContent = '✗ Failed'; btn.disabled = false; }
                 })
                 .catch(function() { status.textContent = '✗ Error'; btn.disabled = false; });
             });
