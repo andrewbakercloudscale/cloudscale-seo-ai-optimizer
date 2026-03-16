@@ -2,7 +2,7 @@
 Contributors: andrewbaker007
 Tags: seo, meta description, ai, opengraph, schema
 Requires at least: 6.0
-Tested up to: 6.8
+Tested up to: 6.9
 Stable tag: 4.19.5
 Requires PHP: 8.0
 License: GPLv2 or later

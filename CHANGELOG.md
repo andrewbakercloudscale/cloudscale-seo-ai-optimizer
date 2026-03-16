@@ -12,7 +12,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Per-row **✦ Generate** button added to AI Summary Box Generator table — calls `cs_seo_summary_generate_one` with `force: 1` for targeted single-article regeneration (`trait-settings-page.php`)
 - Per-row **✦ Generate** button now shown on every row in the AI Image ALT Text Generator table (previously hidden for posts with no missing ALT); always calls with `force: 1` (`trait-settings-page.php`)
 ### Changed
-- `readme.txt` `Tested up to` corrected from `6.9` (unreleased) to `6.8`
+- `readme.txt` `Tested up to` restored to `6.9` (current WordPress stable) after an incorrect downgrade to `6.8` during standards review
 
 ## [4.19.5] - 2026-03-15
 ### Added
