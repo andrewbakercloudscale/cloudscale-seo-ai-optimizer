@@ -3,6 +3,17 @@
 All notable changes to CloudScale SEO AI Optimizer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] - 2026-03-16
+### Fixed
+- Show/Hide Details buttons broken on all admin screens — `getElementById` in the toggle listener replaced with `querySelector('.' + cardId)` since cards use CSS classes, not IDs; auto-load logic for update-posts, alt, and summary cards restored; two pre-existing broken `if/else` blocks in dashboard widget fetch handlers corrected (`trait-admin.php`)
+- `sumGenOne` activity-log line used `({}).textContent` when `querySelector` returned `null`, producing `"✓ undefined"` — now falls back to `"Post #N"` (`trait-settings-page.php`)
+### Added
+- SEO Score badge click now opens a modal showing the AI feedback notes with a **Copy Feedback** button and a **Re-score** button; unscored badges still trigger scoring directly (`trait-settings-page.php`)
+- Per-row **✦ Generate** button added to AI Summary Box Generator table — calls `cs_seo_summary_generate_one` with `force: 1` for targeted single-article regeneration (`trait-settings-page.php`)
+- Per-row **✦ Generate** button now shown on every row in the AI Image ALT Text Generator table (previously hidden for posts with no missing ALT); always calls with `force: 1` (`trait-settings-page.php`)
+### Changed
+- `readme.txt` `Tested up to` corrected from `6.9` (unreleased) to `6.8`
+
 ## [4.19.5] - 2026-03-15
 ### Added
 - `sitemap.txt` endpoint — plain-text sitemap (one URL per line) now served at `/sitemap.txt` alongside the existing XML sitemap; reuses the cached URL list built for `sitemap.xml`

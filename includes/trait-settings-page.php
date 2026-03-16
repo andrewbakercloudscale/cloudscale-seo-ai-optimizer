@@ -2754,12 +2754,13 @@ trait CS_SEO_Settings_Page {
         // ── Render table ─────────────────────────────────────────────────────
         function abScoreBadge(post) {
             const s = (post._seo_score !== undefined) ? post._seo_score : post.seo_score;
-            const n = (post._seo_notes !== undefined) ? post._seo_notes : (post.seo_notes || '');
-            const click = post.no_post ? '' : ' onclick="abScoreOne(' + post.id + ')"';
-            if (!s) return '<span class="ab-score-badge ab-score-none"' + click + ' title="Click to score">Score</span>';
-            const cls = s >= 90 ? 'ab-score-great' : s >= 75 ? 'ab-score-good' : s >= 50 ? 'ab-score-fair' : 'ab-score-poor';
-            const tip = n ? abEsc(n) + ' — click to re-score' : 'Click to re-score';
-            return '<span class="ab-score-badge ' + cls + '"' + click + ' title="' + tip + '">' + s + '%</span>';
+            if (!s) {
+                const click = post.no_post ? '' : ' onclick="abScoreOne(' + post.id + ')"';
+                return '<span class="ab-score-badge ab-score-none"' + click + ' title="Click to score">Score</span>';
+            }
+            const cls   = s >= 90 ? 'ab-score-great' : s >= 75 ? 'ab-score-good' : s >= 50 ? 'ab-score-fair' : 'ab-score-poor';
+            const click = post.no_post ? '' : ' onclick="abShowScoreModal(' + post.id + ')"';
+            return '<span class="ab-score-badge ' + cls + '"' + click + ' title="Click to view feedback" style="cursor:pointer">' + s + '%</span>';
         }
 
         function abBadge(post) {
@@ -2982,6 +2983,75 @@ trait CS_SEO_Settings_Page {
                 if (cell) cell.innerHTML = abScoreBadge(post);
                 abLog('✗ Score network error: ' + e.message, 'err');
             });
+        }
+
+        // ── Score feedback modal ──────────────────────────────────────────────
+        function abShowScoreModal(postId) {
+            const post = abState.posts.find(p => p.id === postId);
+            if (!post) return;
+            const s = (post._seo_score !== undefined) ? post._seo_score : post.seo_score;
+            const n = (post._seo_notes !== undefined) ? post._seo_notes : (post.seo_notes || '');
+
+            if (!document.getElementById('ab-score-modal')) {
+                const el = document.createElement('div');
+                el.id = 'ab-score-modal';
+                el.style.cssText = 'display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;padding:16px';
+                el.innerHTML =
+                    '<div style="background:#fff;border-radius:10px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.35);overflow:hidden">' +
+                        '<div id="ab-score-modal-hdr" style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center">' +
+                            '<strong id="ab-score-modal-title" style="color:#fff;font-size:14px;line-height:1.4;padding-right:12px"></strong>' +
+                            '<button type="button" onclick="document.getElementById(\'ab-score-modal\').style.display=\'none\'" style="flex-shrink:0;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:5px;color:#fff;font-size:16px;font-weight:700;padding:2px 10px;cursor:pointer;line-height:1">&#10005;</button>' +
+                        '</div>' +
+                        '<div style="padding:20px 24px">' +
+                            '<p id="ab-score-modal-notes" style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#1d2327;background:#f6f7f7;border-radius:6px;padding:12px 14px;border:1px solid #e0e0e0;white-space:pre-wrap"></p>' +
+                            '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+                                '<button type="button" id="ab-score-modal-copy" class="button button-primary" style="flex:1;min-width:130px">&#128203; Copy Feedback</button>' +
+                                '<button type="button" id="ab-score-modal-rescore" class="button">&#8635; Re-score</button>' +
+                                '<button type="button" onclick="document.getElementById(\'ab-score-modal\').style.display=\'none\'" class="button">Close</button>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+                document.body.appendChild(el);
+                el.addEventListener('click', function(e) { if (e.target === el) el.style.display = 'none'; });
+            }
+
+            const modal   = document.getElementById('ab-score-modal');
+            const hdr     = document.getElementById('ab-score-modal-hdr');
+            const titleEl = document.getElementById('ab-score-modal-title');
+            const notesEl = document.getElementById('ab-score-modal-notes');
+            const copyBtn = document.getElementById('ab-score-modal-copy');
+            const rescore = document.getElementById('ab-score-modal-rescore');
+
+            const bg = !s ? '#666' : s >= 90 ? '#1a7a34' : s >= 75 ? '#2271b1' : s >= 50 ? '#b45309' : '#b91c1c';
+            hdr.style.background  = bg;
+            titleEl.textContent   = post.title + ' — SEO Score: ' + (s ? s + '%' : 'unscored');
+            notesEl.textContent   = n || 'No feedback yet — click Re-score to generate.';
+
+            copyBtn.innerHTML = '&#128203; Copy Feedback';
+            copyBtn.onclick = function() {
+                if (!n) return;
+                navigator.clipboard.writeText(n).then(function() {
+                    copyBtn.textContent = '✓ Copied!';
+                    setTimeout(function() { copyBtn.innerHTML = '&#128203; Copy Feedback'; }, 2000);
+                }).catch(function() {
+                    const ta = document.createElement('textarea');
+                    ta.value = n;
+                    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy'); // phpcs:ignore
+                    document.body.removeChild(ta);
+                    copyBtn.textContent = '✓ Copied!';
+                    setTimeout(function() { copyBtn.innerHTML = '&#128203; Copy Feedback'; }, 2000);
+                });
+            };
+
+            rescore.onclick = function() {
+                modal.style.display = 'none';
+                abScoreOne(postId);
+            };
+
+            modal.style.display = 'flex';
         }
 
         // ── Score all posts ───────────────────────────────────────────────────
@@ -3566,8 +3636,8 @@ trait CS_SEO_Settings_Page {
                     '</td>' +
                     '<td style="padding:8px 10px;vertical-align:middle">' + statusBadge + '</td>' +
                     '<td style="padding:8px 10px;vertical-align:middle;white-space:nowrap">' +
-                        (hasMissing ? '<button class="button ab-row-btn" onclick="altGenOne(' + p.id + ')" id="ab-alt-btn-' + p.id + '" ' + (p._processing?'disabled':'') + '>' +
-                            (p._processing ? '<span class="ab-spinner">⟳</span>' : '✦') + ' Generate</button> ' : '') +
+                        '<button class="button ab-row-btn" onclick="altGenOne(' + p.id + ', 1)" id="ab-alt-btn-' + p.id + '" ' + (p._processing?'disabled':'') + '>' +
+                            (p._processing ? '<span class="ab-spinner">⟳</span>' : '✦') + ' Generate</button> ' +
                         '<button class="button" style="font-size:11px;padding:2px 8px" id="' + toggleId + '" onclick="altToggleImages(' + p.id + ')">' +
                             (expanded ? '▲ Hide' : '▼ Images') +
                         '</button>' +
@@ -3646,7 +3716,7 @@ trait CS_SEO_Settings_Page {
             });
         }
 
-        function altGenOne(postId) {
+        function altGenOne(postId, force) {
             if (!abCheckApiKey()) return;
             const post = altState.posts.find(p => p.id === postId);
             if (!post) return;
@@ -3654,7 +3724,7 @@ trait CS_SEO_Settings_Page {
             post._expanded   = true;
             altRenderTable();
 
-            abPost('cs_seo_alt_generate_one', {post_id: postId}).then(data => {
+            abPost('cs_seo_alt_generate_one', {post_id: postId, force: force ? 1 : 0}).then(data => {
                 post._processing = false;
                 if (data.success) {
                     const updated   = data.data.updated;
@@ -3828,9 +3898,10 @@ trait CS_SEO_Settings_Page {
                 const sumTitleLink = p.edit_link
                     ? '<a href="' + safeHref(p.edit_link) + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="Edit post">' + abEsc(p.title) + '</a>'
                     : abEsc(p.title);
-                return '<tr>' +
+                return '<tr id="ab-sum-row-' + p.id + '">' +
                     '<td style="padding:6px 10px;font-size:13px;color:#1d2327">' + sumTitleLink + '</td>' +
-                    '<td style="padding:6px 10px;text-align:right">' + badge + '</td>' +
+                    '<td style="padding:6px 10px;text-align:center" class="ab-sum-status-cell">' + badge + '</td>' +
+                    '<td style="padding:6px 10px;text-align:right"><button class="button ab-row-btn" onclick="sumGenOne(' + p.id + ')">✦ Generate</button></td>' +
                     '</tr>';
             }).join('');
 
@@ -3848,7 +3919,8 @@ trait CS_SEO_Settings_Page {
             wrap.innerHTML = '<table style="width:100%;border-collapse:collapse;margin-top:4px">' +
                 '<thead><tr style="background:#f0f0f0">' +
                 '<th style="padding:6px 10px;text-align:left;font-size:12px;color:#50575e;font-weight:600">Post Title</th>' +
-                '<th style="padding:6px 10px;text-align:right;font-size:12px;color:#50575e;font-weight:600">Status</th>' +
+                '<th style="padding:6px 10px;text-align:center;font-size:12px;color:#50575e;font-weight:600">Status</th>' +
+                '<th style="padding:6px 10px;text-align:right;font-size:12px;color:#50575e;font-weight:600">Action</th>' +
                 '</tr></thead>' +
                 '<tbody>' + rows + '</tbody>' +
                 '</table>' + sumPager;
@@ -3920,6 +3992,34 @@ trait CS_SEO_Settings_Page {
         }
 
         function sumStop() { sumState.stopped = true; sumSetStatus('Stopping...'); }
+
+        async function sumGenOne(postId) {
+            const row    = document.getElementById('ab-sum-row-' + postId);
+            if (!row) return;
+            const btn    = row.querySelector('button');
+            const cell   = row.querySelector('.ab-sum-status-cell');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="ab-spinner">⟳</span> Generating…'; }
+            try {
+                const data = await abPost('cs_seo_summary_generate_one', { post_id: postId, force: 1 });
+                if (data.success) {
+                    if (cell) cell.innerHTML = '<span class="ab-badge ab-badge-ok">✓ Generated</span>';
+                    const p = (sumState.posts || []).find(function(x) { return x.id === postId; });
+                    if (p) { p.has_sum = true; p._done = true; }
+                    const done = parseInt(document.getElementById('sum-s-done').textContent || '0', 10) + 1;
+                    document.getElementById('sum-s-done').textContent = done;
+                    const sumTitle = row.querySelector('td a') || row.querySelector('td');
+                    sumLog('✓ ' + (data.data && data.data.skipped ? 'Already had summary: ' : '') + (sumTitle ? sumTitle.textContent : 'Post #' + postId), 'ab-log-ok');
+                } else {
+                    if (cell) cell.innerHTML = '<span class="ab-badge ab-badge-none">✗ Error</span>';
+                    sumLog('✗ Error generating post #' + postId + ': ' + (data.data || 'Unknown'), 'ab-log-error');
+                }
+            } catch (e) {
+                if (cell) cell.innerHTML = '<span class="ab-badge ab-badge-none">✗ Error</span>';
+                sumLog('✗ Network error for post #' + postId + ': ' + e.message, 'ab-log-error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '✦ Generate'; }
+            }
+        }
 
         // ── Category Fixer ───────────────────────────────────────────────────
         const cfNonce = csSeoAdmin.nonce;
