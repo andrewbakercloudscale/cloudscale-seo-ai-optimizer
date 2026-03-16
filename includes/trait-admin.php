@@ -173,11 +173,16 @@ trait CS_SEO_Admin {
                 tabBtns.forEach(function(btn) {
                     btn.addEventListener("click", function() {
                         var tab = btn.getAttribute("data-tab");
-                        document.querySelectorAll(".ab-tab").forEach(function(t) { t.classList.remove("active"); });
-                        document.querySelectorAll(".ab-pane").forEach(function(p) { p.classList.remove("active"); });
-                        btn.classList.add("active");
-                        var pane = document.getElementById("ab-pane-" + tab);
-                        if (pane) pane.classList.add("active");
+                        // Delegate to abTab() so localStorage is kept in sync.
+                        if (typeof window.abTab === "function") {
+                            window.abTab(tab, btn);
+                        } else {
+                            document.querySelectorAll(".ab-tab").forEach(function(t) { t.classList.remove("active"); });
+                            document.querySelectorAll(".ab-pane").forEach(function(p) { p.classList.remove("active"); });
+                            btn.classList.add("active");
+                            var pane = document.getElementById("ab-pane-" + tab);
+                            if (pane) pane.classList.add("active");
+                        }
                     });
                 });
                 var toggleBtns = document.querySelectorAll(".ab-toggle-card-btn");
