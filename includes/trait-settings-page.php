@@ -931,7 +931,7 @@ trait CS_SEO_Settings_Page {
                         </div>
                         <div style="display:flex;gap:6px">
                             <button type="button" class="button" style="font-size:11px;padding:2px 10px" id="ab-robots-live-copy">⎘ Copy</button>
-                            <button type="button" class="button" style="font-size:11px;padding:2px 10px">↻ Refresh</button>
+                            <button type="button" class="button" id="ab-robots-refresh-btn" style="font-size:11px;padding:2px 10px">↻ Refresh</button>
                         </div>
                     </div>
                     <pre id="ab-robots-live-preview" style="background:#1a1a2e;color:#e0e0f0;font-family:'Courier New',monospace;font-size:12px;line-height:1.6;padding:14px;border-radius:6px;max-height:320px;overflow-y:auto;margin:0;white-space:pre-wrap;word-break:break-word">Loading…</pre>
@@ -954,7 +954,7 @@ trait CS_SEO_Settings_Page {
                             <p class="description">Full robots.txt content. The AI bot blocklist (if enabled) and your sitemap URL are appended automatically — do not add them here. Changes take effect immediately at <a href="<?php echo esc_url(home_url('/robots.txt')); ?>" target="_blank"><?php echo esc_html(home_url('/robots.txt')); ?></a></p>
                             <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px">
                                 <button type="button" class="button" id="ab-robots-copy">⎘ Copy</button>
-                                <button type="button" class="button">Reset to default</button>
+                                <button type="button" class="button" id="ab-robots-reset-btn">Reset to default</button>
                             </div>
                         </td>
                     </tr>
@@ -5225,21 +5225,13 @@ trait CS_SEO_Settings_Page {
             on('ab-rename-robots-btn', function() { if (typeof abRenameRobots === 'function') abRenameRobots(); });
             on('ab-robots-live-copy', function() { if (typeof abCopyRobotsLive === 'function') abCopyRobotsLive(); });
             on('ab-robots-copy', function() { if (typeof abCopyRobots === 'function') abCopyRobots(); });
-            var robotsReset = document.querySelector('[onclick*="default_robots_txt"]');
-            if (robotsReset) {
-                robotsReset.removeAttribute('onclick');
-                robotsReset.addEventListener('click', function() {
-                    var textarea = document.getElementById('cs-robots-txt');
-                    if (textarea && typeof csSeoAdmin !== 'undefined' && csSeoAdmin.defaultRobotsTxt) {
-                        textarea.value = csSeoAdmin.defaultRobotsTxt;
-                    }
-                });
-            }
-            var robotsRefresh = document.querySelector('[onclick*="abRefreshRobotsPreview"]');
-            if (robotsRefresh) {
-                robotsRefresh.removeAttribute('onclick');
-                robotsRefresh.addEventListener('click', function() { if (typeof abRefreshRobotsPreview === 'function') abRefreshRobotsPreview(); });
-            }
+            on('ab-robots-reset-btn', function() {
+                var textarea = document.getElementById('cs-robots-txt');
+                if (textarea && typeof csSeoAdmin !== 'undefined' && csSeoAdmin.defaultRobotsTxt) {
+                    textarea.value = csSeoAdmin.defaultRobotsTxt;
+                }
+            });
+            on('ab-robots-refresh-btn', function() { if (typeof abRefreshRobotsPreview === 'function') abRefreshRobotsPreview(); });
             // Sitemap
             on('ab-sitemap-load', function(e) { e.preventDefault(); if (typeof abLoadSitemap === 'function') abLoadSitemap(); });
             on('ab-sitemap-copy', function() { if (typeof abCopySitemap === 'function') abCopySitemap(); });
