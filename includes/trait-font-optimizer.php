@@ -669,6 +669,14 @@ trait CS_SEO_Font_Optimizer {
             self::debug_log('AJAX Handler: font_undo - no file path provided');
             wp_send_json(['success' => false, 'error' => 'No file specified']);
         }
+
+        // Prevent path traversal: file must reside within the WordPress installation.
+        $real_path = realpath($file_path);
+        $real_base = realpath(ABSPATH);
+        if ($real_path === false || $real_base === false || strpos($real_path, $real_base) !== 0) {
+            self::debug_log('AJAX Handler: font_undo - path traversal attempt blocked: ' . $file_path);
+            wp_send_json(['success' => false, 'error' => 'Invalid file path']);
+        }
         
         self::debug_log('AJAX Handler: font_undo - restoring ' . basename($file_path));
         $result = $this->undo_font_fixes($file_path);

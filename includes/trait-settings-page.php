@@ -1751,17 +1751,7 @@ trait CS_SEO_Settings_Page {
                         <button id="ch-analyse-btn" class="button button-primary button-hero">&#128202; Analyse Categories</button>
                     </div>
 
-                    <div id="ch-stats" style="display:none;margin-bottom:16px;gap:10px;flex-wrap:wrap;"></div>
-
-                    <div id="ch-legend" style="display:none;margin-bottom:12px;font-size:12px;color:#555;">
-                        <span style="margin-right:12px;font-weight:600;">Health grades:</span>
-                        <span style="display:inline-block;background:#1a7a34;color:#fff;border-radius:10px;padding:1px 10px;margin-right:6px;">&#9679; Strong</span>
-                        <span style="display:inline-block;background:#e67e00;color:#fff;border-radius:10px;padding:1px 10px;margin-right:6px;">&#9679; Moderate</span>
-                        <span style="display:inline-block;background:#2271b1;color:#fff;border-radius:10px;padding:1px 10px;margin-right:6px;">&#9679; New</span>
-                        <span style="display:inline-block;background:#b8a200;color:#fff;border-radius:10px;padding:1px 10px;margin-right:6px;">&#9679; Weak</span>
-                        <span style="display:inline-block;background:#d63638;color:#fff;border-radius:10px;padding:1px 10px;margin-right:6px;">&#9679; Empty</span>
-                        <span style="display:inline-block;background:#787c82;color:#fff;border-radius:10px;padding:1px 10px;">&#9679; Uncategorized</span>
-                    </div>
+                    <div id="ch-stats" style="display:none;margin-bottom:12px;gap:6px;flex-wrap:wrap;align-items:center;"></div>
 
                     <div id="ch-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;"></div>
 
@@ -3076,7 +3066,7 @@ trait CS_SEO_Settings_Page {
                 try {
                     const data = await abPost('cs_seo_ai_get_posts', {page: pg});
                     if (data.success) allPosts = allPosts.concat(data.data.posts);
-                } catch(e) {}
+                } catch(e) { console.error('[cs-seo] page-fetch failed (pg=' + pg + ')', e); }
             }
             const targets = allPosts.filter(p => !p.no_post);
             let done = 0, errors = 0;
@@ -3133,7 +3123,7 @@ trait CS_SEO_Settings_Page {
                 try {
                     const data = await abPost('cs_seo_ai_get_posts', {page: pg});
                     if (data.success) allPosts = allPosts.concat(data.data.posts);
-                } catch(e) {}
+                } catch(e) { console.error('[cs-seo] page-fetch failed (pg=' + pg + ')', e); }
             }
 
             const targets = allPosts.filter(p => !p.is_homepage && !p.no_post && (!p.has_desc || overwrite));
@@ -3273,7 +3263,7 @@ trait CS_SEO_Settings_Page {
                 try {
                     const data = await abPost('cs_seo_ai_get_posts', {page: pg});
                     if (data.success) allPosts = allPosts.concat(data.data.posts);
-                } catch(e) {}
+                } catch(e) { console.error('[cs-seo] page-fetch failed (pg=' + pg + ')', e); }
             }
 
             // Target only posts that have a description but it's outside the configured range.
@@ -3378,7 +3368,7 @@ trait CS_SEO_Settings_Page {
                 try {
                     const data = await abPost('cs_seo_ai_get_posts', {page: pg});
                     if (data.success) allPosts = allPosts.concat(data.data.posts);
-                } catch(e) {}
+                } catch(e) { console.error('[cs-seo] page-fetch failed (pg=' + pg + ')', e); }
             }
 
             const targets = allPosts.filter(p => !p.is_homepage && !p.no_post && p.title_chars > 0 && (p.title_chars < 50 || p.title_chars > 60));
@@ -4360,30 +4350,76 @@ trait CS_SEO_Settings_Page {
 
         // ── Category Health ───────────────────────────────────────────────────
         const chNonce = csSeoAdmin.nonce;
-        let chData = [];
+        let chData          = [];
+        let chLoading       = false;
+        let chCurrentFilter = 'all';
 
         async function chLoad() {
-            const cta    = document.getElementById('ch-cta');
-            const wrap   = document.getElementById('ch-wrap');
-            const stats  = document.getElementById('ch-stats');
-            const legend = document.getElementById('ch-legend');
-            const reload    = document.getElementById('ch-reload-hdr');
-            const hideBtn   = document.getElementById('ch-hideposts-hdr');
-            cta.style.display = 'none';
-            wrap.innerHTML = '<p style="color:#555;font-size:13px;padding:12px 0;">&#9203; Loading categories...</p>';
-            const fd = new FormData();
-            fd.append('action', 'cs_catfix_health');
-            fd.append('nonce', chNonce);
-            const r = await fetch(ajaxurl, {method:'POST', body:fd});
-            const d = await r.json();
-            if (!d.success) { wrap.innerHTML = '<p style="color:#c3372b;">Error loading health data.</p>'; return; }
-            chData = d.categories;
-            reload.style.display   = '';
-            hideBtn.style.display  = '';
-            stats.style.display    = 'flex';
-            legend.style.display = 'block';
-            chRenderStats();
-            chRenderTable();
+            if (chLoading) return;
+            chLoading = true;
+            const cta     = document.getElementById('ch-cta');
+            const wrap    = document.getElementById('ch-wrap');
+            const stats   = document.getElementById('ch-stats');
+            const reload  = document.getElementById('ch-reload-hdr');
+            const hideBtn = document.getElementById('ch-hideposts-hdr');
+            cta.style.display    = 'none';
+            stats.style.display  = 'none';
+            chData          = [];
+            chCurrentFilter = 'all';
+
+            function chProgress(msg) {
+                wrap.innerHTML = '<p style="color:#555;font-size:13px;padding:12px 0;">&#9203; ' + msg + '</p>';
+            }
+
+            try {
+                // Phase 1: lightweight category list (no post queries)
+                chProgress('Fetching category list\u2026');
+                const fd1 = new FormData();
+                fd1.append('action', 'cs_catfix_health_list');
+                fd1.append('nonce', chNonce);
+                const r1 = await fetch(ajaxurl, {method:'POST', body:fd1});
+                const d1 = await r1.json();
+                if (!d1.success) { wrap.innerHTML = '<p style="color:#c3372b;">Error loading category list.</p>'; return; }
+
+                const cats  = d1.categories;
+                const total = cats.length;
+                if (!total) { wrap.innerHTML = '<p style="color:#555;">No categories found.</p>'; return; }
+
+                // Phase 2: process each category individually so a slow query is visible
+                for (let i = 0; i < total; i++) {
+                    const c = cats[i];
+                    chProgress('Processing category ' + (i + 1) + ' of ' + total + ': <strong>' + abEsc(c.name) + '</strong>');
+                    try {
+                        const fd2 = new FormData();
+                        fd2.append('action', 'cs_catfix_health_cat');
+                        fd2.append('nonce', chNonce);
+                        fd2.append('cat_id', c.id);
+                        const r2 = await fetch(ajaxurl, {method:'POST', body:fd2});
+                        const d2 = await r2.json();
+                        if (d2.success) chData.push(d2.cat);
+                        else console.error('[cathealth] category ' + c.id + ' (' + c.name + ') returned success:false');
+                    } catch (catErr) {
+                        console.error('[cathealth] category ' + c.id + ' (' + c.name + ') failed:', catErr);
+                    }
+                }
+
+                // Sort: grade order then count desc (mirrors original server-side sort)
+                const chGradeOrder = {strong:0, moderate:1, new:2, weak:3, empty:4, uncategorized:5};
+                chData.sort((a, b) => {
+                    const ga = chGradeOrder[a.grade] ?? 5, gb = chGradeOrder[b.grade] ?? 5;
+                    return ga !== gb ? ga - gb : b.count - a.count;
+                });
+
+                reload.style.display = '';
+                if (hideBtn) hideBtn.style.display = '';
+                stats.style.display  = 'flex';
+                chRenderStats();
+                chRenderTable();
+            } catch (err) {
+                wrap.innerHTML = '<p style="color:#c3372b;">Error: ' + abEsc(String(err.message || err)) + '</p>';
+            } finally {
+                chLoading = false;
+            }
         }
 
         function chGradeBadge(grade) {
@@ -4399,23 +4435,34 @@ trait CS_SEO_Settings_Page {
             return `<span style="display:inline-block;background:${g.bg};color:#fff;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:600;white-space:nowrap;">${g.label}</span>`;
         }
 
+        function chFilter(grade) {
+            chCurrentFilter = grade;
+            chRenderStats();
+            chRenderTable();
+        }
+
         function chRenderStats() {
             const counts = {strong:0, moderate:0, new:0, weak:0, empty:0, uncategorized:0};
             chData.forEach(c => { if (counts[c.grade] !== undefined) counts[c.grade]++; });
             const colors = {strong:'#1a7a34', moderate:'#e67e00', new:'#2271b1', weak:'#b8a200', empty:'#d63638', uncategorized:'#787c82'};
             const labels = {strong:'Strong', moderate:'Moderate', new:'New', weak:'Weak', empty:'Empty', uncategorized:'Uncategorized'};
-            document.getElementById('ch-stats').innerHTML = Object.entries(counts).map(([g, n]) =>
-                `<span style="display:inline-flex;align-items:center;gap:6px;background:#f6f7f7;border:1px solid #ddd;border-radius:8px;padding:4px 12px;font-size:12px;">
-                    <span style="width:10px;height:10px;border-radius:50%;background:${colors[g]};display:inline-block;"></span>
-                    <strong>${labels[g]}</strong>: ${n}
-                </span>`
-            ).join('');
+            const total  = chData.length;
+            const allActive = chCurrentFilter === 'all';
+            const allBtn = `<button onclick="chFilter('all')" style="display:inline-flex;align-items:center;gap:5px;background:${allActive ? '#1d2327' : '#f6f7f7'};color:${allActive ? '#fff' : '#1d2327'};border:1px solid ${allActive ? '#1d2327' : '#ddd'};border-radius:8px;padding:4px 12px;font-size:12px;cursor:pointer;font-weight:${allActive ? '600' : '400'};">All&nbsp;<strong>${total}</strong></button>`;
+            const pills = Object.entries(counts).map(([g, n]) => {
+                const active = chCurrentFilter === g;
+                const dot = `<span style="width:9px;height:9px;border-radius:50%;background:${active ? '#fff' : colors[g]};display:inline-block;flex-shrink:0;margin-right:5px;"></span>`;
+                return `<button onclick="chFilter('${g}')" style="display:inline-flex;align-items:center;background:${active ? colors[g] : '#f6f7f7'};color:${active ? '#fff' : '#1d2327'};border:1px solid ${active ? colors[g] : '#ddd'};border-radius:8px;padding:4px 12px;font-size:12px;cursor:pointer;font-weight:${active ? '600' : '400'};white-space:nowrap;">${dot}${labels[g]}&nbsp;<strong>${n}</strong></button>`;
+            }).join('');
+            document.getElementById('ch-stats').innerHTML = allBtn + pills;
         }
 
         function chRenderTable() {
             const wrap = document.getElementById('ch-wrap');
             if (!chData.length) { wrap.innerHTML = '<p style="color:#555;">No categories found.</p>'; return; }
-            const rows = chData.map(c => {
+            const visible = chCurrentFilter === 'all' ? chData : chData.filter(c => c.grade === chCurrentFilter);
+            if (!visible.length) { wrap.innerHTML = '<p style="color:#555;padding:12px 0;">No categories match this filter.</p>'; return; }
+            const rows = visible.map(c => {
                 const postRows = c.posts.length
                     ? c.posts.map(p =>
                         `<li style="margin:2px 0;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${abEsc(p.title)}</a></li>`
@@ -4487,8 +4534,9 @@ trait CS_SEO_Settings_Page {
 
         // ── Category Drift ───────────────────────────────────────────────
         const cdNonce = csSeoAdmin.nonce;
-        let cdDrift      = [];
-        let cdTotalPosts = 0;
+        let cdDrift        = [];
+        let cdTotalPosts   = 0;
+        let cdMovedPostIds = new Set(); // tracks posts moved in any bucket this session
 
         // cdRender: display already-fetched drift data without any API call
         function cdRender(totalPosts, cachedAt) {
@@ -4815,9 +4863,25 @@ trait CS_SEO_Settings_Page {
                 // Track which post IDs have been assigned to a move group
                 const assignedIds = new Set();
 
-                // Render each move group with its own collapsible post list
-                const movesHtml = moves.length
-                    ? moves.map((m, midx) => {
+                // Merge move groups that share the same destination (AI sometimes splits them)
+                // Also strip any suggestion to move posts into "Uncategorized".
+                const fromCatId = c.cat_id || 0;
+                const mergedMoves = [];
+                for (const m of moves) {
+                    const dest = (m.to || '').toLowerCase().trim();
+                    if (dest === 'uncategorized') continue;
+                    const existing = mergedMoves.find(x => (x.to || '').toLowerCase().trim() === dest);
+                    if (existing) {
+                        existing.post_ids = [...new Set([...(existing.post_ids || []), ...(m.post_ids || [])])];
+                        existing.titles   = [...(existing.titles || []), ...(m.titles || [])];
+                    } else {
+                        mergedMoves.push(Object.assign({}, m, {post_ids: [...(m.post_ids || [])], titles: [...(m.titles || [])]}));
+                    }
+                }
+
+                // Render each move group with its own collapsible post list + Move buttons
+                const movesHtml = mergedMoves.length
+                    ? mergedMoves.map((m, midx) => {
                         const groupId = `cd-move-${idx}-${midx}`;
                         // Prefer server-resolved post_ids (exact); fall back to fuzzy title match.
                         const matchedPosts = (m.post_ids && m.post_ids.length)
@@ -4825,22 +4889,26 @@ trait CS_SEO_Settings_Page {
                             : (m.titles || []).map(t => cdMatchPost(t, allPosts)).filter(Boolean);
                         matchedPosts.forEach(p => assignedIds.add(p.id));
 
-                        const postItems = matchedPosts.map(p =>
-                            `<li style="padding:4px 0;border-bottom:1px solid #f0eaff;"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;">${abEsc(p.title)}</a></li>`
-                        ).join('');
+                        const toAttr = abEsc(m.to);
+                        const postItems = matchedPosts.map(p => {
+                            const alreadyMoved = cdMovedPostIds.has(p.id);
+                            const btnHtml = alreadyMoved
+                                ? `<span style="color:#1a7a34;font-size:11px;font-weight:600;flex-shrink:0;">&#10003; Moved</span>`
+                                : `<button class="button button-small cd-move-btn" onclick="cdMoveOne(this)" data-post-id="${p.id}" data-from="${fromCatId}" data-to="${toAttr}" data-idx="${idx}" data-midx="${midx}" style="font-size:11px;flex-shrink:0;white-space:nowrap;">&#8594; Move</button>`;
+                            return `<li id="cd-post-${p.id}-${idx}-${midx}" style="padding:4px 0;border-bottom:1px solid #f0eaff;display:flex;align-items:center;gap:6px;${alreadyMoved ? 'opacity:0.5;' : ''}"><a href="/wp-admin/post.php?post=${p.id}&action=edit" target="_blank" style="color:#2271b1;font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${abEsc(p.title)}</a>${btnHtml}</li>`;
+                        }).join('');
                         const postCount = matchedPosts.length;
                         const toggleBtn = postCount > 0
-                            ? `<button class="button button-small" onclick="cdTogglePosts('${groupId}', this)" style="font-size:11px;margin:4px 0 0;">&#9660; ${postCount} post${postCount !== 1 ? 's' : ''}</button>`
+                            ? `<button class="button button-small" onclick="cdTogglePosts('${groupId}', this)" style="font-size:11px;">&#9660; ${postCount} post${postCount !== 1 ? 's' : ''}</button>`
                             : `<span style="font-size:11px;color:#aaa;">No matched posts</span>`;
+                        const moveAllBtn = postCount > 0
+                            ? `<button class="button button-small" id="cd-moveall-${idx}-${midx}" onclick="cdMoveAll(this)" data-from="${fromCatId}" data-to="${toAttr}" data-idx="${idx}" data-midx="${midx}" style="font-size:11px;background:#6b3fa0;border-color:#6b3fa0;color:#fff;white-space:nowrap;">&#8594; Move all ${postCount}</button>`
+                            : '';
                         const postList = postCount > 0
                             ? `<div id="${groupId}" style="display:none;margin-top:6px;"><ul style="margin:0;padding:0;list-style:none;">${postItems}</ul></div>`
                             : '';
 
-                        return `<div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px dashed #d8c8f0;">
-                            <div style="font-weight:600;font-size:12px;color:#fff;background:#6b3fa0;border-radius:4px;padding:3px 8px;display:inline-block;margin-bottom:3px;">&#8594; ${abEsc(m.to)}</div>
-                            <div style="font-size:11px;color:#666;font-style:italic;margin-bottom:4px;">${m.because || ''}</div>
-                            ${toggleBtn}${postList}
-                        </div>`;
+                        return `<div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px dashed #d8c8f0;"><div style="font-weight:600;font-size:12px;color:#fff;background:#6b3fa0;border-radius:4px;padding:3px 8px;display:inline-block;margin-bottom:3px;">&#8594; ${abEsc(m.to)}</div><div style="font-size:11px;color:#666;font-style:italic;margin-bottom:4px;">${m.because || ''}</div><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${toggleBtn}${moveAllBtn}</div>${postList}</div>`;
                     }).join('')
                     : `<span style="color:#888;font-size:11px;">No structured moves returned</span>`;
 
@@ -4904,6 +4972,79 @@ trait CS_SEO_Settings_Page {
             const open = el.style.display !== 'none';
             el.style.display = open ? 'none' : 'block';
             btn.innerHTML = open ? btn.innerHTML.replace('&#9650;', '&#9660;').replace('Hide', 'Show') : btn.innerHTML.replace('&#9660;', '&#9650;').replace('Show', 'Hide');
+        }
+
+        async function cdMoveOne(btn) {
+            const postId    = parseInt(btn.dataset.postId, 10);
+            const fromCatId = parseInt(btn.dataset.from, 10);
+            const toName    = btn.dataset.to;
+            btn.disabled    = true;
+            btn.textContent = '\u2026';
+            const fd = new FormData();
+            fd.append('action',      'cs_catfix_drift_move');
+            fd.append('nonce',       cdNonce);
+            fd.append('post_id',     postId);
+            fd.append('from_cat_id', fromCatId);
+            fd.append('to_cat_name', toName);
+            try {
+                const r = await fetch(ajaxurl, {method:'POST', body:fd});
+                const d = await r.json();
+                if (d.success) {
+                    cdMovedPostIds.add(postId);
+                    // Dim every Move button for this post across ALL buckets in the table
+                    document.querySelectorAll('.cd-move-btn[data-post-id="' + postId + '"]').forEach(b => {
+                        b.style.display = 'none';
+                        const parentLi = b.closest('li');
+                        if (parentLi) {
+                            parentLi.style.opacity = '0.5';
+                            if (!parentLi.querySelector('.cd-moved-lbl')) parentLi.insertAdjacentHTML('beforeend', '<span class="cd-moved-lbl" style="color:#1a7a34;font-size:11px;font-weight:600;flex-shrink:0;">&#10003; Moved</span>');
+                        }
+                    });
+                    // Check each group that contained this post — mark Move All done if none left
+                    document.querySelectorAll('[id^="cd-move-"]').forEach(groupEl => {
+                        const remaining = groupEl.querySelectorAll('.cd-move-btn:not([style*="display: none"])');
+                        if (!remaining.length) {
+                            const parts   = groupEl.id.replace('cd-move-', '').split('-');
+                            const allBtn  = document.getElementById('cd-moveall-' + parts[0] + '-' + parts[1]);
+                            if (allBtn && !allBtn.disabled) { allBtn.disabled = true; allBtn.textContent = '\u2713 All moved'; allBtn.style.background = '#1a7a34'; allBtn.style.borderColor = '#1a7a34'; }
+                        }
+                    });
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = '\u2192 Move';
+                    alert('Move failed: ' + (d.error || 'Unknown error'));
+                }
+            } catch (e) {
+                btn.disabled = false;
+                btn.textContent = '\u2192 Move';
+                console.error('[drift] move failed:', e);
+            }
+        }
+
+        async function cdMoveAll(btn) {
+            const idx     = btn.dataset.idx;
+            const midx    = btn.dataset.midx;
+            const groupEl = document.getElementById('cd-move-' + idx + '-' + midx);
+            if (!groupEl) return;
+            groupEl.style.display = 'block'; // expand so user can see progress
+            const moveBtns = Array.from(groupEl.querySelectorAll('.cd-move-btn')).filter(b => !b.disabled && b.style.display !== 'none');
+            if (!moveBtns.length) return;
+            btn.disabled = true;
+            let done = 0;
+            btn.textContent = '0 / ' + moveBtns.length + '\u2026';
+            try {
+                for (const moveBtn of moveBtns) {
+                    await cdMoveOne(moveBtn);
+                    btn.textContent = (++done) + ' / ' + moveBtns.length + '\u2026';
+                }
+                btn.textContent = '\u2713 All moved';
+                btn.style.background  = '#1a7a34';
+                btn.style.borderColor = '#1a7a34';
+            } catch(e) {
+                console.error('[cs-seo] cdMoveAll failed', e);
+                btn.disabled = false;
+                btn.textContent = '\u2192 Move all (error — retry)';
+            }
         }
 
         // =====================================================================
@@ -5028,44 +5169,50 @@ trait CS_SEO_Settings_Page {
         async function rcRunOne(postId) {
             const row = document.getElementById('rc-row-' + postId);
             if (row) {
-                row.querySelector('td:nth-child(2)').innerHTML = '<span style="background:#eff6ff;color:#2563eb;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Running\u2026</span>';
+                const statusCell = row.querySelector('td:nth-child(2)');
+                if (statusCell) statusCell.innerHTML = '<span style="background:#eff6ff;color:#2563eb;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Running\u2026</span>';
             }
 
-            let done = false;
-            while (!done) {
-                const fd = new FormData();
-                fd.append('action',  'cs_rc_step');
-                fd.append('nonce',   rcNonce);
-                fd.append('post_id', postId);
+            try {
+                let done = false;
+                while (!done) {
+                    const fd = new FormData();
+                    fd.append('action',  'cs_rc_step');
+                    fd.append('nonce',   rcNonce);
+                    fd.append('post_id', postId);
 
-                const r = await fetch(ajaxurl, { method: 'POST', body: fd });
-                const d = await r.json();
+                    const r = await fetch(ajaxurl, { method: 'POST', body: fd });
+                    const d = await r.json();
 
-                if (!d.success) {
-                    rcUpdateRow(postId, 'error', 0, 0, '', d.data?.message || d.error || 'Failed');
-                    return;
+                    if (!d.success) {
+                        rcUpdateRow(postId, 'error', 0, 0, '', d.data?.message || d.error || 'Failed');
+                        return;
+                    }
+
+                    done = d.data.done;
                 }
 
-                done = d.data.done;
-            }
-
-            // Fetch final state for this post to update the row counts.
-            // Use rcCurrentFilter (never 'all' which returns 0 in some environments).
-            const fetchFilter = rcCurrentFilter && rcCurrentFilter !== 'all' ? rcCurrentFilter : 'complete';
-            for (const pg of [rcCurrentPage, 1]) {
-                const fd2 = new FormData();
-                fd2.append('action', 'cs_rc_get_posts');
-                fd2.append('nonce',  rcNonce);
-                fd2.append('page',   pg);
-                fd2.append('filter', fetchFilter);
-                try {
-                    const r2 = await fetch(ajaxurl, { method: 'POST', body: fd2 });
-                    const d2 = await r2.json();
-                    if (d2.success) {
-                        const p = (d2.data.posts || []).find(x => x.id === postId);
-                        if (p) { rcUpdateRow(postId, p.status, p.top_count, p.bot_count, p.generated, p.error); break; }
-                    }
-                } catch(e) {}
+                // Fetch final state for this post to update the row counts.
+                // Use rcCurrentFilter (never 'all' which returns 0 in some environments).
+                const fetchFilter = rcCurrentFilter && rcCurrentFilter !== 'all' ? rcCurrentFilter : 'complete';
+                for (const pg of [rcCurrentPage, 1]) {
+                    const fd2 = new FormData();
+                    fd2.append('action', 'cs_rc_get_posts');
+                    fd2.append('nonce',  rcNonce);
+                    fd2.append('page',   pg);
+                    fd2.append('filter', fetchFilter);
+                    try {
+                        const r2 = await fetch(ajaxurl, { method: 'POST', body: fd2 });
+                        const d2 = await r2.json();
+                        if (d2.success) {
+                            const p = (d2.data.posts || []).find(x => x.id === postId);
+                            if (p) { rcUpdateRow(postId, p.status, p.top_count, p.bot_count, p.generated, p.error); break; }
+                        }
+                    } catch(e) { console.error('[cs-seo] rcRunOne: row-refresh failed for post ' + postId, e); }
+                }
+            } catch(e) {
+                console.error('[cs-seo] rcRunOne failed for post ' + postId, e);
+                rcUpdateRow(postId, 'error', 0, 0, '', 'Network error: ' + e.message);
             }
         }
 
@@ -5160,7 +5307,7 @@ trait CS_SEO_Settings_Page {
                     const r = await fetch(url, { method: 'POST', body: fd });
                     const d = await r.json();
                     if (d.success) allIds = allIds.concat((d.data.posts || []).map(p => p.id));
-                } catch(e) {}
+                } catch(e) { console.error('[cs-seo] rcBatch: page-fetch failed (pg=' + pg + ')', e); }
             }
 
             allIds = [...new Set(allIds)];
@@ -5204,7 +5351,11 @@ trait CS_SEO_Settings_Page {
                     fdR.append('mode',    'one');
                     try { await fetch(url, { method: 'POST', body: fdR }); } catch(e) {}
                 }
-                await rcRunOne(postId);
+                try {
+                    await rcRunOne(postId);
+                } catch(e) {
+                    console.error('[cs-seo] rcBatch: rcRunOne threw for post ' + postId, e);
+                }
                 rcBatchDone++;
                 rcUpdateBatchProgress();
                 await new Promise(res => setTimeout(res, 300));

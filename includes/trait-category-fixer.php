@@ -177,8 +177,8 @@ trait CS_SEO_Category_Fixer {
                 'posts_per_page'      => $batch,
                 'paged'               => $page++,
                 'fields'              => 'ids',
-                'orderby'             => 'title',
-                'order'               => 'ASC',
+                'orderby'             => 'date',
+                'order'               => 'DESC',
                 'no_found_rows'       => true,
                 'ignore_sticky_posts' => true,
             ]);
@@ -511,9 +511,97 @@ trait CS_SEO_Category_Fixer {
     // =========================================================================
 
     /**
+     * AJAX handler: returns a lightweight list of all categories (no post queries).
+     *
+     * Used by the JS health scanner to get the category list before processing
+     * each category individually via ajax_catfix_health_cat().
+     *
+     * @since 4.19.29
+     * @return void
+     */
+    public function ajax_catfix_health_list(): void {
+        $this->catfix_nonce_check();
+
+        $cats = get_categories(['hide_empty' => false, 'orderby' => 'count', 'order' => 'DESC']);
+        wp_send_json(['success' => true, 'categories' => array_map(fn($c) => [
+            'id'    => (int) $c->term_id,
+            'name'  => $c->name,
+            'slug'  => $c->slug,
+            'count' => (int) $c->count,
+        ], $cats)]);
+    }
+
+    /**
+     * AJAX handler: returns health data for a single category.
+     *
+     * Accepts `cat_id` (int). Used by the JS scanner to process one category at a
+     * time so the UI can show per-category progress and identify slow/stalled queries.
+     *
+     * @since 4.19.29
+     * @return void
+     */
+    public function ajax_catfix_health_cat(): void {
+        $this->catfix_nonce_check();
+
+        // phpcs:disable WordPress.Security.NonceVerification.Missing -- nonce checked via catfix_nonce_check()
+        $cid = absint(wp_unslash($_POST['cat_id'] ?? 0));
+        // phpcs:enable WordPress.Security.NonceVerification.Missing
+
+        if (!$cid) {
+            wp_send_json(['success' => false, 'error' => 'Missing cat_id.']);
+            return;
+        }
+
+        $cat = get_category($cid);
+        if (!$cat || is_wp_error($cat)) {
+            wp_send_json(['success' => false, 'error' => 'Category not found.']);
+            return;
+        }
+
+        $count            = (int) $cat->count;
+        $is_uncategorized = strtolower($cat->slug) === 'uncategorized';
+
+        $posts = get_posts([
+            'category'       => $cid,
+            'posts_per_page' => 50,
+            'post_status'    => 'publish',
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+        ]);
+        $post_list = array_map(fn($p) => [
+            'id'    => $p->ID,
+            'title' => get_the_title($p->ID),
+        ], $posts);
+
+        $is_new = false;
+        if (!$is_uncategorized && $count >= 1 && $count <= 3 && !empty($posts)) {
+            $days_old = (time() - strtotime($posts[0]->post_date)) / DAY_IN_SECONDS;
+            if ($days_old <= 180) $is_new = true;
+        }
+
+        if ($is_uncategorized)  $grade = 'uncategorized';
+        elseif ($count >= 10)   $grade = 'strong';
+        elseif ($count >= 4)    $grade = 'moderate';
+        elseif ($is_new)        $grade = 'new';
+        elseif ($count >= 2)    $grade = 'weak';
+        else                    $grade = 'empty';
+
+        wp_send_json(['success' => true, 'cat' => [
+            'id'       => $cid,
+            'name'     => $cat->name,
+            'slug'     => $cat->slug,
+            'count'    => $count,
+            'grade'    => $grade,
+            'edit_url' => admin_url('edit.php?post_type=post&category_name=' . $cat->slug),
+            'posts'    => $post_list,
+        ]]);
+    }
+
+    /**
      * AJAX handler: returns category health statistics (post counts per category).
      *
      * @since 4.10.65
+     * @deprecated 4.19.29 JS now uses ajax_catfix_health_list + ajax_catfix_health_cat for progress.
      * @return void
      */
     public function ajax_catfix_health(): void {
@@ -699,6 +787,7 @@ trait CS_SEO_Category_Fixer {
             . 'Post titles may include an "[also in: X, Y]" annotation showing their other existing categories. '
             . 'A post already assigned to an appropriate category does NOT need to be moved there — it is already covered. '
             . 'Only suggest moving a post to a category it is NOT already in. '
+            . 'NEVER suggest moving posts to the "Uncategorized" category. '
             . 'You respond ONLY with valid JSON and nothing else. No markdown fences, no explanation.';
         $user_msg = 'Analyse the following WordPress blog categories. Each entry shows the category name, total post count, and a sample of post titles.' . "\n\n"
             . 'For each category, determine whether the posts form a coherent topic or whether the category is being used inconsistently as a catch-all.' . "\n"
@@ -911,6 +1000,7 @@ trait CS_SEO_Category_Fixer {
 
         $system = 'You are a content taxonomy analyst. Post titles may include "[also in: X]" annotations. '
             . 'Only suggest moving a post to a category it is NOT already in. '
+            . 'NEVER suggest moving posts to the "Uncategorized" category. '
             . 'You respond ONLY with valid JSON and nothing else. No markdown fences, no explanation.';
         $user_msg = 'The following posts are in the \'' . $cat_name . '\' category and have not yet been assigned to a move group.' . "\n"
             . 'For each post, determine the best existing category it should be moved to from this list: ' . $all_cat_names . "\n\n"
@@ -1005,5 +1095,84 @@ trait CS_SEO_Category_Fixer {
         }
 
         wp_send_json(['success' => true, 'moves' => $moves]);
+    }
+
+    /**
+     * AJAX handler: moves a single post from its current (drift-flagged) category to the AI-suggested target.
+     *
+     * Accepts `post_id` (int), `from_cat_id` (int), and `to_cat_name` (string).
+     * Resolves the target category by name; creates it if it does not yet exist.
+     *
+     * @since 4.19.29
+     * @return void
+     */
+    public function ajax_catfix_drift_move(): void {
+        $this->catfix_nonce_check();
+
+        // phpcs:disable WordPress.Security.NonceVerification.Missing -- nonce checked via catfix_nonce_check()
+        $pid         = isset($_POST['post_id'])     ? absint(wp_unslash($_POST['post_id']))                  : 0;
+        $from_cat_id = isset($_POST['from_cat_id']) ? absint(wp_unslash($_POST['from_cat_id']))              : 0;
+        $to_cat_name = isset($_POST['to_cat_name']) ? sanitize_text_field(wp_unslash($_POST['to_cat_name'])) : '';
+        // phpcs:enable WordPress.Security.NonceVerification.Missing
+
+        if (!$pid) {
+            wp_send_json(['success' => false, 'error' => 'Missing post_id.']);
+            return;
+        }
+        if (!$to_cat_name) {
+            wp_send_json(['success' => false, 'error' => 'Missing target category name.']);
+            return;
+        }
+        if (strtolower($to_cat_name) === 'uncategorized') {
+            wp_send_json(['success' => false, 'error' => 'Cannot move posts to Uncategorized.']);
+            return;
+        }
+
+        // Resolve target category by name, creating it if it doesn't exist yet.
+        $target = get_term_by('name', $to_cat_name, 'category');
+        if ($target && !is_wp_error($target)) {
+            $to_cat_id = (int) $target->term_id;
+        } else {
+            $inserted = wp_insert_term($to_cat_name, 'category');
+            if (is_wp_error($inserted)) {
+                wp_send_json(['success' => false, 'error' => 'Could not create category: ' . $inserted->get_error_message()]);
+                return;
+            }
+            $to_cat_id = (int) $inserted['term_id'];
+        }
+
+        // Remove post from the drift-flagged category, add it to the target.
+        $current_cats = wp_get_post_categories($pid, ['fields' => 'ids']);
+        if ($from_cat_id) {
+            $current_cats = array_filter($current_cats, fn($id) => (int) $id !== $from_cat_id);
+        }
+        $current_cats[] = $to_cat_id;
+        wp_set_post_categories($pid, array_unique(array_map('intval', $current_cats)));
+
+        // Remove the moved post from the drift cache so it doesn't reappear on reload.
+        $cache = get_option('cs_seo_drift_cache', []);
+        if (!empty($cache['drift'])) {
+            foreach ($cache['drift'] as &$entry) {
+                if ((int) ($entry['cat_id'] ?? 0) !== $from_cat_id) continue;
+                // Remove from the top-level posts list.
+                $entry['posts'] = array_values(array_filter(
+                    $entry['posts'] ?? [],
+                    fn($p) => (int) $p['id'] !== $pid
+                ));
+                // Remove from each move group's post_ids.
+                foreach ($entry['moves'] as &$move) {
+                    $move['post_ids'] = array_values(array_filter(
+                        $move['post_ids'] ?? [],
+                        fn($id) => (int) $id !== $pid
+                    ));
+                }
+                unset($move);
+                break;
+            }
+            unset($entry);
+            update_option('cs_seo_drift_cache', $cache, false);
+        }
+
+        wp_send_json(['success' => true, 'to_cat_id' => $to_cat_id]);
     }
 }

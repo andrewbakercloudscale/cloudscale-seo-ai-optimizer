@@ -270,10 +270,13 @@ final class CloudScale_SEO_AI_Optimizer {
         add_action('wp_ajax_cs_catfix_skip',     [$this, 'ajax_catfix_skip']);
         add_action('wp_ajax_cs_catfix_bulk_apply', [$this, 'ajax_catfix_bulk_apply']);
         add_action('wp_ajax_cs_catfix_ai_one',    [$this, 'ajax_catfix_ai_one']);
-        add_action('wp_ajax_cs_catfix_health',    [$this, 'ajax_catfix_health']);
+        add_action('wp_ajax_cs_catfix_health',      [$this, 'ajax_catfix_health']);
+        add_action('wp_ajax_cs_catfix_health_list', [$this, 'ajax_catfix_health_list']);
+        add_action('wp_ajax_cs_catfix_health_cat',  [$this, 'ajax_catfix_health_cat']);
         add_action('wp_ajax_cs_catfix_drift',                  [$this, 'ajax_catfix_drift']);
         add_action('wp_ajax_cs_catfix_drift_cache_get',       [$this, 'ajax_catfix_drift_cache_get']);
         add_action('wp_ajax_cs_catfix_drift_analyse_remaining', [$this, 'ajax_catfix_drift_analyse_remaining']);
+        add_action('wp_ajax_cs_catfix_drift_move',             [$this, 'ajax_catfix_drift_move']);
 
         // Related Articles — run pipeline synchronously on publish (no API, no cron dependency).
         add_action('transition_post_status', [$this, 'rc_on_post_publish'], 20, 3);
