@@ -3,6 +3,63 @@
 All notable changes to CloudScale SEO AI Optimizer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.19.29] - 2026-03-17
+### Fixed
+- **`rcRunOne`** — `fetch` and `r.json()` inside the `while` step-loop were not wrapped in `try/catch`; a network error or non-JSON response silently rejected the Promise, halting the run with no user feedback. Both are now guarded; errors surface via `rcUpdateRow` with the error message (`trait-settings-page.php`)
+- **`rcBatch`** — `await rcRunOne(postId)` was not wrapped per-iteration; a single failing post rejected the entire batch loop, leaving the progress bar stuck and `rcBatchRunning = true`. Each call is now wrapped in `try/catch` so the batch continues to the next post on failure (`trait-settings-page.php`)
+- **`cdMoveAll`** — entire function body had no `try/catch`; any runtime error inside the move loop silently rejected the Promise with no user feedback and the button stayed disabled. Added outer `try/catch` with button re-enable on failure (`trait-settings-page.php`)
+- **Silent `catch(e) {}`** in page-fetch pagination loops inside `abScoreAll`, `abGenAll`, `abFixAll`, `abFixTitles`, and `abRegenStatic` — failures were swallowed with no developer or user visibility; all five now call `console.error('[cs-seo] page-fetch failed', e)` (`trait-settings-page.php`)
+- **Silent `catch(e) {}`** in `rcBatch` page-fetch pagination and `rcRunOne` row-refresh loop — same fix; both now log to console (`trait-settings-page.php`)
+- **`rcRunOne`** — `row.querySelector('td:nth-child(2)')` result was used without a null-check before `.innerHTML` assignment; the result is now stored in a variable and guarded (`trait-settings-page.php`)
+
+## [4.19.28] - 2026-03-17
+### Fixed
+- **Category Drift** — AI was occasionally suggesting "Uncategorized" as a move destination. Added explicit `NEVER suggest moving posts to the "Uncategorized" category` instruction to both drift prompts (`ajax_catfix_drift` and `ajax_catfix_drift_analyse_remaining`), client-side filter that skips any merged move group whose `to` value is "uncategorized" (case-insensitive), and server-side guard in `ajax_catfix_drift_move` that rejects such requests with an error (`trait-category-fixer.php`, `trait-settings-page.php`)
+
+## [4.19.27] - 2026-03-17
+### Fixed
+- **Category Drift** — after using "Move" or "Move all", refreshing the page reloaded the cached drift results and showed moved posts as if they had not been moved. `ajax_catfix_drift_move` now updates the `cs_seo_drift_cache` option after each successful move, removing the post from the relevant entry's `posts` list and from every move group's `post_ids` array (`trait-category-fixer.php`)
+
+## [4.19.26] - 2026-03-17
+### Fixed
+- **Category Drift** — "Move all" button was absent from move groups containing only one matched post (condition was `postCount > 1`); changed to `postCount > 0` so every non-empty group gets the button (`trait-settings-page.php`)
+- **Category Drift** — the same post could appear in multiple move buckets (different destinations); moving it in one bucket left stale "→ Move" buttons active in the others. Added `cdMovedPostIds` (a session-level `Set`) that is populated on every successful move; on move success, all `.cd-move-btn[data-post-id="N"]` elements across the entire table are found and dimmed simultaneously (`trait-settings-page.php`)
+- **Category Drift** — "Move all N posts" button was rendered inside the collapsible post list div, so it was hidden until the list was expanded. Moved outside the collapsible div to sit inline next to the "▼ N posts" toggle (`trait-settings-page.php`)
+
+## [4.19.25] - 2026-03-17
+### Fixed
+- **Category Drift** — the AI sometimes returns multiple move groups with the same `to` destination for a single category. These are now merged client-side before rendering: groups sharing the same destination (case-insensitive) are collapsed into one bucket with deduplicated post IDs (`trait-settings-page.php`)
+
+## [4.19.24] - 2026-03-17
+### Fixed
+- **Category Health filter pills** — label and count were rendering on separate lines because the `<button>` template literal contained newlines between the `<span>` dot, the label text, and the `<strong>` count, creating whitespace text nodes inside the flex container. Collapsed to a single line with `white-space:nowrap` (`trait-settings-page.php`)
+
+## [4.19.23] - 2026-03-17
+### Added
+- **Category Drift — Move Post / Move all** — each matched post in a drift move group now has a "→ Move" button that moves it from the drift-flagged category to the AI-suggested destination. Groups with multiple posts get a "→ Move all N" button. Moving is done via the new `cs_catfix_drift_move` AJAX endpoint which resolves the target category by name (creating it if absent) and removes the post from the source category. The button turns green and shows "✓ Moved" on success. New PHP method `ajax_catfix_drift_move` registered at `wp_ajax_cs_catfix_drift_move` (`trait-category-fixer.php`, `trait-settings-page.php`, `cloudscale-seo-ai-optimizer.php`)
+- **Category Health — clickable filter pills** — the static legend row (● Strong ● Moderate…) and the separate stats row (Strong: 5, Moderate: 3…) were merged into a single row of clickable filter buttons. Each pill shows the colour dot, grade label, and count; clicking it filters the table to show only that grade. An "All N" pill resets the filter. Active pill is highlighted. Filter resets to "All" on each reload (`trait-settings-page.php`)
+### Fixed
+- **Category Health filter pills** — the static legend is removed from the HTML; `chLoad()` no longer references the removed `ch-legend` element (`trait-settings-page.php`)
+
+## [4.19.22] - 2026-03-17
+### Added
+- **Category Health — per-category progress** — loading now runs in two phases: a fast `cs_catfix_health_list` call returns all category IDs/names (no post queries), then JS processes each category individually via `cs_catfix_health_cat`, showing "Processing category N of M: [name]" so stuck queries are immediately visible. New PHP methods `ajax_catfix_health_list` and `ajax_catfix_health_cat` registered at `wp_ajax_cs_catfix_health_list` and `wp_ajax_cs_catfix_health_cat`. `ajax_catfix_health` retained but marked deprecated (`trait-category-fixer.php`, `cloudscale-seo-ai-optimizer.php`)
+- **Category Health — sort and filter** — `chLoad()` resets `chCurrentFilter` to `'all'` on each reload; client-side grade sort mirrors the original server-side order (`trait-settings-page.php`)
+### Fixed
+- **Category Health — Reload button** — `chLoad()` was a single blocking request; when it stalled the Reload button appeared to do nothing because reloading produced the same stalled state. The batched approach makes each category independently observable. Added `chLoading` guard to prevent parallel loads (`trait-settings-page.php`)
+- **Font Optimizer — path traversal** — `ajax_font_undo` accepted a raw `file_path` from `$_POST` and passed it directly to `$wp_filesystem->put_contents()`; an attacker with `manage_options` could write arbitrary files outside ABSPATH. Added `realpath()` validation to confirm the resolved path is within `ABSPATH` before any write (`trait-font-optimizer.php`)
+
+## [4.19.21] - 2026-03-17
+### Fixed
+- **Category Fixer** — posts were sorted by title ascending in `ajax_catfix_list_ids` and `ajax_catfix_load`; changed to `date DESC` so the scan and table display newest posts first (`trait-category-fixer.php`)
+
+## [4.19.20] - 2026-03-16
+### Added
+- **Category Fixer — batched scan** — "Scan Posts" now fetches post IDs in a single fast call then processes configurable-sized batches with live progress ("Scanning post N of M"), matching the existing AI analysis loop pattern; individual batch failures are caught and logged without aborting the full scan
+- **Playwright UI tests** — end-to-end test suite covering login, admin navigation, and Category Fixer scan flow added under `tests/`
+### Fixed
+- Error handling hardened across Category Fixer AJAX paths
+
 ## [4.19.7] - 2026-03-16
 ### Fixed
 - **Scan Posts** button (Categories tab) not responding to clicks — button had no `id` after the PCP refactor removed its `onclick`; added `id="cf-scan-btn"` and replaced broken `querySelector('[onclick=...]')` with `on('cf-scan-btn', fn)` (`trait-settings-page.php`)
