@@ -4743,8 +4743,11 @@ trait CS_SEO_Settings_Page {
                 return;
             }
 
-            // Merge into cdDrift state
+            // Merge into cdDrift state — moves and the flat list of analysed post IDs
             cdDrift[catIdx].moves = [...(cdDrift[catIdx].moves || []), ...newMoves];
+            const returnedAnalysedIds = (d.analysed_post_ids || []).map(Number);
+            const existingAnalysed    = (cdDrift[catIdx].analysed_post_ids || []).map(Number);
+            cdDrift[catIdx].analysed_post_ids = [...new Set([...existingAnalysed, ...returnedAnalysedIds])];
 
             // Find the moves column for this row and inject new groups without re-rendering
             const movesCell = document.querySelector(`#cd-move-cell-${catIdx}`);
@@ -4912,8 +4915,11 @@ trait CS_SEO_Settings_Page {
                     }).join('')
                     : `<span style="color:#888;font-size:11px;">No structured moves returned</span>`;
 
-                // Unanalysed posts (those not matched to any move group)
-                const unassigned = allPosts.filter(p => !assignedIds.has(p.id));
+                // Unanalysed posts: exclude move-group matches AND any post explicitly
+                // tracked via analysed_post_ids (set by analyse_remaining on the server
+                // regardless of whether title→ID resolution succeeded).
+                const analysedIds = new Set((c.analysed_post_ids || []).map(Number));
+                const unassigned = allPosts.filter(p => !assignedIds.has(p.id) && !analysedIds.has(p.id));
                 const unassignedId = `cd-posts-${idx}`;
                 const unassignedHtml = (() => {
                     if (!allPosts.length) return '';

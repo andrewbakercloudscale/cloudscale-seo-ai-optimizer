@@ -516,7 +516,7 @@ trait CS_SEO_Category_Fixer {
      * Used by the JS health scanner to get the category list before processing
      * each category individually via ajax_catfix_health_cat().
      *
-     * @since 4.19.29
+     * @since 4.19.30
      * @return void
      */
     public function ajax_catfix_health_list(): void {
@@ -537,7 +537,7 @@ trait CS_SEO_Category_Fixer {
      * Accepts `cat_id` (int). Used by the JS scanner to process one category at a
      * time so the UI can show per-category progress and identify slow/stalled queries.
      *
-     * @since 4.19.29
+     * @since 4.19.30
      * @return void
      */
     public function ajax_catfix_health_cat(): void {
@@ -601,7 +601,7 @@ trait CS_SEO_Category_Fixer {
      * AJAX handler: returns category health statistics (post counts per category).
      *
      * @since 4.10.65
-     * @deprecated 4.19.29 JS now uses ajax_catfix_health_list + ajax_catfix_health_cat for progress.
+     * @deprecated 4.19.30 JS now uses ajax_catfix_health_list + ajax_catfix_health_cat for progress.
      * @return void
      */
     public function ajax_catfix_health(): void {
@@ -1081,20 +1081,25 @@ trait CS_SEO_Category_Fixer {
         }
         unset( $move );
 
-        // Merge into cache
+        // Merge into cache — store new moves AND track every post ID that went through
+        // this analysis so the JS can exclude them from the "unanalysed" list on reload,
+        // even when title-to-ID resolution failed and post_ids is empty on a move group.
         $cache = get_option('cs_seo_drift_cache', []);
         if (!empty($cache['drift'])) {
             foreach ($cache['drift'] as &$entry) {
-                if ((int)$entry['cat_id'] === $cat_id) {
-                    $entry['moves'] = array_merge($entry['moves'] ?? [], $moves);
-                    break;
-                }
+                if ((int)$entry['cat_id'] !== $cat_id) continue;
+                $entry['moves']             = array_merge($entry['moves'] ?? [], $moves);
+                $entry['analysed_post_ids'] = array_values(array_unique(array_merge(
+                    array_map('intval', $entry['analysed_post_ids'] ?? []),
+                    array_map('intval', $post_ids)
+                )));
+                break;
             }
             unset($entry);
             update_option('cs_seo_drift_cache', $cache, false);
         }
 
-        wp_send_json(['success' => true, 'moves' => $moves]);
+        wp_send_json(['success' => true, 'moves' => $moves, 'analysed_post_ids' => array_map('intval', $post_ids)]);
     }
 
     /**
@@ -1103,7 +1108,7 @@ trait CS_SEO_Category_Fixer {
      * Accepts `post_id` (int), `from_cat_id` (int), and `to_cat_name` (string).
      * Resolves the target category by name; creates it if it does not yet exist.
      *
-     * @since 4.19.29
+     * @since 4.19.30
      * @return void
      */
     public function ajax_catfix_drift_move(): void {
