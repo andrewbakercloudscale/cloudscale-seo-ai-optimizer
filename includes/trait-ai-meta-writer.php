@@ -762,11 +762,12 @@ trait CS_SEO_AI_Meta_Writer {
                     if (preg_match('/alt=["\']([^"\']*)["\']/i', $img_tag, $m) && $m[1] === '') $missing_alt++;
                 }
                 $hp_score_raw = get_post_meta($front_page_id, self::META_SEO_SCORE, true);
+                $hp_raw_title = html_entity_decode((string) get_the_title($front_page_id), ENT_QUOTES | ENT_HTML5, 'UTF-8');
                 $homepage = [
                     'id'              => $front_page_id,
-                    'title'           => get_the_title($front_page_id),
-                    'effective_title' => $custom_hp_title !== '' ? $custom_hp_title : get_the_title($front_page_id),
-                    'title_chars'     => mb_strlen($custom_hp_title !== '' ? $custom_hp_title : get_the_title($front_page_id)),
+                    'title'           => $hp_raw_title,
+                    'effective_title' => $custom_hp_title !== '' ? $custom_hp_title : $hp_raw_title,
+                    'title_chars'     => mb_strlen($custom_hp_title !== '' ? $custom_hp_title : $hp_raw_title),
                     'type'            => 'homepage',
                     'date'            => get_the_date('Y-m-d', $front_page_id),
                     'has_desc'        => $desc !== '',
@@ -823,7 +824,8 @@ trait CS_SEO_AI_Meta_Writer {
             $desc = trim((string) get_post_meta($p->ID, self::META_DESC, true));
             // Effective title = custom SEO title if set, otherwise post title.
             $custom_title    = trim((string) get_post_meta($p->ID, self::META_TITLE, true));
-            $effective_title = $custom_title !== '' ? $custom_title : get_the_title($p->ID);
+            $raw_title       = html_entity_decode((string) get_the_title($p->ID), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $effective_title = $custom_title !== '' ? $custom_title : $raw_title;
             // Count images with empty ALT in post content.
             preg_match_all('/<img[^>]+>/i', (string) $p->post_content, $img_tags);
             $missing_alt = 0;
@@ -833,7 +835,7 @@ trait CS_SEO_AI_Meta_Writer {
             $score_raw = get_post_meta($p->ID, self::META_SEO_SCORE, true);
             $items[] = [
                 'id'               => $p->ID,
-                'title'            => get_the_title($p->ID),
+                'title'            => $raw_title,
                 'effective_title'  => $effective_title,
                 'title_chars'      => mb_strlen($effective_title),
                 'type'             => $p->post_type,
