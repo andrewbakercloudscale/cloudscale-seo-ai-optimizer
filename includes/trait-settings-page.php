@@ -248,8 +248,8 @@ trait CS_SEO_Settings_Page {
                                     'claude-haiku-4-5-20251001' => 'Claude Haiku 4.5 (faster, cheaper)',
                                 ];
                                 $gemini_models = [
-                                    'gemini-2.5-flash-preview-04-17' => 'Gemini 2.5 Flash Preview (recommended — fast, latest)',
-                                    'gemini-2.0-flash-001'           => 'Gemini 2.0 Flash 001 (stable)',
+                                    'gemini-2.0-flash'     => 'Gemini 2.0 Flash (recommended — stable, fast)',
+                                    'gemini-2.0-flash-001' => 'Gemini 2.0 Flash 001 (pinned stable)',
                                     'gemini-2.0-flash-lite'          => 'Gemini 2.0 Flash Lite (fastest, cheapest)',
                                     'gemini-2.5-pro-preview-03-25'   => 'Gemini 2.5 Pro Preview (best quality)',
                                 ];
@@ -285,7 +285,7 @@ trait CS_SEO_Settings_Page {
                                     <code>claude-sonnet-4-6</code>
                                     <code>claude-haiku-4-5-20251001</code><br>
                                     <strong>Gemini examples:</strong>
-                                    <code>gemini-2.5-flash-preview-04-17</code>
+                                    <code>gemini-2.0-flash</code>
                                     <code>gemini-2.5-pro-preview-03-25</code>
                                     <code>gemini-2.0-flash-001</code><br>
                                     Find all available IDs at

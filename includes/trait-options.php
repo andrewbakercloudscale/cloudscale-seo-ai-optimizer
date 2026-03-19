@@ -142,6 +142,14 @@ Write a single meta description for the article provided. Rules:
      */
     private function get_ai_opts(): array {
         $saved = get_option(self::AI_OPT, []);
-        return array_merge(self::ai_defaults(), is_array($saved) ? $saved : []);
+        $merged = array_merge(self::ai_defaults(), is_array($saved) ? $saved : []);
+
+        // Migration: retired preview model → stable replacement.
+        if (($merged['model'] ?? '') === 'gemini-2.5-flash-preview-04-17') {
+            $merged['model'] = 'gemini-2.0-flash';
+            update_option(self::AI_OPT, $merged);
+        }
+
+        return $merged;
     }
 }
