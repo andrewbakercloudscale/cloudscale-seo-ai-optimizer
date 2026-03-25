@@ -1,6 +1,6 @@
 === CloudScale SEO AI Optimizer ===
 Contributors: andrewjbaker
-Tags: seo, meta description, ai, opengraph, schema, sitemap, related posts
+Tags: seo, ai, meta description, opengraph, schema
 Requires at least: 6.0
 Tested up to: 6.9
 Stable tag: 4.19.66
