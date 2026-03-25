@@ -694,7 +694,6 @@ trait CS_SEO_Settings_Page {
                                     </select>
                                     <p class="description" style="margin-top:4px;">Changes take effect immediately — no need to regenerate.</p>
                                     <div id="rc-style-preview" style="margin-top:14px;max-width:400px;"></div>
-
                                 </td>
                             </tr>
                             <tr>
@@ -4098,28 +4097,33 @@ trait CS_SEO_Settings_Page {
             document.getElementById('ab-sum-stop').style.display = '';
             sumSetProgress(0);
 
-            while (!sumState.stopped) {
-                const data = await abPost('cs_seo_summary_generate_all', { force: force ? 1 : 0 });
-                if (!data.success) {
-                    sumLog('✗ Error: ' + (data.data || 'Unknown'), 'ab-log-error');
-                    break;
+            try {
+                while (!sumState.stopped) {
+                    const data = await abPost('cs_seo_summary_generate_all', { force: force ? 1 : 0 });
+                    if (!data.success) {
+                        sumLog('✗ Error: ' + (data.data || 'Unknown'), 'ab-log-error');
+                        break;
+                    }
+                    const d = data.data;
+                    if (d.done) break;
+                    sumState.done++;
+                    document.getElementById('sum-s-done').textContent = sumState.done;
+                    const title = d.title || 'Post #' + d.post_id;
+                    sumLog('✓ ' + title, 'ab-log-ok');
+                    const total = force ? sumState.total : sumState.missing;
+                    const pct   = total > 0 ? Math.round((sumState.done / total) * 100) : 0;
+                    sumSetProgress(pct);
+                    sumSetStatus(sumState.done + ' generated' + (d.remaining > 0 ? ', ' + d.remaining + ' remaining' : ''));
                 }
-                const d = data.data;
-                if (d.done) break;
-                sumState.done++;
-                document.getElementById('sum-s-done').textContent = sumState.done;
-                const title = d.title || 'Post #' + d.post_id;
-                sumLog('✓ ' + title, 'ab-log-ok');
-                const total = force ? sumState.total : sumState.missing;
-                const pct   = total > 0 ? Math.round((sumState.done / total) * 100) : 0;
-                sumSetProgress(pct);
-                sumSetStatus(sumState.done + ' generated' + (d.remaining > 0 ? ', ' + d.remaining + ' remaining' : ''));
+            } catch (err) {
+                console.error('sumGenAll error:', err);
+                sumLog('✗ Unexpected error: ' + err.message, 'ab-log-error');
+            } finally {
+                sumState.running = false;
+                document.getElementById('ab-sum-gen-all').disabled   = false;
+                document.getElementById('ab-sum-force-all').disabled = false;
+                document.getElementById('ab-sum-stop').style.display = 'none';
             }
-
-            sumState.running = false;
-            document.getElementById('ab-sum-gen-all').disabled   = false;
-            document.getElementById('ab-sum-force-all').disabled = false;
-            document.getElementById('ab-sum-stop').style.display = 'none';
             if (!sumState.stopped) {
                 sumSetProgress(100);
                 sumSetStatus('✓ Done — ' + sumState.done + ' summaries generated');

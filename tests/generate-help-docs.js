@@ -584,6 +584,8 @@ ${img(panel.file, panel.label)}
 .cs-hero h1 { font-size: 2.2em; font-weight: 800; margin: 0 0 12px; letter-spacing: -0.02em; color: #fff; }
 .cs-hero p { font-size: 1.1em; margin: 0; opacity: 0.85; max-width: 680px; }
 .cs-hero .cs-badge { display: inline-block; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 4px 14px; font-size: 0.8em; font-weight: 600; margin-bottom: 16px; letter-spacing: 0.05em; text-transform: uppercase; }
+.cs-download-btn { display: inline-block; background: #22c55e; color: #fff !important; padding: 10px 22px; border-radius: 8px; text-decoration: none; font-size: 1em; font-weight: 700; letter-spacing: 0.01em; }
+.cs-wporg-btn { display: inline-block; background: #3858e9; color: #fff !important; padding: 10px 22px; border-radius: 8px; text-decoration: none; font-size: 1em; font-weight: 700; letter-spacing: 0.01em; }
 
 /* Table of contents */
 .cs-toc { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 28px 36px; margin: 32px 0; }
@@ -643,6 +645,7 @@ ${img(panel.file, panel.label)}
 <h1>CloudScale SEO AI Optimizer — Help &amp; Documentation</h1>
 <p>CloudScale SEO AI Optimizer is a free WordPress plugin that combines complete technical SEO with an AI-powered content suite. It writes your meta descriptions, ALT text, and article summaries using your own Anthropic Claude or Google Gemini API key, builds an automatic internal linking network across your entire site, and handles all the technical SEO that WordPress leaves out — sitemaps, robots.txt, structured data schemas, social sharing tags, and performance optimisations that improve your Core Web Vitals scores.</p>
 <p style="margin-top:12px;opacity:0.85">There is no Pro version, no upsell, no monthly subscription, and no feature locked behind a licence key. Everything the plugin does is documented on this page.</p>
+<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;"><a class="cs-download-btn" href="https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-seo-ai-optimizer.zip">⬇ Download Latest Version (.zip)</a><a class="cs-wporg-btn" href="https://wordpress.org/plugins/cloudscale-seo-ai-optimizer/" target="_blank" rel="noopener">⭐ View on WordPress.org</a></div>
 </div>
 
 <div class="cs-toc">
