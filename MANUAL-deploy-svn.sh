@@ -120,6 +120,7 @@ NON-BLOCKING (never trigger FAIL, document as informational only):
 - implode of integer-cast IDs for IN clauses — safe
 - Missing @since or DocBlock tags — documentation only, not security
 - Version numbers matching between header and constant — not a violation
+- wp_ajax_nopriv_ handlers that use a single-use HMAC token (hash_hmac + hash_equals + short-lived transient) instead of check_ajax_referer — this is the correct WP pattern for server-to-server async requests where no browser session exists (same as WP core spawn_cron). NOT a CSRF vulnerability. Mark as PASS.
 
 End your response with EXACTLY one of: BUILD_STATUS: PASS or BUILD_STATUS: FAIL" \
             >> "$REVIEW_TMPDIR/$label.txt" 2>&1) || true
