@@ -3,6 +3,50 @@
 All notable changes to CloudScale SEO AI Optimizer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.20.74] - 2026-04-20
+### Added
+- **Readability — Details button** — Readability column now has a "Details" button matching the SEO Score column; clicking opens a modal with Score, Avg sentence length, Heading density, Passive voice %, and Word count (`trait-settings-page.php`)
+- **Related Articles — random tiebreaker** — equal-scored candidates now receive a small `wp_rand(0,9)` tiebreaker so tied posts rotate across regenerations instead of always resolving in the same order (`trait-related-articles.php`)
+- **Related Articles — 30-day cache expiry** — cached results expire after 30 days (filterable via `cs_seo_rc_max_age_days`) so newer posts can rotate in without a manual regenerate (`trait-related-articles.php`)
+### Changed
+- **Generate Missing Titles — concurrent processing** — replaced sequential per-post loop (2 s sleep between each) with a 3-worker concurrent pool; typical speedup ~3× for sites with many untitled posts (`trait-settings-page.php`)
+### Fixed
+- **PCP — `mt_rand` → `wp_rand`** — replaced `mt_rand()` with `wp_rand()` to clear `WordPress.WP.AlternativeFunctions.rand_mt_rand` PCP error introduced in 4.20.73 (`trait-related-articles.php`)
+
+## [4.20.64] - 2026-04-09
+### Added
+- **Broken Link Checker — Date Created column** — results table now shows each post's publication date; columns Post, Date Created, and Status are all sortable by clicking the column header (`trait-settings-page.php`, `trait-broken-links.php`)
+### Fixed
+- **Broken Link Checker — 503 false positives** — sites returning `503 Service Unavailable` to server-side requests (Cloudflare JS-challenge, codeconductor.ai, etc.) are now treated as alive via the same Pass 3 fallback that already handled 401/403/405 (`trait-broken-links.php`)
+
+## [4.20.63] - 2026-04-09
+### Added
+- **Redirects — Created column sortable** — "Created" column moved next to "Last hit" and is now sortable by clicking the header; Hits, Last hit, and Created all support click-to-sort with ascending/descending toggle (`trait-redirects.php`)
+
+## [4.20.62] - 2026-04-09
+### Added
+- **Redirects — column sort** — "Hits" and "Last hit" column headers are now clickable; first click sorts descending, second ascending; active sort direction shown with ↓/↑ indicator (`trait-redirects.php`)
+### Fixed
+- **Broken Link Checker — 401 false positives** — sites returning `401 Unauthorized` to server-side requests (Reuters, WatchMojo, etc. using Cloudflare JA3/JA4 bot-detection) are now treated as alive via the same Pass 3 fallback that already handled 403/405 (`trait-broken-links.php`)
+
+## [4.20.27] - 2026-04-08
+### Fixed
+- **Title Optimiser summary card** — "This Session" label renamed to "Analysed This Session" for clarity (`trait-settings-page.php`)
+- **Title Optimiser post title links** — clicking a post title now opens the post preview (frontend URL) in a new tab; a small ✏ icon links to the WP admin edit screen (`trait-settings-page.php`, `trait-title-optimiser.php`)
+
+## [4.20.26] - 2026-04-08
+### Security
+- **BLC SSRF guard** — `blc_is_ssrf_blocked()` helper added to `ajax_blc_check_url()`; resolves hostname to IPv4 and blocks loopback, link-local (169.254.x), private (10.x, 172.16–31.x, 192.168.x), and reserved ranges before calling `wp_remote_head()` (`trait-broken-links.php`)
+### Fixed
+- **Title Optimiser stale badge** — stale detection now requires > 60-second delta between `post_modified` and `analysed_at`, eliminating false positives from `wp_update_post()` writing `post_modified` ~1 s after `analysed_at` was set (`trait-title-optimiser.php`)
+- **Title Optimiser hint text** — applied-post hint for old posts (no stored original) corrected to "Title was changed to suggested title" (`trait-settings-page.php`)
+- **PCP phpcs:ignore** — `set_time_limit(0)` in `cron_title_opt_process` now suppresses `Squiz.PHP.DiscouragedFunctions.Discouraged` as well as `Generic.PHP.NoSilencedErrors.Discouraged` (`trait-title-optimiser.php`)
+- **PCP phpcs:ignore** — `$_POST['post_id']` in `ajax_readability_score_one` now has `NonceVerification.Missing` inline suppression (`trait-readability.php`)
+### Docs
+- readme.txt: added feature sections for Readability Analyser, Broken Link Checker, and Image SEO Audit
+- readme.txt: corrected "What This Plugin Does Not Do" — removed incorrect "no readability scoring" claim
+- readme.txt: added BLC outbound HTTP requests to `== External services ==` section
+
 ## [4.20.0] - 2026-04-08
 ### Added
 - **Title Optimiser** — new "🎯 Title Optimiser" tab; AI scans all published posts and suggests SEO-optimised replacement titles; shows before/after SEO score (0–100) and identified primary keywords per post; supports single-post analyse, bulk "Analyse All" polling loop, selective apply, and "Apply All Suggested" batch; applying a title updates `post_title` + `post_name` (slug) and automatically creates a 301 redirect from the old URL in the Redirects tab (`trait-title-optimiser.php`, `trait-settings-page.php`, `trait-settings-assets.php`, `cloudscale-seo-ai-optimizer.php`)

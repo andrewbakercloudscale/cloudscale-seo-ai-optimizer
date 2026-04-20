@@ -3,6 +3,32 @@
 All notable changes to CloudScale SEO AI Optimizer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.20.74] - 2026-04-20
+### Added
+- **Readability — Details button** — Readability column now has a "Details" button matching the SEO Score column; clicking opens a modal with Score, Avg sentence length, Heading density, Passive voice %, and Word count (`trait-settings-page.php`)
+- **Related Articles — random tiebreaker** — equal-scored candidates now receive a small `wp_rand(0,9)` tiebreaker so tied posts rotate across regenerations instead of always resolving in the same order (`trait-related-articles.php`)
+- **Related Articles — 30-day cache expiry** — cached results expire after 30 days (filterable via `cs_seo_rc_max_age_days`) so newer posts can rotate in without a manual regenerate (`trait-related-articles.php`)
+### Changed
+- **Generate Missing Titles — concurrent processing** — replaced sequential per-post loop (2 s sleep between each) with a 3-worker concurrent pool; typical speedup ~3× for sites with many untitled posts (`trait-settings-page.php`)
+### Fixed
+- **PCP — `mt_rand` → `wp_rand`** — replaced `mt_rand()` with `wp_rand()` to clear `WordPress.WP.AlternativeFunctions.rand_mt_rand` PCP error introduced in 4.20.73 (`trait-related-articles.php`)
+
+## [4.20.64] - 2026-04-09
+### Added
+- **Broken Link Checker — Date Created column** — results table now shows each post's publication date; columns Post, Date Created, and Status are all sortable by clicking the column header (`trait-settings-page.php`, `trait-broken-links.php`)
+### Fixed
+- **Broken Link Checker — 503 false positives** — sites returning `503 Service Unavailable` to server-side requests (Cloudflare JS-challenge, codeconductor.ai, etc.) are now treated as alive via the same Pass 3 fallback that already handled 401/403/405 (`trait-broken-links.php`)
+
+## [4.20.63] - 2026-04-09
+### Added
+- **Redirects — Created column sortable** — "Created" column moved next to "Last hit" and is now sortable by clicking the header; Hits, Last hit, and Created all support click-to-sort with ascending/descending toggle (`trait-redirects.php`)
+
+## [4.20.62] - 2026-04-09
+### Added
+- **Redirects — column sort** — "Hits" and "Last hit" column headers are now clickable; first click sorts descending, second ascending; active sort direction shown with ↓/↑ indicator (`trait-redirects.php`)
+### Fixed
+- **Broken Link Checker — 401 false positives** — sites returning `401 Unauthorized` to server-side requests (Reuters, WatchMojo, etc. using Cloudflare JA3/JA4 bot-detection) are now treated as alive via the same Pass 3 fallback that already handled 403/405 (`trait-broken-links.php`)
+
 ## [4.20.27] - 2026-04-08
 ### Fixed
 - **Title Optimiser summary card** — "This Session" label renamed to "Analysed This Session" for clarity (`trait-settings-page.php`)
