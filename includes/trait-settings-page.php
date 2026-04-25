@@ -2962,6 +2962,24 @@ trait CS_SEO_Settings_Page {
             }).then(r => r.json());
         }
 
+        // Model lists — kept in JS so we can rebuild the <select> on provider change.
+        // display:none on <option> is ignored by Safari; DOM removal is the only reliable cross-browser approach.
+        var abAnthropicModels = [
+            {value: 'claude-opus-4-6',           label: 'Claude Opus 4.6 (best quality, highest cost)'},
+            {value: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6 (recommended — quality + speed)'},
+            {value: 'claude-sonnet-4-5',         label: 'Claude Sonnet 4.5'},
+            {value: 'claude-sonnet-4.20.140514', label: 'Claude Sonnet 4 (stable pinned)'},
+            {value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fastest, cheapest)'},
+        ];
+        var abGeminiModels = [
+            {value: 'gemini-2.0-flash',      label: 'Gemini 2.0 Flash (recommended — stable, fast)'},
+            {value: 'gemini-2.0-flash-001',  label: 'Gemini 2.0 Flash 001 (pinned stable)'},
+            {value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite (fast, cheapest 2.0)'},
+            {value: 'gemini-1.5-pro',        label: 'Gemini 1.5 Pro (high quality, long context)'},
+            {value: 'gemini-1.5-flash',      label: 'Gemini 1.5 Flash (fast, stable)'},
+            {value: 'gemini-1.5-flash-8b',   label: 'Gemini 1.5 Flash 8B (smallest, cheapest)'},
+        ];
+
         // ── Test API key ─────────────────────────────────────────────────────
         function abProviderChanged() {
             const provider = document.getElementById('ab-ai-provider').value;
@@ -2970,28 +2988,49 @@ trait CS_SEO_Settings_Page {
             document.getElementById('ab-gemini-key-field').style.display    = isGemini ? '' : 'none';
             document.getElementById('ab-key-hint-anthropic').style.display  = isGemini ? 'none' : '';
             document.getElementById('ab-key-hint-gemini').style.display     = isGemini ? '' : 'none';
-            // Show/hide model options for the active provider
-            document.querySelectorAll('#ab-model-select option').forEach(opt => {
-                if (opt.value === '_custom' || opt.value === '_auto') return; // always visible
-                opt.style.display = opt.dataset.provider === provider ? '' : 'none';
-            });
-            // Only reset model selection if the current choice belongs to a different provider.
-            // This preserves the saved value on initial page load while still switching to
-            // Automatic when the user actively changes provider.
-            const sel = document.getElementById('ab-model-select');
-            const currentOpt = sel.options[sel.selectedIndex];
-            const currentProvider = currentOpt ? currentOpt.dataset.provider : null;
-            if (currentProvider && currentProvider !== provider) {
-                const autoOpt = sel.querySelector('option[value="_auto"]');
-                const target = autoOpt || sel.querySelector('option[data-provider="' + provider + '"]');
-                if (target) {
-                    Array.from(sel.options).forEach(o => { o.selected = false; });
-                    target.selected = true;
+
+            // Rebuild model options by removing all provider-specific options and re-inserting
+            // only those for the active provider. display:none on <option> is unreliable in
+            // Safari on macOS, so we manipulate the DOM directly instead.
+            var sel = document.getElementById('ab-model-select');
+            if (sel) {
+                var prev = sel.value;
+                var prevBelongsHere = sel.options[sel.selectedIndex] &&
+                    sel.options[sel.selectedIndex].getAttribute('data-provider') === provider;
+
+                // Remove all provider-keyed options
+                for (var i = sel.options.length - 1; i >= 0; i--) {
+                    if (sel.options[i].getAttribute('data-provider')) sel.remove(i);
+                }
+
+                // Find insertion point (before the _custom option)
+                var insertBefore = null;
+                for (var j = 0; j < sel.options.length; j++) {
+                    if (sel.options[j].value === '_custom') { insertBefore = sel.options[j]; break; }
+                }
+
+                // Insert models for the active provider
+                var models = isGemini ? abGeminiModels : abAnthropicModels;
+                models.forEach(function(m) {
+                    var opt = document.createElement('option');
+                    opt.value = m.value;
+                    opt.textContent = m.label;
+                    opt.setAttribute('data-provider', provider);
+                    sel.insertBefore(opt, insertBefore);
+                });
+
+                // Restore previous selection or fall back to _auto
+                if (prevBelongsHere) {
+                    sel.value = prev;
+                } else if (prev !== '_auto' && prev !== '_custom') {
+                    sel.value = '_auto';
                     abModelSelectChanged();
                 }
             }
+
             document.getElementById('ab-key-status').textContent = '';
-            // Toggle model docs link
+
+            // Toggle model docs links
             const linkA = document.getElementById('ab-model-link-anthropic');
             const linkG = document.getElementById('ab-model-link-gemini');
             if (linkA) linkA.style.display = isGemini ? 'none' : '';
