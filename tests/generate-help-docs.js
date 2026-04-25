@@ -29,6 +29,7 @@ if (!BASE_URL || !COOKIES || !REST_USER || !REST_PASS || !DOCS_DIR) {
     process.exit(1);
 }
 
+const LOGO_URL    = 'https://andrewbaker.ninja/wp-content/uploads/2026/04/cloudscale-seo-ai-icon.jpg';
 const PLUGIN_PAGE = `${BASE_URL}/wp-admin/tools.php?page=cs-seo-optimizer`;
 const SCREENSHOTS = path.join(DOCS_DIR, 'screenshots');
 const REST_BASE   = `${BASE_URL}/wp-json/wp/v2`;
@@ -620,12 +621,14 @@ ${img(panel.file, panel.label)}
 .cs-hero h1 { font-size: 2.2em; font-weight: 800; margin: 0 0 12px; letter-spacing: -0.02em; color: #fff; }
 .cs-hero p { font-size: 1.1em; margin: 0; opacity: 0.85; max-width: 680px; }
 .cs-hero .cs-badge { display: inline-block; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 4px 14px; font-size: 0.8em; font-weight: 600; margin-bottom: 16px; letter-spacing: 0.05em; text-transform: uppercase; }
-.cs-download-btn, .cs-wporg-btn { display: inline-block; padding: 10px 22px; border-radius: 8px; text-decoration: none; font-size: 1em; font-weight: 700; letter-spacing: 0.01em; transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s ease; will-change: transform; }
+.cs-download-btn, .cs-wporg-btn, .cs-github-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; border-radius: 8px; text-decoration: none; font-size: 1em; font-weight: 700; letter-spacing: 0.01em; transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s ease; will-change: transform; }
 .cs-download-btn { background: #22c55e; color: #fff !important; box-shadow: 0 2px 6px rgba(34,197,94,0.35); }
 .cs-wporg-btn { background: #3858e9; color: #fff !important; box-shadow: 0 2px 6px rgba(56,88,233,0.35); }
+.cs-github-btn { background: #24292f; color: #fff !important; box-shadow: 0 2px 6px rgba(0,0,0,0.35); }
 .cs-download-btn:hover { transform: translateY(-6px) scale(1.06); box-shadow: 0 14px 28px rgba(34,197,94,0.45), 0 4px 10px rgba(34,197,94,0.3); color: #fff !important; }
 .cs-wporg-btn:hover { transform: translateY(-6px) scale(1.06); box-shadow: 0 14px 28px rgba(56,88,233,0.45), 0 4px 10px rgba(56,88,233,0.3); color: #fff !important; }
-.cs-download-btn:active, .cs-wporg-btn:active { transform: translateY(-2px) scale(1.02); transition-duration: 0.07s; }
+.cs-github-btn:hover { transform: translateY(-6px) scale(1.06); box-shadow: 0 14px 28px rgba(0,0,0,0.5), 0 4px 10px rgba(0,0,0,0.3); color: #fff !important; }
+.cs-download-btn:active, .cs-wporg-btn:active, .cs-github-btn:active { transform: translateY(-2px) scale(1.02); transition-duration: 0.07s; }
 
 /* Table of contents */
 .cs-toc { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 28px 36px; margin: 32px 0; }
@@ -684,11 +687,16 @@ ${img(panel.file, panel.label)}
 </style>
 
 <div class="cs-hero">
+<div style="display:flex;align-items:center;gap:20px;margin-bottom:16px;">
+<div style="flex:1;min-width:0;">
 <div class="cs-badge">Free &amp; Open Source — No Pro Version, No Upsells, No Subscriptions</div>
-<h1>CloudScale SEO AI Optimizer</h1>
+<h1 style="margin-bottom:0;">CloudScale SEO AI Optimizer</h1>
+</div>
+<img src="${LOGO_URL}" alt="CloudScale SEO AI Optimizer icon" style="flex-shrink:0;width:96px;height:96px;border-radius:16px;box-shadow:0 6px 24px rgba(0,0,0,.4);object-fit:cover;">
+</div>
 <p>CloudScale SEO AI Optimizer is a free WordPress plugin that combines complete technical SEO with an AI-powered content suite. It writes your meta descriptions, ALT text, and article summaries using your own Anthropic Claude or Google Gemini API key, builds an automatic internal linking network across your entire site, and handles all the technical SEO that WordPress leaves out: sitemaps, robots.txt, structured data schemas, social sharing tags, and performance optimisations that improve your Core Web Vitals scores.</p>
 <p style="margin-top:12px;opacity:0.85">There is no Pro version, no upsell, no monthly subscription, and no feature locked behind a licence key. Everything the plugin does is documented on this page.</p>
-<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;"><a class="cs-download-btn" href="https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-seo-ai-optimizer.zip">⬇ Download Latest Version (.zip)</a><a class="cs-wporg-btn" href="https://wordpress.org/plugins/cloudscale-seo-ai-optimizer/" target="_blank" rel="noopener">⭐ View on WordPress.org</a></div>
+<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;"><a class="cs-download-btn" href="https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-seo-ai-optimizer.zip">⬇ Download Latest Version (.zip)</a><a class="cs-wporg-btn" href="https://wordpress.org/plugins/cloudscale-seo-ai-optimizer/" target="_blank" rel="noopener">⭐ View on WordPress.org</a><a class="cs-github-btn" href="https://github.com/andrewbakercloudscale/wordpress-seo-ai-optimizer" target="_blank" rel="noopener"><svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> View on GitHub</a></div>
 </div>
 
 <div class="cs-toc">
