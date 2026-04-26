@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale SEO AI Optimizer
  * Plugin URI:  https://andrewbaker.ninja/2026/02/24/cloudscale-seo-ai-optimiser-enterprise-grade-wordpress-seo-completely-free/
  * Description: Lightweight SEO with AI meta descriptions via Claude API. Titles, canonicals, OpenGraph, Twitter Cards, JSON-LD schema, sitemaps, robots.txt, and font display optimization.
- * Version:     4.20.27
+ * Version:     4.20.76
  * Author:      Andrew Baker
  * Author URI:  https://andrewbaker.ninja/
  * License:     GPLv2 or later
@@ -173,7 +173,7 @@ final class Cs_Seo_Plugin {
     // Related Articles generator version — bump when scoring logic changes
     const RC_VERSION = '1.0';
 
-    const VERSION    = '4.20.27';
+    const VERSION    = '4.20.76';
 
     // Separate option key for AI config — keeps sensitive data isolated.
     const AI_OPT     = 'cs_seo_ai_options';
@@ -366,6 +366,7 @@ final class Cs_Seo_Plugin {
         add_action('wp_ajax_cs_seo_title_analyse_all',     [$this, 'ajax_title_analyse_all']);
         add_action('wp_ajax_cs_seo_title_apply_one',       [$this, 'ajax_title_apply_one']);
         add_action('wp_ajax_cs_seo_title_apply_all',       [$this, 'ajax_title_apply_all']);
+        add_action('wp_ajax_cs_seo_title_fix_links',       [$this, 'ajax_title_fix_internal_links']);
         // Title Optimiser — background queue
         add_action('wp_ajax_cs_seo_title_queue_start',     [$this, 'ajax_title_queue_start']);
         add_action('wp_ajax_cs_seo_title_queue_stop',      [$this, 'ajax_title_queue_stop']);

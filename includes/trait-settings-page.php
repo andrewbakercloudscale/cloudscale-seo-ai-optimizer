@@ -26,6 +26,18 @@ trait CS_SEO_Settings_Page {
         ?>
         <div class="wrap">
         <h1>CloudScale SEO AI Optimizer <span style="font-size:13px;font-weight:400;color:#999;margin-left:6px">v<?php echo esc_html(self::VERSION); ?></span></h1>
+        <?php if ( isset( $_GET['settings-updated'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
+        <div id="ab-settings-saved-toast" style="position:fixed;top:46px;right:20px;z-index:99999;background:#fff;border:1px solid #c3e6cb;border-left:4px solid #00a32a;color:#155724;padding:12px 20px;border-radius:6px;box-shadow:0 2px 12px rgba(0,0,0,.18);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;transition:opacity 0.4s;">
+            &#x2705; <?php esc_html_e( 'Settings saved.', 'cloudscale-seo-ai-optimizer' ); ?>
+        </div>
+        <script>
+        (function(){
+            var t = document.getElementById('ab-settings-saved-toast');
+            if (!t) return;
+            setTimeout(function(){ t.style.opacity='0'; setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); },400); },3000);
+        })();
+        </script>
+        <?php endif; ?>
         <a href="https://andrewbaker.ninja" target="_blank" rel="noopener" style="
             display:inline-flex;
             align-items:center;
@@ -3072,6 +3084,7 @@ trait CS_SEO_Settings_Page {
 
         function abTestKey() {
             const status   = document.getElementById('ab-key-status');
+            const testBtn  = document.getElementById('ab-test-key-btn');
             const provider = document.getElementById('ab-ai-provider').value;
             const keyField = provider === 'gemini'
                 ? document.getElementById('ab-gemini-key-field')
@@ -3084,6 +3097,7 @@ trait CS_SEO_Settings_Page {
             }
             status.textContent = '⟳ Checking firewall & API key…';
             status.className   = 'ab-key-status';
+            if (testBtn) { testBtn.disabled = true; testBtn.textContent = '⟳ Testing…'; }
 
             fetch(abAjax, {
                 method: 'POST',
@@ -3108,6 +3122,9 @@ trait CS_SEO_Settings_Page {
             .catch(e => {
                 status.textContent = '✗ Network error: ' + e.message;
                 status.className   = 'ab-key-status ab-key-err';
+            })
+            .finally(() => {
+                if (testBtn) { testBtn.disabled = false; testBtn.textContent = 'Test Key'; }
             });
         }
 
@@ -3124,6 +3141,8 @@ trait CS_SEO_Settings_Page {
             page = page || 1;
             abState.page = page;
             abSetStatus('Loading posts...');
+            const rldBtn = document.getElementById('ab-reload-hdr');
+            if (rldBtn) { rldBtn.disabled = true; rldBtn.textContent = '⟳ Loading…'; }
             abPost('cs_seo_ai_get_posts', {page}).then(data => {
                 if (!data.success) { abLog('Failed to load posts: ' + data.data, 'err'); return; }
                 abState.posts          = data.data.posts;
@@ -3136,7 +3155,8 @@ trait CS_SEO_Settings_Page {
                 abRenderTable();
                 abSetStatus(data.data.total + ' posts & pages loaded');
                 document.getElementById('ab-ai-toolbar').style.display = 'flex';
-                document.getElementById('ab-reload-hdr').style.visibility = 'visible';
+                const rldBtnDone = document.getElementById('ab-reload-hdr');
+                if (rldBtnDone) { rldBtnDone.disabled = false; rldBtnDone.textContent = '↻ Reload'; rldBtnDone.style.visibility = 'visible'; }
                 document.getElementById('ab-ai-gen-missing').disabled          = false;
                 document.getElementById('ab-ai-gen-all').disabled               = false;
                 document.getElementById('ab-ai-fix').disabled                   = false;
@@ -3153,6 +3173,8 @@ trait CS_SEO_Settings_Page {
                 document.getElementById('ab-next').disabled = abState.page >= abState.totalPages;
             }).catch(e => {
                 abLog('Error: ' + e.message, 'err');
+                const rldBtnErr = document.getElementById('ab-reload-hdr');
+                if (rldBtnErr) { rldBtnErr.disabled = false; rldBtnErr.textContent = '↻ Reload'; }
             });
         }
 
@@ -4393,8 +4415,10 @@ trait CS_SEO_Settings_Page {
 
         function altLoad() {
             altSetStatus('Scanning posts...');
+            const altRldBtn = document.getElementById('ab-alt-reload-hdr');
+            if (altRldBtn) { altRldBtn.disabled = true; altRldBtn.textContent = '⟳ Loading…'; }
             abPost('cs_seo_alt_get_posts', {}).then(data => {
-                if (!data.success) { altLog('Failed to scan: ' + data.data, 'err'); return; }
+                if (!data.success) { altLog('Failed to scan: ' + data.data, 'err'); if (altRldBtn) { altRldBtn.disabled = false; altRldBtn.textContent = '↻ Reload'; } return; }
                 altState.posts = data.data.posts;
                 // Auto-enable show-all when nothing is missing so the audit view is useful
                 if (data.data.missing_alt === 0) altState.showAll = true;
@@ -4404,7 +4428,7 @@ trait CS_SEO_Settings_Page {
                 altRenderTable();
                 altState.page = 0;
                 document.getElementById('ab-alt-toolbar').style.display  = 'flex';
-                document.getElementById('ab-alt-reload-hdr').style.visibility = 'visible';
+                if (altRldBtn) { altRldBtn.disabled = false; altRldBtn.textContent = '↻ Reload'; altRldBtn.style.visibility = 'visible'; }
                 document.getElementById('ab-alt-gen-all').disabled       = data.data.missing_alt === 0;
                 const total = data.data.missing_alt;
                 altSetStatus(total > 0
@@ -4415,6 +4439,7 @@ trait CS_SEO_Settings_Page {
                 }
             }).catch(e => {
                 altLog('Error: ' + e.message, 'err');
+                if (altRldBtn) { altRldBtn.disabled = false; altRldBtn.textContent = '↻ Reload'; }
             });
         }
 
@@ -4556,24 +4581,29 @@ trait CS_SEO_Settings_Page {
 
         async function sumLoad() {
             sumSetStatus('Loading...');
-            const data = await abPost('cs_seo_summary_load', {});
-            if (!data.success) { sumSetStatus('Error: ' + (data.data || 'Unknown')); return; }
-            const d = data.data;
-            sumState.page    = 0;
-            sumState.total   = d.total;
-            sumState.missing = d.missing;
-            document.getElementById('sum-s-total').textContent   = d.total;
-            document.getElementById('sum-s-has').textContent     = d.has;
-            document.getElementById('sum-s-missing').textContent = d.missing;
-            document.getElementById('sum-s-done').textContent    = 0;
-            document.getElementById('ab-sum-summary').style.display = '';
-            document.getElementById('ab-sum-toolbar').style.display = '';
-            document.getElementById('ab-sum-gen-all').disabled = d.missing === 0;
-            sumSetStatus(d.missing === 0 ? '✓ All posts have summaries' : d.missing + ' posts need summaries');
-            // Store posts and render table
-            sumState.posts = d.posts || [];
-            sumRenderTable();
-            document.getElementById('ab-sum-reload-hdr').style.visibility = 'visible';
+            const sumRldBtn = document.getElementById('ab-sum-reload-hdr');
+            if (sumRldBtn) { sumRldBtn.disabled = true; sumRldBtn.textContent = '⟳ Loading…'; }
+            try {
+                const data = await abPost('cs_seo_summary_load', {});
+                if (!data.success) { sumSetStatus('Error: ' + (data.data || 'Unknown')); return; }
+                const d = data.data;
+                sumState.page    = 0;
+                sumState.total   = d.total;
+                sumState.missing = d.missing;
+                document.getElementById('sum-s-total').textContent   = d.total;
+                document.getElementById('sum-s-has').textContent     = d.has;
+                document.getElementById('sum-s-missing').textContent = d.missing;
+                document.getElementById('sum-s-done').textContent    = 0;
+                document.getElementById('ab-sum-summary').style.display = '';
+                document.getElementById('ab-sum-toolbar').style.display = '';
+                document.getElementById('ab-sum-gen-all').disabled = d.missing === 0;
+                sumSetStatus(d.missing === 0 ? '✓ All posts have summaries' : d.missing + ' posts need summaries');
+                sumState.posts = d.posts || [];
+                sumRenderTable();
+                if (sumRldBtn) { sumRldBtn.style.visibility = 'visible'; }
+            } finally {
+                if (sumRldBtn) { sumRldBtn.disabled = false; sumRldBtn.textContent = '↻ Reload'; }
+            }
         }
 
         function sumRenderTable() {

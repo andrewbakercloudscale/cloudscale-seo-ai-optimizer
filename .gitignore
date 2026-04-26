@@ -42,3 +42,4 @@ MANUAL-deploy-svn.sh
 generate-help-docs.sh
 docs/screenshots/
 .cf-deploy-token.sh
+.env.test

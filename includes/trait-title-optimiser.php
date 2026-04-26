@@ -339,9 +339,10 @@ trait CS_SEO_Title_Optimiser {
 
         $new_url = get_permalink( $post_id );
 
-        // Store a 301 redirect from old → new if the slug actually changed.
+        // Store a 301 redirect and update internal links if the slug actually changed.
         if ( $old_url && $new_url && $old_url !== $new_url ) {
             $this->store_redirect( $old_url, (string) $new_url, $post_id );
+            $this->title_opt_update_internal_links( $old_url, (string) $new_url );
         }
 
         // Mark as applied. Use the actual post_modified written by wp_update_post so
@@ -430,6 +431,7 @@ trait CS_SEO_Title_Optimiser {
             $redirected = false;
             if ( $old_url && $new_url && $old_url !== $new_url ) {
                 $this->store_redirect( $old_url, (string) $new_url, $post_id );
+                $this->title_opt_update_internal_links( $old_url, (string) $new_url );
                 $redirects++;
                 $redirected = true;
             }
@@ -613,5 +615,166 @@ trait CS_SEO_Title_Optimiser {
 
             update_option( self::OPT_TITLE_JOB, $job, false );
         }
+    }
+
+    // =========================================================================
+    // Internal link repair
+    // =========================================================================
+
+    /**
+     * Replaces all occurrences of $old_url with $new_url in the post_content of
+     * all published posts. Called whenever a slug change is applied so internal
+     * links are kept in sync without relying on the redirect chain.
+     *
+     * @since 4.20.39
+     * @param string $old_url Full old permalink (as returned by get_permalink()).
+     * @param string $new_url Full new permalink.
+     * @return int Number of posts whose content was updated.
+     */
+    private function title_opt_update_internal_links( string $old_url, string $new_url ): int {
+        global $wpdb;
+        if ( ! $old_url || $old_url === $new_url ) return 0;
+
+        $like = '%' . $wpdb->esc_like( $old_url ) . '%';
+
+        // Fetch affected IDs first so we can clear their object-cache entries after
+        // the direct SQL update (required when a persistent cache like Redis is in use).
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $affected_ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT ID FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_content LIKE %s",
+                $like
+            )
+        );
+
+        if ( ! $affected_ids ) return 0;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $updated = (int) $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$wpdb->posts} SET post_content = REPLACE(post_content, %s, %s) WHERE post_status = 'publish' AND post_content LIKE %s",
+                $old_url,
+                $new_url,
+                $like
+            )
+        );
+
+        // Purge object-cache entries so subsequent get_post() calls return fresh content.
+        foreach ( $affected_ids as $post_id ) {
+            clean_post_cache( (int) $post_id );
+        }
+
+        return $updated;
+    }
+
+    /**
+     * AJAX: scan for internal links still pointing to old redirect sources.
+     *
+     * Checks every redirect entry against post_content to find published posts
+     * that still contain old/redirected URLs. Returns a list of affected posts
+     * without modifying anything.
+     *
+     * @since 4.20.49
+     * @return void
+     */
+    public function ajax_title_scan_broken_links(): void {
+        check_ajax_referer( 'cs_seo_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+
+        global $wpdb;
+
+        $redirects = get_option( 'cs_seo_redirects', [] );
+        if ( ! is_array( $redirects ) ) $redirects = [];
+
+        $all_redirects = array_filter(
+            $redirects,
+            static fn( $r ) => ! empty( $r['from'] ) && ! empty( $r['to'] )
+        );
+
+        $broken_posts      = [];
+        $redirects_checked = 0;
+
+        foreach ( $all_redirects as $r ) {
+            $old_url = trailingslashit( (string) home_url( $r['from'] ) );
+            $new_url = trailingslashit( (string) $r['to'] );
+            if ( ! $old_url || $old_url === $new_url ) continue;
+
+            $redirects_checked++;
+            $like = '%' . $wpdb->esc_like( $old_url ) . '%';
+
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+            $ids = $wpdb->get_col(
+                $wpdb->prepare(
+                    "SELECT ID FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_content LIKE %s",
+                    $like
+                )
+            );
+
+            foreach ( $ids as $raw_id ) {
+                $pid = (int) $raw_id;
+                if ( ! isset( $broken_posts[ $pid ] ) ) {
+                    clean_post_cache( $pid );
+                    $post = get_post( $pid );
+                    $broken_posts[ $pid ] = [
+                        'post_id'    => $pid,
+                        'post_title' => $post ? get_the_title( $pid ) : "Post #{$pid}",
+                        'post_edit'  => $post ? (string) get_edit_post_link( $pid, 'raw' ) : '',
+                        'old_urls'   => [],
+                    ];
+                }
+                $broken_posts[ $pid ]['old_urls'][] = $old_url;
+            }
+        }
+
+        wp_send_json_success( [
+            'redirects_checked' => $redirects_checked,
+            'broken_posts'      => array_values( $broken_posts ),
+        ] );
+    }
+
+    /**
+     * AJAX: retrospective internal-link repair.
+     *
+     * Iterates every redirect stored in cs_seo_redirects and replaces the old URL
+     * with the new URL inside all published post_content. Run after
+     * ajax_title_scan_broken_links() to apply the fixes.
+     *
+     * Safe to re-run — REPLACE() is a no-op when the search string is absent.
+     *
+     * @since 4.20.39
+     * @return void
+     */
+    public function ajax_title_fix_internal_links(): void {
+        check_ajax_referer( 'cs_seo_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+
+        $redirects = get_option( 'cs_seo_redirects', [] );
+        if ( ! is_array( $redirects ) ) $redirects = [];
+
+        // Process all redirects that have valid from/to paths — both auto and manual.
+        $all_redirects = array_filter(
+            $redirects,
+            static fn( $r ) => ! empty( $r['from'] ) && ! empty( $r['to'] )
+        );
+
+        $processed     = 0;
+        $posts_updated = 0;
+
+        foreach ( $all_redirects as $r ) {
+            // WordPress permalinks always have a trailing slash; add one so the
+            // REPLACE() finds an exact match rather than a partial-substring match
+            // (which would leave a double-slash in the replaced URL).
+            $old_url = trailingslashit( (string) home_url( $r['from'] ) );
+            $new_url = trailingslashit( (string) $r['to'] );
+            if ( ! $old_url || $old_url === $new_url ) continue;
+
+            $posts_updated += $this->title_opt_update_internal_links( $old_url, $new_url );
+            $processed++;
+        }
+
+        wp_send_json_success( [
+            'processed'     => $processed,
+            'posts_updated' => $posts_updated,
+        ] );
     }
 }

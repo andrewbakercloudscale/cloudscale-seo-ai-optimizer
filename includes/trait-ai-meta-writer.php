@@ -635,6 +635,52 @@ trait CS_SEO_AI_Meta_Writer {
         }
     }
 
+    /**
+     * AJAX handler: generates an SEO title for posts that have none yet.
+     * Skips posts that already have a custom _cs_seo_title set.
+     *
+     * @since 4.20.76
+     * @return void
+     */
+    public function ajax_generate_missing_title(): void {
+        check_ajax_referer( 'cs_seo_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+        if ( ! $post_id ) wp_send_json_error( 'Missing post_id' );
+
+        $post = get_post( $post_id );
+        if ( ! $post ) wp_send_json_error( 'Post not found' );
+
+        $existing = trim( (string) get_post_meta( $post_id, self::META_TITLE, true ) );
+        if ( $existing !== '' ) {
+            wp_send_json_success( [
+                'post_id' => $post_id,
+                'status'  => 'skipped',
+                'message' => 'Skipped — title already set',
+                'title'   => $existing,
+                'chars'   => mb_strlen( $existing ),
+            ] );
+            return;
+        }
+
+        $raw_title = html_entity_decode( (string) get_the_title( $post_id ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+        try {
+            $new_title = $this->call_ai_fix_title( $post_id, $raw_title );
+            $new_len   = mb_strlen( $new_title );
+            $in_range  = ( $new_len >= 50 && $new_len <= 60 );
+            update_post_meta( $post_id, self::META_TITLE, sanitize_text_field( $new_title ) );
+            wp_send_json_success( [
+                'post_id'  => $post_id,
+                'status'   => $in_range ? 'generated' : 'generated_imperfect',
+                'title'    => $new_title,
+                'chars'    => $new_len,
+                'in_range' => $in_range,
+            ] );
+        } catch ( \Throwable $e ) {
+            wp_send_json_error( [ 'post_id' => $post_id, 'message' => $e->getMessage() ] );
+        }
+    }
+
     private function call_ai_fix_title(int $post_id, string $current_title): string {
         $post = get_post($post_id);
         if (!$post) throw new \RuntimeException( "Post {$post_id} not found" ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
@@ -885,6 +931,7 @@ trait CS_SEO_AI_Meta_Writer {
                 'title'             => $raw_title,
                 'effective_title'   => $effective_title,
                 'title_chars'       => mb_strlen($effective_title),
+                'has_title'         => $custom_title !== '',
                 'type'              => $p->post_type,
                 'date'              => get_the_date('Y-m-d', $p->ID),
                 'has_desc'          => $desc !== '',
@@ -906,12 +953,12 @@ trait CS_SEO_AI_Meta_Writer {
         }
 
         wp_send_json_success([
-            'posts'           => $items,
-            'homepage'        => $homepage,
-            'total'           => (int) $q->found_posts,
-            'total_pages'     => (int) $q->max_num_pages,
-            'page'            => $page,
-            'total_with_desc' => (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            'posts'            => $items,
+            'homepage'         => $homepage,
+            'total'            => (int) $q->found_posts,
+            'total_pages'      => (int) $q->max_num_pages,
+            'page'             => $page,
+            'total_with_desc'  => (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
                 $wpdb->prepare(
                     "SELECT COUNT(DISTINCT p.ID)
                      FROM {$wpdb->posts} p
@@ -925,6 +972,23 @@ trait CS_SEO_AI_Meta_Writer {
                          WHERE meta_key = %s AND meta_value = '1'
                      )",
                     self::META_DESC,
+                    self::META_NOINDEX
+                )
+            ),
+            'total_with_title' => (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                $wpdb->prepare(
+                    "SELECT COUNT(DISTINCT p.ID)
+                     FROM {$wpdb->posts} p
+                     INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
+                     WHERE p.post_type IN ('post','page')
+                     AND p.post_status = 'publish'
+                     AND pm.meta_key = %s
+                     AND pm.meta_value != ''
+                     AND p.ID NOT IN (
+                         SELECT post_id FROM {$wpdb->postmeta}
+                         WHERE meta_key = %s AND meta_value = '1'
+                     )",
+                    self::META_TITLE,
                     self::META_NOINDEX
                 )
             ),

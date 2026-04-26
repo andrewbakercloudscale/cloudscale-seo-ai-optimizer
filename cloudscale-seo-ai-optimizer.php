@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale SEO AI Optimizer
  * Plugin URI:  https://andrewbaker.ninja/2026/02/24/cloudscale-seo-ai-optimiser-enterprise-grade-wordpress-seo-completely-free/
  * Description: Lightweight SEO with AI meta descriptions via Claude API. Titles, canonicals, OpenGraph, Twitter Cards, JSON-LD schema, sitemaps, robots.txt, and font display optimization.
- * Version:     4.20.27
+ * Version:     4.20.76
  * Author:      Andrew Baker
  * Author URI:  https://andrewbaker.ninja/
  * License:     GPLv2 or later
@@ -173,7 +173,7 @@ final class Cs_Seo_Plugin {
     // Related Articles generator version — bump when scoring logic changes
     const RC_VERSION = '1.0';
 
-    const VERSION    = '4.20.27';
+    const VERSION    = '4.20.76';
 
     // Separate option key for AI config — keeps sensitive data isolated.
     const AI_OPT     = 'cs_seo_ai_options';
@@ -199,6 +199,32 @@ final class Cs_Seo_Plugin {
      */
     private static function debug_log(string $message): void {
         Cs_Seo_Utils::log($message);
+    }
+
+    /**
+     * Registers a WP-Cron action wrapped in a Throwable catcher so an uncaught
+     * exception cannot crash the PHP-FPM worker and trigger a site-down loop.
+     *
+     * @since 4.20.76
+     * @param string   $hook     The WP-Cron hook name.
+     * @param callable $callback The callback to invoke.
+     * @return void
+     */
+    private static function cron_action( string $hook, callable $callback ): void {
+        add_action( $hook, static function () use ( $hook, $callback ): void {
+            try {
+                $callback();
+            } catch ( \Throwable $e ) {
+                error_log( sprintf(
+                    '[cs-seo] cron "%s" exception (%s): %s in %s line %d',
+                    $hook,
+                    get_class( $e ),
+                    $e->getMessage(),
+                    $e->getFile(),
+                    $e->getLine()
+                ) );
+            }
+        } );
     }
 
     /**
@@ -258,13 +284,13 @@ final class Cs_Seo_Plugin {
         add_action('init', [$this, 'register_rest_meta']);
 
         // WP Cron batch job for scheduled generation.
-        add_action('cs_seo_daily_batch', [$this, 'run_scheduled_batch']);
+        self::cron_action( 'cs_seo_daily_batch', [ $this, 'run_scheduled_batch' ] );
 
         // Auto pipeline — publish/update triggers (non-blocking HTTP, no cron dependency).
         add_action('transition_post_status', [$this, 'on_post_publish'], 10, 3);
         add_action('post_updated',           [$this, 'on_post_update'],  10, 3);
         add_action('before_delete_post',     [$this, 'on_post_delete'],  10, 1);
-        add_action('cs_seo_cleanup_pipeline',            [$this, 'run_cleanup_pipeline']);
+        self::cron_action( 'cs_seo_cleanup_pipeline', [ $this, 'run_cleanup_pipeline' ] );
         add_action('wp_ajax_cs_seo_pipeline_run',        [$this, 'ajax_pipeline_run']);
         // nopriv is intentional — the handler authenticates via a single-use HMAC token
         // (stored as a transient, expiring after 120 s) generated at fire time. No session needed.
@@ -291,8 +317,9 @@ final class Cs_Seo_Plugin {
         add_action('wp_ajax_cs_seo_score_one',        [$this, 'ajax_score_one']);
         add_action('wp_ajax_cs_seo_save_desc',          [$this, 'ajax_save_desc']);
         add_action('wp_ajax_cs_seo_ai_fix_desc',        [$this, 'ajax_fix_desc']);
-        add_action('wp_ajax_cs_seo_ai_fix_title',       [$this, 'ajax_fix_title']);
-        add_action('wp_ajax_cs_seo_ai_get_posts',       [$this, 'ajax_get_posts']);
+        add_action('wp_ajax_cs_seo_ai_fix_title',          [$this, 'ajax_fix_title']);
+        add_action('wp_ajax_cs_seo_ai_gen_missing_title',  [$this, 'ajax_generate_missing_title']);
+        add_action('wp_ajax_cs_seo_ai_get_posts',          [$this, 'ajax_get_posts']);
         add_action('wp_ajax_cs_seo_ai_test_key',        [$this, 'ajax_test_key']);
         add_action('wp_ajax_cs_seo_ai_get_batch_log',   [$this, 'ajax_get_batch_log']);
         add_action('wp_ajax_cs_seo_regen_static',       [$this, 'ajax_regen_static']);
@@ -348,9 +375,12 @@ final class Cs_Seo_Plugin {
 
         // Redirects
         $this->init_redirects();
-        add_action('wp_ajax_cs_seo_delete_redirect', [$this, 'ajax_delete_redirect']);
-        add_action('wp_ajax_cs_seo_clear_redirects',  [$this, 'ajax_clear_redirects']);
-        add_action('wp_ajax_cs_seo_add_redirect',     [$this, 'ajax_add_redirect']);
+        add_action('wp_ajax_cs_seo_delete_redirect',         [$this, 'ajax_delete_redirect']);
+        add_action('wp_ajax_cs_seo_clear_redirects',         [$this, 'ajax_clear_redirects']);
+        add_action('wp_ajax_cs_seo_add_redirect',            [$this, 'ajax_add_redirect']);
+        add_action('wp_ajax_cs_seo_prune_unused_redirects',   [$this, 'ajax_prune_unused_redirects']);
+        add_action('wp_ajax_cs_seo_analyse_redirect_chains', [$this, 'ajax_analyse_redirect_chains']);
+        add_action('wp_ajax_cs_seo_squash_redirect_chains',  [$this, 'ajax_squash_redirect_chains']);
 
         // Broken Link Checker
         add_action('wp_ajax_cs_seo_blc_get_posts',     [$this, 'ajax_blc_get_posts']);
@@ -366,11 +396,13 @@ final class Cs_Seo_Plugin {
         add_action('wp_ajax_cs_seo_title_analyse_all',     [$this, 'ajax_title_analyse_all']);
         add_action('wp_ajax_cs_seo_title_apply_one',       [$this, 'ajax_title_apply_one']);
         add_action('wp_ajax_cs_seo_title_apply_all',       [$this, 'ajax_title_apply_all']);
+        add_action('wp_ajax_cs_seo_title_scan_links',       [$this, 'ajax_title_scan_broken_links']);
+        add_action('wp_ajax_cs_seo_title_fix_links',        [$this, 'ajax_title_fix_internal_links']);
         // Title Optimiser — background queue
         add_action('wp_ajax_cs_seo_title_queue_start',     [$this, 'ajax_title_queue_start']);
         add_action('wp_ajax_cs_seo_title_queue_stop',      [$this, 'ajax_title_queue_stop']);
         add_action('wp_ajax_cs_seo_title_queue_status',    [$this, 'ajax_title_queue_status']);
-        add_action(self::CRON_TITLE_OPT,                   [$this, 'cron_title_opt_process']);
+        self::cron_action( self::CRON_TITLE_OPT, [ $this, 'cron_title_opt_process' ] );
     }
 
     // =========================================================================

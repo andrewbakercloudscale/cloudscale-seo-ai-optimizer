@@ -3,7 +3,7 @@ Contributors: andrewjbaker
 Tags: seo, ai, meta description, opengraph, schema
 Requires at least: 6.0
 Tested up to: 6.9
-Stable tag: 4.20.27
+Stable tag: 4.20.76
 Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -316,6 +316,16 @@ The plugin scores all posts against each other using shared categories, tags, an
 10. Dashboard widget showing SEO health pills with colour-coded coverage scores
 
 == Changelog ==
+
+= 4.20.76 =
+* feat: Add "Generate Missing Titles" button — batch-generates SEO title tags for posts with no _cs_seo_title set
+* feat: Add "Have Title Tag" counter card in the summary row alongside "Have Description"
+
+= 4.20.67 =
+* Add: Broken Link Checker — Date Created column in results table; Post, Date Created, and Status headers are now sortable
+* Fix: Broken Link Checker — sites returning 503 to server-side requests (Cloudflare JS-challenge) now treated as alive, eliminating false positives
+* Add: Redirects — Created column moved next to Last hit and made sortable; Hits, Last hit, and Created all support click-to-sort
+* Fix: Broken Link Checker — sites returning 401 to server-side requests (Reuters, WatchMojo) now treated as alive, eliminating false positives
 
 = 4.20.27 =
 * Security: Broken Link Checker SSRF guard — `blc_is_ssrf_blocked()` now rejects URLs that resolve to loopback, link-local, or private IP ranges before making the `wp_remote_head()` call

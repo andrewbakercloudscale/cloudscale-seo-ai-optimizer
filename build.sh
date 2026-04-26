@@ -169,18 +169,14 @@ sed -i '' "s/const VERSION    = '[0-9.]*'/const VERSION    = '$NEW_VER'/" "$REPO
 # Create temp directory with plugin name as wrapper
 mkdir -p "$TEMP_DIR/$PLUGIN_NAME"
 rsync -a \
-  --exclude='.git' --exclude='.gitignore' --exclude='*.zip' \
-  --exclude='.DS_Store' --exclude='._*' \
-  --exclude='.claude-flow' --exclude='.claude' \
-  --exclude='.distignore' \
-  --exclude='build.sh' --exclude='deploy-wordpress.sh' \
-  --exclude='backup-s3.sh' --exclude='purge-cloudflare.sh' \
-  --exclude='rollback-wordpress.sh' --exclude='repo/' \
-  --exclude='tests/' --exclude='run-ui-tests.sh' \
-  --exclude='.svn-working-copy' --exclude='.svn' --exclude='.svn-credentials.sh' \
-  --exclude='generate-help-docs.sh' --exclude='MANUAL-deploy-svn.sh' \
-  --exclude='build-review.sh' --exclude='docs/' \
-  --exclude='CloudScaleSEOAI.jpg' \
+  --exclude='.*' \
+  --exclude='*.zip' --exclude='*.sh' --exclude='*.xml' \
+  --exclude='*.json' \
+  --exclude='*.jpg' --exclude='*.png' --exclude='*.svg' \
+  --exclude='repo/' --exclude='docs/' --exclude='tests/' \
+  --exclude='node_modules/' --exclude='svn-assets/' \
+  --exclude='playwright-report/' --exclude='playwright.config.js' \
+  --exclude='reddit-post.js' --exclude='reddit-submit.js' \
   "$REPO_DIR/" "$TEMP_DIR/$PLUGIN_NAME/"
 
 # Build zip with correct structure
