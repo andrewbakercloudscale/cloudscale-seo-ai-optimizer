@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale SEO AI Optimizer
  * Plugin URI:  https://andrewbaker.ninja/2026/02/24/cloudscale-seo-ai-optimiser-enterprise-grade-wordpress-seo-completely-free/
  * Description: Lightweight SEO with AI meta descriptions via Claude API. Titles, canonicals, OpenGraph, Twitter Cards, JSON-LD schema, sitemaps, robots.txt, and font display optimization.
- * Version:     4.20.77
+ * Version:     4.20.78
  * Author:      Andrew Baker
  * Author URI:  https://andrewbaker.ninja/
  * License:     GPLv2 or later
@@ -113,6 +113,7 @@ final class Cs_Seo_Plugin {
     const META_TITLE    = '_cs_seo_title';
     const META_DESC     = '_cs_seo_desc';
     const META_OGIMG    = '_cs_seo_ogimg';
+    const META_PLUGIN_ICON = '_cs_seo_plugin_icon';
     const META_SUM_WHAT    = '_cs_seo_summary_what';
     const META_SUM_WHY     = '_cs_seo_summary_why';
     const META_SUM_KEY     = '_cs_seo_summary_takeaway';
@@ -173,7 +174,7 @@ final class Cs_Seo_Plugin {
     // Related Articles generator version — bump when scoring logic changes
     const RC_VERSION = '1.0';
 
-    const VERSION    = '4.20.77';
+    const VERSION    = '4.20.78';
 
     // Separate option key for AI config — keeps sensitive data isolated.
     const AI_OPT     = 'cs_seo_ai_options';
@@ -205,7 +206,7 @@ final class Cs_Seo_Plugin {
      * Registers a WP-Cron action wrapped in a Throwable catcher so an uncaught
      * exception cannot crash the PHP-FPM worker and trigger a site-down loop.
      *
-     * @since 4.20.77
+     * @since 4.20.78
      * @param string   $hook     The WP-Cron hook name.
      * @param callable $callback The callback to invoke.
      * @return void
@@ -432,6 +433,13 @@ final class Cs_Seo_Plugin {
                 'sanitize_callback' => 'sanitize_textarea_field',
             ]);
             register_post_meta($post_type, self::META_OGIMG, [
+                'show_in_rest'      => true,
+                'single'            => true,
+                'type'              => 'string',
+                'auth_callback'     => fn() => current_user_can('edit_posts'),
+                'sanitize_callback' => 'esc_url_raw',
+            ]);
+            register_post_meta($post_type, self::META_PLUGIN_ICON, [
                 'show_in_rest'      => true,
                 'single'            => true,
                 'type'              => 'string',

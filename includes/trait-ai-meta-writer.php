@@ -639,7 +639,7 @@ trait CS_SEO_AI_Meta_Writer {
      * AJAX handler: generates an SEO title for posts that have none yet.
      * Skips posts that already have a custom _cs_seo_title set.
      *
-     * @since 4.20.76
+     * @since 4.20.78
      * @return void
      */
     public function ajax_generate_missing_title(): void {
@@ -681,6 +681,15 @@ trait CS_SEO_AI_Meta_Writer {
         }
     }
 
+    /**
+     * Calls the configured AI provider to rewrite a post title to 50–60 characters.
+     *
+     * @since 4.10.24
+     * @param int    $post_id       The post ID being fixed.
+     * @param string $current_title The existing title that needs rewriting.
+     * @return string The AI-generated replacement title.
+     * @throws \RuntimeException If the post is not found or no API key is configured.
+     */
     private function call_ai_fix_title(int $post_id, string $current_title): string {
         $post = get_post($post_id);
         if (!$post) throw new \RuntimeException( "Post {$post_id} not found" ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped

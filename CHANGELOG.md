@@ -3,6 +3,25 @@
 All notable changes to CloudScale SEO AI Optimizer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.20.78] - 2026-04-29
+### Added
+- **`META_PLUGIN_ICON` constant** — `_cs_seo_plugin_icon` post meta registered with the REST API for Gutenberg block editor access; constant added to main class for consistent referencing
+### Fixed
+- **DocBlock** — added `@since`, `@param`, `@return` to `call_ai_fix_title()` in `trait-ai-meta-writer.php`
+- **`@since` tags** — corrected `ajax_generate_missing_title()` and `cs_seo_rc_max_age_days` filter docblock to retain their original introduction version
+
+## [4.20.77] - 2026-04-28
+### Fixed
+- **Generate Missing Titles** — skip posts where `_cs_seo_title` is an empty string; previously a blank-string saved title was not treated as "missing" and caused unnecessary AI calls
+
+## [4.20.76] - 2026-04-27
+### Changed
+- **UX Phase 1** — settings save toast notification; primary action buttons now show a loading state while the save request is in flight
+
+## [4.20.75] - 2026-04-26
+### Fixed
+- **Model dropdown** — rebuild option list on provider change so the correct model choices appear immediately after switching between Anthropic and Gemini (Safari-safe; avoids `innerHTML` reassignment issue)
+
 ## [4.20.74] - 2026-04-20
 ### Added
 - **Readability — Details button** — Readability column now has a "Details" button matching the SEO Score column; clicking opens a modal with Score, Avg sentence length, Heading density, Passive voice %, and Word count (`trait-settings-page.php`)

@@ -33,7 +33,9 @@ const LOGO_URL    = 'https://andrewbaker.ninja/wp-content/uploads/2026/04/clouds
 const PLUGIN_PAGE = `${BASE_URL}/wp-admin/tools.php?page=cs-seo-optimizer`;
 const SCREENSHOTS = path.join(DOCS_DIR, 'screenshots');
 const REST_BASE   = `${BASE_URL}/wp-json/wp/v2`;
-const AUTH_HEADER = 'Basic ' + Buffer.from(`${REST_USER}:${REST_PASS}`).toString('base64');
+// Cookie+nonce auth — Basic auth (app password) returns 401 on this server.
+const COOKIE_STR = `${COOKIES.auth_name}=${encodeURIComponent(COOKIES.auth_value)}; ${COOKIES.login_name}=${encodeURIComponent(COOKIES.login_value)}`;
+let WP_NONCE = null;
 
 // ── Panel screenshot plan ─────────────────────────────────────────────────────
 // cardClass: the CSS class on the ab-zone-card div
@@ -76,6 +78,12 @@ const PANELS = [
 const DOCS = {
 
 'ab-card-identity': `
+<div style="background:#f0f9ff;border-left:4px solid #0e6b8f;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:28px;">
+<p style="margin:0 0 10px;font-size:1.3em;font-weight:800;color:#0f172a;">Why CloudScale SEO Optimizer?</p>
+<p style="margin:0 0 10px;">Yoast SEO locks most of its features — redirect management, internal linking suggestions, social previews, and AI generation — behind Yoast Premium at $99/year per site. RankMath Free gives you a solid base but charges $59+/year the moment you want AI-powered generation or advanced schema. All in One SEO's AI writing tools cost $49+/year on their Plus plan.</p>
+<p style="margin:0 0 10px;">CloudScale SEO Optimizer uses Anthropic Claude 4 and Google Gemini 2.5 Pro — the same frontier models that SEO agencies charge thousands per month to access — to generate meta descriptions, ALT text, summary boxes, and related article links in bulk. Automatic XML sitemap, robots.txt editor, llms.txt generation, font optimiser, render-blocking JS/CSS removal, category health and drift detection, automatic redirects, and a full batch scheduler are all included. Free. No subscription, no premium tier, no API key required for the bundled plan.</p>
+<p style="margin:0;"><strong>Configure Site Identity first.</strong> Target audience and Writing tone are injected into every AI request — they are the single biggest quality lever before you run any bulk generation.</p>
+</div>
 <p>When someone searches for your name or your site on Google, how does Google decide what to show? It reads structured signals embedded in your pages: your site name, your homepage title, your preferred language, your social profiles. Without those signals, Google guesses, and it often gets things wrong. The <strong>Site Identity</strong> panel is where you set the record straight.</p>
 <p>Everything you configure here is automatically embedded into every page on your site as meta tags, OpenGraph tags (which control how your pages look when shared on social media), and JSON-LD structured data (which Google reads to build rich search results). You only configure this once, and the plugin handles the rest.</p>
 <ul>
@@ -430,6 +438,31 @@ const DOCS = {
 
 // ── REST API helpers ──────────────────────────────────────────────────────────
 
+function fetchNonce() {
+    const url = new URL(`${BASE_URL}/wp-admin/index.php`);
+    const mod = url.protocol === 'https:' ? https : http;
+    return new Promise((resolve, reject) => {
+        const req = mod.request({
+            hostname: url.hostname,
+            port:     url.port || (url.protocol === 'https:' ? 443 : 80),
+            path:     url.pathname,
+            method:   'GET',
+            headers:  { Cookie: COOKIE_STR, 'User-Agent': 'Mozilla/5.0 (compatible; CSDT-help-docs/1.0)', Accept: 'text/html' },
+        }, res => {
+            const chunks = [];
+            res.on('data', c => chunks.push(c));
+            res.on('end', () => {
+                const text = Buffer.concat(chunks).toString();
+                const m = text.match(/"nonce"\s*:\s*"([a-f0-9]+)"/);
+                if (m) resolve(m[1]);
+                else reject(new Error(`Could not extract WP REST nonce from admin page (HTTP ${res.statusCode}). Check cookie auth.`));
+            });
+        });
+        req.on('error', reject);
+        req.end();
+    });
+}
+
 function restRequest(method, endpoint, body, contentType) {
     return new Promise((resolve, reject) => {
         const url  = new URL(endpoint.startsWith('http') ? endpoint : `${REST_BASE}${endpoint}`);
@@ -439,7 +472,7 @@ function restRequest(method, endpoint, body, contentType) {
             port:     url.port || (url.protocol === 'https:' ? 443 : 80),
             path:     url.pathname + url.search,
             method,
-            headers:  { Authorization: AUTH_HEADER },
+            headers:  { Cookie: COOKIE_STR, 'X-WP-Nonce': WP_NONCE },
         };
 
         let bodyBuf = null;
@@ -511,8 +544,8 @@ async function findPageBySlug(slug) {
 }
 
 async function findOrCreateParentPage() {
-    const { buildParentIndex } = require('REPO_BASE/shared-help-docs/help-lib.js');
-    const PARENT_ID_FILE = 'REPO_BASE/shared-help-docs/.parent-page-id';
+    const { buildParentIndex } = require('/Users/cp363412/Desktop/github/shared-help-docs/help-lib.js');
+    const PARENT_ID_FILE = '/Users/cp363412/Desktop/github/shared-help-docs/.parent-page-id';
     // Use persisted ID so all plugin scripts share the same parent page
     if (fs.existsSync(PARENT_ID_FILE)) {
         const stored = parseInt(fs.readFileSync(PARENT_ID_FILE, 'utf8').trim(), 10);
@@ -536,7 +569,7 @@ async function findOrCreateParentPage() {
 async function updateParentIndex(parentId) {
     const res = await restRequest('GET', `/pages?parent=${parentId}&per_page=20&orderby=title&order=asc`);
     const children = Array.isArray(res.body) ? res.body : [];
-    const { buildParentIndex } = require('REPO_BASE/shared-help-docs/help-lib.js');
+    const { buildParentIndex } = require('/Users/cp363412/Desktop/github/shared-help-docs/help-lib.js');
     await restRequest('POST', `/pages/${parentId}`, {
         title:   'WordPress Plugin Help',
         content: buildParentIndex(children),
@@ -563,25 +596,25 @@ async function createOrUpdatePage(title, content, slug, parentId) {
 function buildHtml(imageMap) {
     const img = (file, alt) => {
         const src = imageMap[file] || `screenshots/${file}`;
-        return `<figure class="cs-screenshot"><img src="${src}" alt="${alt}" /></figure>`;
+        return `<figure style="margin:20px 0 24px;"><img src="${src}" alt="${alt}" style="max-width:100%;border-radius:8px;border:1px solid #d1d5db;box-shadow:0 4px 20px rgba(0,0,0,.10);display:block;" /></figure>`;
     };
 
     const section = (panel) => {
         const docText = DOCS[panel.cardClass] || `<p>${panel.label}</p>`;
         return `
-<div class="cs-panel-section">
-<h3 class="cs-panel-heading" id="${panel.cardClass}">${panel.label}</h3>
+<div style="margin:36px 0 0;">
+<h3 style="font-size:1.45em;font-weight:700;color:#1e293b;margin:0 0 16px;padding:0 0 10px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:10px;" id="${panel.cardClass}"><span style="display:inline-block;width:4px;height:1.2em;background:#0e6b8f;border-radius:2px;flex-shrink:0;"></span>${panel.label}</h3>
 ${img(panel.file, panel.label)}
-<div class="cs-panel-body">${docText}</div>
+<div style="color:#334155;">${docText}</div>
 </div>`;
     };
 
     // Text-only sections (no screenshot — panel hidden until API key is configured)
     const textSection = (id, title, docText) => `
-<div class="cs-panel-section cs-panel-no-screenshot">
-<h3 class="cs-panel-heading" id="${id}">${title}</h3>
-<div class="cs-panel-body">${docText}
-<p class="cs-gated-note"><strong>Note:</strong> this panel only appears once an AI API key has been saved in the AI Settings panel above.</p>
+<div style="margin:36px 0 0;background:#fafafa;border:1px solid #e5e7eb;border-radius:8px;padding:24px 28px;">
+<h3 style="font-size:1.45em;font-weight:700;color:#1e293b;margin:0 0 16px;padding:0 0 10px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:10px;" id="${id}"><span style="display:inline-block;width:4px;height:1.2em;background:#0e6b8f;border-radius:2px;flex-shrink:0;"></span>${title}</h3>
+<div style="color:#334155;">${docText}
+<p style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px 14px;font-size:0.92em;color:#92400e;margin-top:16px;"><strong>Note:</strong> this panel only appears once an AI API key has been saved in the AI Settings panel above.</p>
 </div>
 </div>`;
 
@@ -610,98 +643,22 @@ ${img(panel.file, panel.label)}
     };
 
     let body = `
-<style>
-/* ── CloudScale SEO AI Optimizer — Help Page Styles ─────────────────────── */
-.cs-help-docs { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1a202c; line-height: 1.7; max-width: 900px; }
-.cs-help-docs a { color: #2563eb; }
-.cs-help-docs code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; padding: 1px 6px; font-size: 0.88em; }
-
-/* Hero header */
-.cs-hero { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #0e6b8f 100%); color: #fff; border-radius: 12px; padding: 48px 40px; margin-bottom: 40px; }
-.cs-hero h1 { font-size: 2.2em; font-weight: 800; margin: 0 0 12px; letter-spacing: -0.02em; color: #fff; }
-.cs-hero p { font-size: 1.1em; margin: 0; opacity: 0.85; max-width: 680px; }
-.cs-hero .cs-badge { display: inline-block; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 4px 14px; font-size: 0.8em; font-weight: 600; margin-bottom: 16px; letter-spacing: 0.05em; text-transform: uppercase; }
-.cs-download-btn, .cs-wporg-btn, .cs-github-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; border-radius: 8px; text-decoration: none; font-size: 1em; font-weight: 700; letter-spacing: 0.01em; transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s ease; will-change: transform; }
-.cs-download-btn { background: #22c55e; color: #fff !important; box-shadow: 0 2px 6px rgba(34,197,94,0.35); }
-.cs-wporg-btn { background: #3858e9; color: #fff !important; box-shadow: 0 2px 6px rgba(56,88,233,0.35); }
-.cs-github-btn { background: #24292f; color: #fff !important; box-shadow: 0 2px 6px rgba(0,0,0,0.35); }
-.cs-download-btn:hover { transform: translateY(-6px) scale(1.06); box-shadow: 0 14px 28px rgba(34,197,94,0.45), 0 4px 10px rgba(34,197,94,0.3); color: #fff !important; }
-.cs-wporg-btn:hover { transform: translateY(-6px) scale(1.06); box-shadow: 0 14px 28px rgba(56,88,233,0.45), 0 4px 10px rgba(56,88,233,0.3); color: #fff !important; }
-.cs-github-btn:hover { transform: translateY(-6px) scale(1.06); box-shadow: 0 14px 28px rgba(0,0,0,0.5), 0 4px 10px rgba(0,0,0,0.3); color: #fff !important; }
-.cs-download-btn:active, .cs-wporg-btn:active, .cs-github-btn:active { transform: translateY(-2px) scale(1.02); transition-duration: 0.07s; }
-
-/* Table of contents */
-.cs-toc { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 28px 36px; margin: 32px 0; }
-.cs-toc-title { font-size: 1em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin: 0 0 16px; }
-.cs-toc > ol { columns: 2; gap: 0 32px; margin: 0; padding-left: 22px; }
-.cs-toc > ol > li { break-inside: avoid; margin-bottom: 6px; }
-.cs-toc > ol > li > ol { margin: 4px 0 0; padding-left: 18px; list-style-type: lower-alpha; }
-.cs-toc > ol > li > ol > li { margin: 2px 0; }
-.cs-toc li a { color: #2563eb; text-decoration: none; font-weight: 500; font-size: 0.95em; }
-.cs-toc li a:hover { text-decoration: underline; }
-
-/* Setup checklist */
-.cs-setup { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 28px 36px; margin: 32px 0; }
-.cs-setup-title { font-size: 1.2em; font-weight: 700; color: #14532d; margin: 0 0 16px; }
-.cs-setup ol { margin: 0; padding-left: 20px; }
-.cs-setup li { margin: 8px 0; color: #166534; }
-.cs-setup li strong { color: #14532d; }
-
-/* Tab section dividers */
-.cs-tab-section { margin: 56px 0 0; }
-.cs-tab-heading { font-size: 2em; font-weight: 800; color: #0f172a; padding: 0 0 16px; border-bottom: 3px solid #0e6b8f; margin: 0 0 8px; letter-spacing: -0.01em; }
-.cs-tab-intro { color: #475569; font-size: 1.05em; margin: 10px 0 32px; }
-
-/* Panel sections */
-.cs-panel-section { margin: 36px 0 0; }
-.cs-panel-no-screenshot { background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 24px 28px; }
-.cs-panel-heading { font-size: 1.45em; font-weight: 700; color: #1e293b; margin: 0 0 16px; padding: 0 0 10px; border-bottom: 2px solid #e2e8f0; display: flex; align-items: center; gap: 10px; }
-.cs-panel-heading::before { content: ""; display: inline-block; width: 4px; height: 1.2em; background: #0e6b8f; border-radius: 2px; flex-shrink: 0; }
-
-/* Screenshots */
-.cs-screenshot { margin: 20px 0 24px; }
-.cs-screenshot img { max-width: 100%; border-radius: 8px; border: 1px solid #d1d5db; box-shadow: 0 4px 20px rgba(0,0,0,0.10); display: block; }
-
-/* Panel body */
-.cs-panel-body { color: #334155; }
-.cs-panel-body p { margin: 0 0 12px; }
-.cs-panel-body ul, .cs-panel-body ol { padding-left: 22px; margin: 8px 0 16px; }
-.cs-panel-body li { margin: 6px 0; }
-.cs-panel-body strong { color: #1e293b; }
-
-/* Gated panel note */
-.cs-gated-note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 14px; font-size: 0.92em; color: #92400e; margin-top: 16px; }
-
-/* Explain-button tip */
-.cs-tip-box { background: #f0f9ff; border: 1px solid #bae6fd; border-left: 4px solid #0284c7; border-radius: 8px; padding: 16px 20px; margin: 24px 0; font-size: 0.97em; color: #0c4a6e; }
-
-/* Section dividers */
-.cs-divider { border: none; border-top: 1px solid #e2e8f0; margin: 40px 0; }
-
-/* Glossary */
-.cs-glossary { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 28px 36px; margin-top: 40px; }
-.cs-glossary h2 { font-size: 1.8em; font-weight: 800; color: #0f172a; margin: 0 0 24px; }
-.cs-glossary dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 24px; align-items: baseline; }
-.cs-glossary dt { font-weight: 700; color: #0e6b8f; font-size: 0.95em; }
-.cs-glossary dd { margin: 0; color: #475569; font-size: 0.95em; }
-</style>
-
-<div class="cs-hero">
+<div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0e6b8f 100%);color:#fff;border-radius:12px;padding:48px 40px;margin-bottom:40px;">
 <div style="display:flex;align-items:center;gap:20px;margin-bottom:16px;">
 <div style="flex:1;min-width:0;">
-<div class="cs-badge">Free &amp; Open Source — No Pro Version, No Upsells, No Subscriptions</div>
-<h1 style="margin-bottom:0;">CloudScale SEO AI Optimizer</h1>
+<div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:20px;padding:4px 14px;font-size:0.8em;font-weight:600;margin-bottom:16px;letter-spacing:0.05em;text-transform:uppercase;">Free &amp; Open Source — No Pro Version, No Upsells, No Subscriptions</div>
+<h1 style="margin-bottom:0;font-size:2.2em;font-weight:800;letter-spacing:-0.02em;color:#fff;">CloudScale SEO AI Optimizer</h1>
 </div>
 <img src="${LOGO_URL}" alt="CloudScale SEO AI Optimizer icon" style="flex-shrink:0;width:96px;height:96px;border-radius:16px;box-shadow:0 6px 24px rgba(0,0,0,.4);object-fit:cover;">
 </div>
 <p>CloudScale SEO AI Optimizer is a free WordPress plugin that combines complete technical SEO with an AI-powered content suite. It writes your meta descriptions, ALT text, and article summaries using your own Anthropic Claude or Google Gemini API key, builds an automatic internal linking network across your entire site, and handles all the technical SEO that WordPress leaves out: sitemaps, robots.txt, structured data schemas, social sharing tags, and performance optimisations that improve your Core Web Vitals scores.</p>
 <p style="margin-top:12px;opacity:0.85">There is no Pro version, no upsell, no monthly subscription, and no feature locked behind a licence key. Everything the plugin does is documented on this page.</p>
-<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;"><a class="cs-download-btn" href="https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-seo-ai-optimizer.zip">⬇ Download Latest Version (.zip)</a><a class="cs-wporg-btn" href="https://wordpress.org/plugins/cloudscale-seo-ai-optimizer/" target="_blank" rel="noopener">⭐ View on WordPress.org</a><a class="cs-github-btn" href="https://github.com/andrewbakercloudscale/wordpress-seo-ai-optimizer" target="_blank" rel="noopener"><svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> View on GitHub</a></div>
+<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;"><a href="https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-seo-ai-optimizer.zip" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:8px;text-decoration:none;font-size:1em;font-weight:700;background:#22c55e;color:#fff;box-shadow:0 2px 6px rgba(34,197,94,0.35);">⬇ Download Latest Version (.zip)</a><a href="https://wordpress.org/plugins/cloudscale-seo-ai-optimizer/" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:8px;text-decoration:none;font-size:1em;font-weight:700;background:#3858e9;color:#fff;box-shadow:0 2px 6px rgba(56,88,233,0.35);">⭐ View on WordPress.org</a><a href="https://github.com/andrewbakercloudscale/wordpress-seo-ai-optimizer" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:8px;text-decoration:none;font-size:1em;font-weight:700;background:#24292f;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.35);"><svg height="20" width="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> View on GitHub</a></div>
 </div>
 
-<div class="cs-toc">
-<div class="cs-toc-title">Contents</div>
-<ol>
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:28px 36px;margin:32px 0;">
+<div style="font-size:1em;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#64748b;margin:0 0 16px;">Contents</div>
+<ol style="columns:2;gap:0 32px;margin:0;padding-left:22px;">
 <li><a href="#setup">First-time setup</a></li>
 <li><a href="#seo">📊 SEO Settings</a>
   <ol>
@@ -754,9 +711,9 @@ ${img(panel.file, panel.label)}
 </ol>
 </div>
 
-<div class="cs-setup" id="setup">
-<div class="cs-setup-title">✅ First-time setup checklist</div>
-<ol>
+<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:28px 36px;margin:32px 0;" id="setup">
+<div style="font-size:1.2em;font-weight:700;color:#14532d;margin:0 0 16px;">✅ First-time setup checklist</div>
+<ol style="margin:0;padding-left:20px;color:#166534;">
 <li>Go to the <strong>SEO Settings</strong> tab → <strong>Site Identity</strong> panel and fill in your Site name, Locale, and Default OG image.</li>
 <li>Still in Site Identity, fill in <strong>Target audience</strong> and <strong>Writing tone</strong>. These are injected into every AI request and have the biggest single impact on output quality.</li>
 <li>In the <strong>AI Settings</strong> panel, add your Anthropic Claude or Google Gemini API key and click <strong>Test Key</strong> to confirm it works. (<a href="https://console.anthropic.com/" target="_blank" rel="noopener">Get a Claude key</a> · <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Get a Gemini key</a>)</li>
@@ -766,22 +723,22 @@ ${img(panel.file, panel.label)}
 </ol>
 </div>
 
-<div class="cs-tip-box">
+<div style="background:#f0f9ff;border:1px solid #bae6fd;border-left:4px solid #0284c7;border-radius:8px;padding:16px 20px;margin:24px 0;font-size:0.97em;color:#0c4a6e;">
 <strong>💡 Explain buttons: inline help while you work.</strong> Every panel in the plugin settings has a <strong>?</strong> button in its header. Click it for a detailed pop-up explaining each field in that panel, covering what it does, whether it's recommended or optional, and exactly what to fill in. Use the Explain buttons when you're actively configuring a panel; use this page when you want the full context and the why behind each feature.
 </div>
 
-<hr class="cs-divider"/>
+<hr style="border:none;border-top:1px solid #e2e8f0;margin:40px 0;"/>
 `;
 
     for (const [tabKey, panels] of Object.entries(panelsByTab)) {
-        body += `\n<div class="cs-tab-section">\n<h2 class="cs-tab-heading" id="${tabKey}">${TAB_TITLES[tabKey] || tabKey}</h2>\n<p class="cs-tab-intro">${TAB_INTROS[tabKey] || ''}</p>\n`;
+        body += `\n<div style="margin:56px 0 0;">\n<h2 style="font-size:2em;font-weight:800;color:#0f172a;padding:0 0 16px;border-bottom:3px solid #0e6b8f;margin:0 0 8px;letter-spacing:-0.01em;" id="${tabKey}">${TAB_TITLES[tabKey] || tabKey}</h2>\n<p style="color:#475569;font-size:1.05em;margin:10px 0 32px;">${TAB_INTROS[tabKey] || ''}</p>\n`;
         for (const p of panels) {
             body += section(p);
-            body += '\n<hr class="cs-divider"/>\n';
+            body += '\n<hr style="border:none;border-top:1px solid #e2e8f0;margin:40px 0;"/>\n';
             // Inject text-only section for the HTTPS fixer (hidden until API key configured)
             if (p.cardClass === 'ab-card-render') {
                 body += textSection('ab-card-https', 'HTTPS URL Fixer', DOCS['ab-card-https']);
-                body += '\n<hr class="cs-divider"/>\n';
+                body += '\n<hr style="border:none;border-top:1px solid #e2e8f0;margin:40px 0;"/>\n';
             }
         }
         body += `</div>\n`;
@@ -789,33 +746,33 @@ ${img(panel.file, panel.label)}
 
     // Glossary
     body += `
-<div class="cs-glossary" id="glossary">
-<h2>Glossary of terms</h2>
-<dl>
-<dt>AEO</dt><dd>Answer Engine Optimisation. The practice of structuring content so it is understood and surfaced by AI-powered answer engines such as Google's AI Overviews, Perplexity, and ChatGPT Browse, as well as traditional search engines.</dd>
-<dt>API</dt><dd>Application Programming Interface. A standard way for software to communicate with another service. In this plugin, you supply an API key so WordPress can send requests to Anthropic Claude or Google Gemini to generate content.</dd>
-<dt>ALT text</dt><dd>Alternative text. A written description of an image, stored in the HTML <code>alt</code> attribute. Read by screen readers for accessibility and used by search engines to understand image content.</dd>
-<dt>Canonical URL</dt><dd>The preferred URL for a page when multiple URLs could serve the same content. Set via <code>&lt;link rel="canonical" href="..."&gt;</code> to tell search engines which version to index.</dd>
-<dt>CDN</dt><dd>Content Delivery Network. A globally distributed network of servers that delivers files (e.g. fonts, images, scripts) to visitors from the closest physical location, reducing load time.</dd>
-<dt>CSS</dt><dd>Cascading Style Sheets. The language that controls the visual appearance of web pages.</dd>
-<dt>E-E-A-T</dt><dd>Experience, Expertise, Authoritativeness, Trustworthiness. Google's quality evaluation framework for web content. Person schema and author information contribute to E-E-A-T signals.</dd>
-<dt>GDPR</dt><dd>General Data Protection Regulation. EU privacy law requiring disclosure and often consent for processing personal data, including IP addresses sent to third-party services such as Google Fonts CDN.</dd>
-<dt>JSON-LD</dt><dd>JavaScript Object Notation for Linked Data. A format for embedding structured data in a web page. Google reads JSON-LD to understand page type, author, organisation, and content, enabling rich search results.</dd>
-<dt>JS</dt><dd>JavaScript. The programming language that runs in web browsers. Deferring JS improves page load speed.</dd>
-<dt>LCP</dt><dd>Largest Contentful Paint. A Core Web Vitals metric measuring how long it takes the largest visible element (usually an image or heading) to appear. Google uses LCP as a ranking factor.</dd>
-<dt>llms.txt</dt><dd>A plain-text file at <code>/llms.txt</code> that provides a structured summary of your website for AI language models. Analogous to <code>robots.txt</code> but for AI systems.</dd>
-<dt>noindex</dt><dd>A directive in the <code>&lt;meta name="robots"&gt;</code> tag that tells search engines not to include a page in their index. The page can still be crawled but will not appear in search results.</dd>
-<dt>OG / OpenGraph</dt><dd>OpenGraph. A protocol developed by Facebook that standardises how web pages are represented when shared on social media. OG tags control the title, description, and image shown in social previews.</dd>
-<dt>SEO</dt><dd>Search Engine Optimisation. The practice of improving a website's visibility in organic (unpaid) search engine results.</dd>
-<dt>Schema / Structured Data</dt><dd>Machine-readable data embedded in a web page (using formats like JSON-LD) that tells search engines what a page is about: its type, author, publication date, and so on. Can enable rich results in Google Search.</dd>
-<dt>TTI</dt><dd>Time to Interactive. A performance metric measuring how long until a page is fully interactive. Deferring JavaScript improves TTI.</dd>
-<dt>UTM</dt><dd>Urchin Tracking Module. Parameters appended to URLs for marketing analytics (e.g. <code>?utm_source=newsletter</code>). Should be stripped from canonical URLs to prevent duplicate content.</dd>
-<dt>XML</dt><dd>eXtensible Markup Language. The format used for sitemaps. An XML sitemap is a structured list of URLs that search engines can parse to discover your content.</dd>
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:28px 36px;margin-top:40px;" id="glossary">
+<h2 style="font-size:1.8em;font-weight:800;color:#0f172a;margin:0 0 24px;">Glossary of terms</h2>
+<dl style="display:grid;grid-template-columns:max-content 1fr;gap:6px 24px;align-items:baseline;">
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">AEO</dt><dd style="margin:0;color:#475569;font-size:0.95em;">Answer Engine Optimisation. The practice of structuring content so it is understood and surfaced by AI-powered answer engines such as Google's AI Overviews, Perplexity, and ChatGPT Browse, as well as traditional search engines.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">API</dt><dd style="margin:0;color:#475569;font-size:0.95em;">Application Programming Interface. A standard way for software to communicate with another service. In this plugin, you supply an API key so WordPress can send requests to Anthropic Claude or Google Gemini to generate content.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">ALT text</dt><dd style="margin:0;color:#475569;font-size:0.95em;">Alternative text. A written description of an image, stored in the HTML <code>alt</code> attribute. Read by screen readers for accessibility and used by search engines to understand image content.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">Canonical URL</dt><dd style="margin:0;color:#475569;font-size:0.95em;">The preferred URL for a page when multiple URLs could serve the same content. Set via <code>&lt;link rel="canonical" href="..."&gt;</code> to tell search engines which version to index.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">CDN</dt><dd style="margin:0;color:#475569;font-size:0.95em;">Content Delivery Network. A globally distributed network of servers that delivers files (e.g. fonts, images, scripts) to visitors from the closest physical location, reducing load time.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">CSS</dt><dd style="margin:0;color:#475569;font-size:0.95em;">Cascading Style Sheets. The language that controls the visual appearance of web pages.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">E-E-A-T</dt><dd style="margin:0;color:#475569;font-size:0.95em;">Experience, Expertise, Authoritativeness, Trustworthiness. Google's quality evaluation framework for web content. Person schema and author information contribute to E-E-A-T signals.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">GDPR</dt><dd style="margin:0;color:#475569;font-size:0.95em;">General Data Protection Regulation. EU privacy law requiring disclosure and often consent for processing personal data, including IP addresses sent to third-party services such as Google Fonts CDN.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">JSON-LD</dt><dd style="margin:0;color:#475569;font-size:0.95em;">JavaScript Object Notation for Linked Data. A format for embedding structured data in a web page. Google reads JSON-LD to understand page type, author, organisation, and content, enabling rich search results.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">JS</dt><dd style="margin:0;color:#475569;font-size:0.95em;">JavaScript. The programming language that runs in web browsers. Deferring JS improves page load speed.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">LCP</dt><dd style="margin:0;color:#475569;font-size:0.95em;">Largest Contentful Paint. A Core Web Vitals metric measuring how long it takes the largest visible element (usually an image or heading) to appear. Google uses LCP as a ranking factor.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">llms.txt</dt><dd style="margin:0;color:#475569;font-size:0.95em;">A plain-text file at <code>/llms.txt</code> that provides a structured summary of your website for AI language models. Analogous to <code>robots.txt</code> but for AI systems.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">noindex</dt><dd style="margin:0;color:#475569;font-size:0.95em;">A directive in the <code>&lt;meta name="robots"&gt;</code> tag that tells search engines not to include a page in their index. The page can still be crawled but will not appear in search results.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">OG / OpenGraph</dt><dd style="margin:0;color:#475569;font-size:0.95em;">OpenGraph. A protocol developed by Facebook that standardises how web pages are represented when shared on social media. OG tags control the title, description, and image shown in social previews.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">SEO</dt><dd style="margin:0;color:#475569;font-size:0.95em;">Search Engine Optimisation. The practice of improving a website's visibility in organic (unpaid) search engine results.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">Schema / Structured Data</dt><dd style="margin:0;color:#475569;font-size:0.95em;">Machine-readable data embedded in a web page (using formats like JSON-LD) that tells search engines what a page is about: its type, author, publication date, and so on. Can enable rich results in Google Search.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">TTI</dt><dd style="margin:0;color:#475569;font-size:0.95em;">Time to Interactive. A performance metric measuring how long until a page is fully interactive. Deferring JavaScript improves TTI.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">UTM</dt><dd style="margin:0;color:#475569;font-size:0.95em;">Urchin Tracking Module. Parameters appended to URLs for marketing analytics (e.g. <code>?utm_source=newsletter</code>). Should be stripped from canonical URLs to prevent duplicate content.</dd>
+<dt style="font-weight:700;color:#0e6b8f;font-size:0.95em;">XML</dt><dd style="margin:0;color:#475569;font-size:0.95em;">eXtensible Markup Language. The format used for sitemaps. An XML sitemap is a structured list of URLs that search engines can parse to discover your content.</dd>
 </dl>
 </div>
 `;
 
-    return `<!-- wp:html -->\n<div class="cs-help-docs" style="max-width:900px;margin:0 auto;">\n${body}\n</div>\n<!-- /wp:html -->`;
+    return `<!-- wp:html -->\n<div style="max-width:900px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1a202c;line-height:1.7;">\n${body}\n</div>\n<!-- /wp:html -->`;
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -948,6 +905,11 @@ ${img(panel.file, panel.label)}
     const localPath = path.join(DOCS_DIR, 'help-page.html');
     fs.writeFileSync(localPath, localHtml, 'utf8');
     console.log(`\nLocal HTML saved: ${localPath}`);
+
+    // Obtain WP REST nonce (cookie+nonce auth — Basic auth is unreliable on this server)
+    console.log('\nObtaining WP REST nonce...');
+    WP_NONCE = await fetchNonce();
+    console.log(`  Nonce: ${WP_NONCE}`);
 
     // Upload screenshots to WordPress Media Library
     console.log('\nUploading screenshots to WordPress Media Library...');
