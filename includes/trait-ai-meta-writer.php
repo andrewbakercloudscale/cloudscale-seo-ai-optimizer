@@ -57,7 +57,9 @@ trait CS_SEO_AI_Meta_Writer {
 
         // ── Current title ─────────────────────────────────────────────────────
         $custom_title  = trim((string) get_post_meta($post_id, self::META_TITLE, true));
-        $current_title = $custom_title !== '' ? $custom_title : get_the_title($post_id);
+        // Use raw post_title to avoid the_title filters injecting third-party HTML (e.g. view counters)
+        $raw_title     = sanitize_post_field( 'post_title', $post->post_title, $post_id, 'display' );
+        $current_title = $custom_title !== '' ? $custom_title : $raw_title;
         $title_len     = mb_strlen($current_title);
         $needs_title   = ($title_len < 50 || $title_len > 60);
         $title_direction = $title_len > 60 ? 'too long' : 'too short';
@@ -92,8 +94,12 @@ trait CS_SEO_AI_Meta_Writer {
         }
 
         $score_context = $old_score > 0 ? " The previous SEO score was {$old_score}%." : '';
-        $feedback_instruction = $seo_feedback
-            ? "\n\nSEO IMPROVEMENT GUIDANCE:{$score_context} A previous analysis flagged: \"{$seo_feedback}\". Address this directly when writing the meta description and title. Your seo_score should reflect the improvements you are making."
+        // Strip stale view-counter / H1-injection notes — these were false positives from an old
+        // plugin version that hooked the_title; the issue no longer exists.
+        $clean_feedback = preg_replace( '/\b(view.count|view counter|H1.*inject|inject.*H1|cspv)[^.]*\./i', '', $seo_feedback );
+        $clean_feedback = trim( (string) $clean_feedback );
+        $feedback_instruction = $clean_feedback
+            ? "\n\nSEO IMPROVEMENT GUIDANCE:{$score_context} A previous analysis flagged: \"{$clean_feedback}\". Address this directly when writing the meta description and title. Your seo_score should reflect the improvements you are making."
             : '';
 
         $is_front_page = ( 'page' === get_option('show_on_front') && (int) get_option('page_on_front') === $post_id );
@@ -639,7 +645,7 @@ trait CS_SEO_AI_Meta_Writer {
      * AJAX handler: generates an SEO title for posts that have none yet.
      * Skips posts that already have a custom _cs_seo_title set.
      *
-     * @since 4.20.87
+     * @since 4.20.90
      * @return void
      */
     public function ajax_generate_missing_title(): void {
@@ -802,7 +808,7 @@ trait CS_SEO_AI_Meta_Writer {
     /**
      * AJAX handler: generates (or regenerates) the AEO direct-answer paragraph for a single post.
      *
-     * @since 4.20.87
+     * @since 4.20.90
      * @return void
      */
     public function ajax_aeo_gen_one(): void {

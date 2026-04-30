@@ -38,7 +38,9 @@ trait CS_SEO_AI_Scoring {
         $content   = mb_substr(Cs_Seo_Utils::text_from_html((string) $post->post_content), 0, 3000);
         $desc      = trim((string) get_post_meta($post_id, self::META_DESC, true));
         $custom    = trim((string) get_post_meta($post_id, self::META_TITLE, true));
-        $title     = $custom !== '' ? $custom : get_the_title($post_id);
+        // Use raw post_title to avoid the_title filters injecting third-party HTML (e.g. view counters)
+        $raw_title = sanitize_post_field( 'post_title', $post->post_title, $post_id, 'display' );
+        $title     = $custom !== '' ? $custom : $raw_title;
         $title_len = mb_strlen($title);
 
         $system = "You are an SEO expert. Rate an article's search engine optimisation from 0-100 (integer).\n"
