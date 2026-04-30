@@ -639,7 +639,7 @@ trait CS_SEO_AI_Meta_Writer {
      * AJAX handler: generates an SEO title for posts that have none yet.
      * Skips posts that already have a custom _cs_seo_title set.
      *
-     * @since 4.20.82
+     * @since 4.20.83
      * @return void
      */
     public function ajax_generate_missing_title(): void {
@@ -824,16 +824,16 @@ trait CS_SEO_AI_Meta_Writer {
             }
         }
 
-        $provider = (string) ( $this->ai_opts['provider'] ?? 'anthropic' );
+        $provider = (string) ( $this->ai_opts['ai_provider'] ?? 'anthropic' );
         $key      = $provider === 'gemini'
-            ? (string) ( $this->ai_opts['gemini_key'] ?? '' )
-            : (string) ( $this->ai_opts['anthropic_key'] ?? '' );
+            ? trim( (string) ( $this->ai_opts['gemini_key'] ?? '' ) )
+            : trim( (string) ( $this->ai_opts['anthropic_key'] ?? '' ) );
         if ( ! $key ) wp_send_json_error( 'No AI key configured' );
-        $model = (string) ( $this->ai_opts['model'] ?? 'auto' );
+        $model = $this->resolve_model( trim( (string) ( $this->ai_opts['model'] ?? '' ) ), $provider );
 
-        // Strip HTML/blocks, collapse whitespace, cap at 800 chars for context.
-        $content = wp_strip_all_tags( apply_filters( 'the_content', $post->post_content ), true );
-        $content = trim( (string) preg_replace( '/\s+/', ' ', $content ) );
+        // Use raw post content — do NOT call apply_filters('the_content') in AJAX context
+        // as it triggers content hooks that output HTML and break the JSON response.
+        $content = Cs_Seo_Utils::text_from_html( (string) $post->post_content );
         $content = mb_substr( $content, 0, 800 );
 
         $system = 'You are an SEO specialist writing AEO (Answer Engine Optimisation) answer paragraphs. '
