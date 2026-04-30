@@ -155,7 +155,7 @@ trait CS_SEO_Summary_Box {
      * Runs at the_content priority 8 — before prepend_summary_box (priority 10).
      * Google's featured snippet extractor reads this as the page's primary prose answer.
      *
-     * @since 4.20.83
+     * @since 4.20.85
      * @param string $content The post content.
      * @return string Content with AEO answer prepended, or original if not applicable.
      */

@@ -3377,6 +3377,9 @@ trait CS_SEO_Settings_Page {
                     } else if (abState.sortKey === 'alt') {
                         av = a.missing_alt || 0;
                         bv = b.missing_alt || 0;
+                    } else if (abState.sortKey === 'aeo') {
+                        av = a.has_aeo ? 1 : 0;
+                        bv = b.has_aeo ? 1 : 0;
                     } else if (abState.sortKey === 'readability') {
                         av = (a._readability_score !== undefined ? a._readability_score : a.readability_score) ?? -1;
                         bv = (b._readability_score !== undefined ? b._readability_score : b.readability_score) ?? -1;
@@ -3463,6 +3466,12 @@ trait CS_SEO_Settings_Page {
                 const titleLink = p.permalink
                     ? '<a href="' + safeHref(p.permalink) + '" target="_blank" style="color:inherit;text-decoration:none;border-bottom:1px dotted #aaa" title="View page">' + abEsc(abDecodeTitle(p.title)) + '</a>'
                     : abEsc(abDecodeTitle(p.title));
+                const aeoBadge = (p.is_homepage || p.no_post)
+                    ? '<span style="color:#aaa;font-size:11px">—</span>'
+                    : p.has_aeo
+                        ? '<span style="display:inline-block;background:#d1e7dd;color:#0a3622;border:1px solid #a3cfbb;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;white-space:nowrap">✓</span>'
+                        : '<span style="display:inline-block;background:#f8d7da;color:#842029;border:1px solid #f5c2c7;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;white-space:nowrap">✗</span>';
+
                 return '<tr id="ab-row-' + p.id + '" style="' + rowStyle + '">' +
                     '<td><strong>' + typeLabel + titleLink + '</strong>' +
                     noPostNote + '</td>' +
@@ -3470,6 +3479,7 @@ trait CS_SEO_Settings_Page {
                     '<td>' + descCell + '</td>' +
                     '<td style="text-align:center">' + titleBadge + '</td>' +
                     '<td style="text-align:center">' + altCell + '</td>' +
+                    '<td style="text-align:center" class="ab-aeo-cell">' + aeoBadge + '</td>' +
                     '<td style="text-align:center" class="ab-score-cell">' + abScoreBadge(p) + '</td>' +
                     '<td style="text-align:center" class="ab-r-cell">' + abReadabilityBadge(p) + '</td>' +
                     '<td>' + actionCell + '</td>' +
@@ -3483,6 +3493,7 @@ trait CS_SEO_Settings_Page {
                 '<th style="width:25%;cursor:pointer;user-select:none" onclick="abSortBy(\'desc\')">Description' + abSortIcon('desc') + '</th>' +
                 '<th style="width:6%;text-align:center;cursor:pointer;user-select:none" onclick="abSortBy(\'title_chars\')">Title' + abSortIcon('title_chars') + '</th>' +
                 '<th style="width:6%;text-align:center;cursor:pointer;user-select:none" onclick="abSortBy(\'alt\')">ALT' + abSortIcon('alt') + '</th>' +
+                '<th style="width:5%;text-align:center;cursor:pointer;user-select:none" onclick="abSortBy(\'aeo\')">AEO' + abSortIcon('aeo') + '</th>' +
                 '<th style="width:8%;text-align:center;cursor:pointer;user-select:none" onclick="abSortBy(\'score\')">SEO Score' + abSortIcon('score') + '</th>' +
                 '<th style="width:10%;text-align:center;cursor:pointer;user-select:none" onclick="abSortBy(\'readability\')">Readability' + abSortIcon('readability') + '</th>' +
                 '<th style="width:10%">Action</th>' +
@@ -3551,6 +3562,16 @@ trait CS_SEO_Settings_Page {
                         abRenderTable();
                     }
                 }).catch(() => {});
+                // AEO answer — generate silently if not already set
+                if (!post.has_aeo) {
+                    abPost('cs_seo_aeo_gen_one', {post_id: postId, force: 0}).then(ad => {
+                        if (ad.success && ad.data.status === 'generated') {
+                            post.has_aeo = true;
+                            abLog('✓ AEO (' + ad.data.words + 'w): ' + ad.data.answer.slice(0, 60) + '…', 'ok');
+                            abRenderTable();
+                        }
+                    }).catch(() => {});
+                }
             }).catch(e => {
                 post._processing = false;
                 abLog('✗ Network error: ' + e.message, 'err');
