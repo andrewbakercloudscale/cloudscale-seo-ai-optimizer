@@ -149,4 +149,21 @@ trait CS_SEO_Summary_Box {
 
         return $box . $content;
     }
+
+    /**
+     * Prepends the AEO direct-answer paragraph as a naked <p> before the summary box.
+     * Runs at the_content priority 8 — before prepend_summary_box (priority 10).
+     * Google's featured snippet extractor reads this as the page's primary prose answer.
+     *
+     * @since 4.20.83
+     * @param string $content The post content.
+     * @return string Content with AEO answer prepended, or original if not applicable.
+     */
+    public function prepend_aeo_answer(string $content): string {
+        if (!is_singular('post') || is_admin()) return $content;
+        if (!in_the_loop() || !is_main_query()) return $content;
+        $answer = trim((string) get_post_meta((int) get_the_ID(), self::META_AEO_ANSWER, true));
+        if (!$answer) return $content;
+        return '<p>' . esc_html($answer) . '</p>' . "\n" . $content;
+    }
 }

@@ -3,6 +3,18 @@
 All notable changes to CloudScale SEO AI Optimizer are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [4.20.83] - 2026-04-30
+### Added
+- **AEO Answer Paragraph** — new `_cs_seo_aeo_answer` meta field adds a 40–60 word direct-answer paragraph as the first `<p>` in post content (priority 8, before the summary box at priority 10); Google's featured-snippet extractor reads plain prose as the primary answer, enabling position-zero extraction on queries implied by the post title
+- **Per-post AEO field in metabox** — textarea with live word count (green 40–60, red outside range), "Generate AEO Answer" and "Regenerate" buttons that call Claude to produce the paragraph from post title + opening content
+- **Bulk generation in AI Tools** — "✦ Generate AEO Answers" toolbar button runs `abGenAEO()` across all posts missing an AEO answer (3 concurrent workers, stop-safe); all other bulk-run buttons correctly disable/re-enable it
+- **`ajax_aeo_gen_one()`** — AJAX handler that generates or regenerates the AEO paragraph for a single post; skips posts that already have one unless `force=1`
+- **`has_aeo` in posts list** — `ajax_get_posts()` now includes `has_aeo` per post so the bulk runner can skip already-generated posts
+
+## [4.20.82] - 2026-04-30
+### Added
+- **Category SEO** — custom SEO title, meta description, and AI-generated category intro fields on the WordPress category/tag edit screens; intro text is prepended above posts on archive pages via `the_archive_description` filter (with `loop_start` fallback); `filter_title()` and `meta_desc()` now use term meta for category/tag pages
+
 ## [4.20.78] - 2026-04-29
 ### Added
 - **`META_PLUGIN_ICON` constant** — `_cs_seo_plugin_icon` post meta registered with the REST API for Gutenberg block editor access; constant added to main class for consistent referencing

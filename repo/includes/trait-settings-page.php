@@ -26,6 +26,18 @@ trait CS_SEO_Settings_Page {
         ?>
         <div class="wrap">
         <h1>CloudScale SEO AI Optimizer <span style="font-size:13px;font-weight:400;color:#999;margin-left:6px">v<?php echo esc_html(self::VERSION); ?></span></h1>
+        <?php if ( isset( $_GET['settings-updated'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
+        <div id="ab-settings-saved-toast" style="position:fixed;top:46px;right:20px;z-index:99999;background:#fff;border:1px solid #c3e6cb;border-left:4px solid #00a32a;color:#155724;padding:12px 20px;border-radius:6px;box-shadow:0 2px 12px rgba(0,0,0,.18);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;transition:opacity 0.4s;">
+            &#x2705; <?php esc_html_e( 'Settings saved.', 'cloudscale-seo-ai-optimizer' ); ?>
+        </div>
+        <script>
+        (function(){
+            var t = document.getElementById('ab-settings-saved-toast');
+            if (!t) return;
+            setTimeout(function(){ t.style.opacity='0'; setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); },400); },3000);
+        })();
+        </script>
+        <?php endif; ?>
         <a href="https://andrewbaker.ninja" target="_blank" rel="noopener" style="
             display:inline-flex;
             align-items:center;
@@ -434,6 +446,7 @@ trait CS_SEO_Settings_Page {
                         ['rec'=>'⬜ Optional','name'=>'Fix Long/Short','desc'=>'Finds descriptions that fall outside your target character range and rewrites only those. Does not touch ALT text — use the ALT Text Generator panel for that.'],
                         ['rec'=>'⬜ Optional','name'=>'Fix Titles','desc'=>'Scans all posts for title tags that fall outside the ideal 50–60 character range and AI-rewrites them to fit. The rewritten title is saved as a custom SEO title — your original WordPress post title is never changed. Skips the homepage (fix that manually) and any titles already in range.'],
                         ['rec'=>'⬜ Optional','name'=>'Regenerate Static','desc'=>'Fixes stale static data for every post — specifically, clears any custom OG image URL that has been overridden, so the post falls back to its current featured image. Run this if you have updated featured images on posts and LinkedIn, Twitter/X, or other platforms are still showing the old image. It does not touch AI descriptions or ALT text.'],
+                        ['rec'=>'✅ Recommended','name'=>'Generate AEO Answers','desc'=>'Writes a 40–60 word direct-answer paragraph for every post that does not have one yet. This paragraph is inserted as plain text before the AI summary box — Google reads it as the page\'s primary prose answer and can extract it as a featured snippet (position zero). Skips posts that already have an AEO answer set.'],
                         ['rec'=>'ℹ️ Info','name'=>'Generate (per row)','desc'=>'Rewrites the description for a single post and also generates missing image ALT text for that post in the same API call. Click this next to any post to manually trigger the AI for just that one entry.'],
                         ['rec'=>'ℹ️ Info','name'=>'ALT Images column','desc'=>'Shows how many images in each post are still missing ALT text. ⚠ yellow means images need attention — generating the description will fix them automatically. ✓ green means all images have ALT text.'],
                         ['rec'=>'ℹ️ Info','name'=>'Title column','desc'=>'Shows the character count of each post\'s effective title tag (custom SEO title if set, otherwise the WordPress post title). Green = 50–60 chars (ideal). Amber = 40–69 chars (acceptable). Red = outside that range (too short or too long for Google). Hover the badge to see the full title text. Use Fix Titles to auto-fix all out-of-range titles in one pass.'],
@@ -475,6 +488,7 @@ trait CS_SEO_Settings_Page {
                     <button class="button ab-action-btn ab-fix-btn" id="ab-ai-fix" disabled>⚑ Fix Long/Short</button>
                     <button class="button ab-action-btn" id="ab-ai-fix-titles" disabled style="background:#7c3aed;color:#fff;border-color:#6d28d9">✎ Fix Titles</button>
                     <button class="button ab-action-btn" id="ab-ai-gen-missing-titles" disabled style="background:#0e6b6b;color:#fff;border-color:#0a5050">✦ Generate Missing Titles</button>
+                    <button class="button ab-action-btn" id="ab-ai-gen-aeo" disabled style="background:#0284c7;color:#fff;border-color:#0369a1">✦ Generate AEO Answers</button>
                     <button class="button ab-action-btn ab-static-btn" id="ab-ai-static" disabled>🖼 Regenerate Static</button>
                     <button class="button ab-action-btn" id="ab-ai-score-all" disabled style="background:#0e6b6b;border-color:#0a5050;color:#fff;font-weight:600">📊 Calculate SEO Scores</button>
                     <span id="ab-toolbar-status" style="font-size:12px;color:#50575e;"></span>
@@ -3072,6 +3086,7 @@ trait CS_SEO_Settings_Page {
 
         function abTestKey() {
             const status   = document.getElementById('ab-key-status');
+            const testBtn  = document.getElementById('ab-test-key-btn');
             const provider = document.getElementById('ab-ai-provider').value;
             const keyField = provider === 'gemini'
                 ? document.getElementById('ab-gemini-key-field')
@@ -3084,6 +3099,7 @@ trait CS_SEO_Settings_Page {
             }
             status.textContent = '⟳ Checking firewall & API key…';
             status.className   = 'ab-key-status';
+            if (testBtn) { testBtn.disabled = true; testBtn.textContent = '⟳ Testing…'; }
 
             fetch(abAjax, {
                 method: 'POST',
@@ -3108,6 +3124,9 @@ trait CS_SEO_Settings_Page {
             .catch(e => {
                 status.textContent = '✗ Network error: ' + e.message;
                 status.className   = 'ab-key-status ab-key-err';
+            })
+            .finally(() => {
+                if (testBtn) { testBtn.disabled = false; testBtn.textContent = 'Test Key'; }
             });
         }
 
@@ -3124,6 +3143,8 @@ trait CS_SEO_Settings_Page {
             page = page || 1;
             abState.page = page;
             abSetStatus('Loading posts...');
+            const rldBtn = document.getElementById('ab-reload-hdr');
+            if (rldBtn) { rldBtn.disabled = true; rldBtn.textContent = '⟳ Loading…'; }
             abPost('cs_seo_ai_get_posts', {page}).then(data => {
                 if (!data.success) { abLog('Failed to load posts: ' + data.data, 'err'); return; }
                 abState.posts          = data.data.posts;
@@ -3136,12 +3157,14 @@ trait CS_SEO_Settings_Page {
                 abRenderTable();
                 abSetStatus(data.data.total + ' posts & pages loaded');
                 document.getElementById('ab-ai-toolbar').style.display = 'flex';
-                document.getElementById('ab-reload-hdr').style.visibility = 'visible';
+                const rldBtnDone = document.getElementById('ab-reload-hdr');
+                if (rldBtnDone) { rldBtnDone.disabled = false; rldBtnDone.textContent = '↻ Reload'; rldBtnDone.style.visibility = 'visible'; }
                 document.getElementById('ab-ai-gen-missing').disabled          = false;
                 document.getElementById('ab-ai-gen-all').disabled               = false;
                 document.getElementById('ab-ai-fix').disabled                   = false;
                 document.getElementById('ab-ai-fix-titles').disabled            = false;
                 document.getElementById('ab-ai-gen-missing-titles').disabled    = false;
+                document.getElementById('ab-ai-gen-aeo').disabled               = false;
                 document.getElementById('ab-ai-static').disabled                = false;
                 document.getElementById('ab-ai-score-all').disabled             = false;
                 // Pager
@@ -3153,6 +3176,8 @@ trait CS_SEO_Settings_Page {
                 document.getElementById('ab-next').disabled = abState.page >= abState.totalPages;
             }).catch(e => {
                 abLog('Error: ' + e.message, 'err');
+                const rldBtnErr = document.getElementById('ab-reload-hdr');
+                if (rldBtnErr) { rldBtnErr.disabled = false; rldBtnErr.textContent = '↻ Reload'; }
             });
         }
 
@@ -3636,6 +3661,8 @@ trait CS_SEO_Settings_Page {
             document.getElementById('ab-ai-gen-all').disabled = true;
             document.getElementById('ab-ai-fix').disabled = true;
             document.getElementById('ab-ai-fix-titles').disabled = true;
+            document.getElementById('ab-ai-gen-missing-titles').disabled = true;
+            document.getElementById('ab-ai-gen-aeo').disabled = true;
             document.getElementById('ab-ai-static').disabled = true;
             document.getElementById('ab-ai-score-all').disabled = true;
             document.getElementById('ab-ai-stop').style.display = 'inline-block';
@@ -3679,6 +3706,7 @@ trait CS_SEO_Settings_Page {
             document.getElementById('ab-ai-fix').disabled                  = false;
             document.getElementById('ab-ai-fix-titles').disabled           = false;
             document.getElementById('ab-ai-gen-missing-titles').disabled   = false;
+            document.getElementById('ab-ai-gen-aeo').disabled              = false;
             document.getElementById('ab-ai-static').disabled               = false;
             document.getElementById('ab-ai-score-all').disabled            = false;
             document.getElementById('ab-ai-stop').style.display            = 'none';
@@ -3697,6 +3725,7 @@ trait CS_SEO_Settings_Page {
             document.getElementById('ab-ai-fix').disabled                  = true;
             document.getElementById('ab-ai-fix-titles').disabled           = true;
             document.getElementById('ab-ai-gen-missing-titles').disabled   = true;
+            document.getElementById('ab-ai-gen-aeo').disabled              = true;
             document.getElementById('ab-ai-static').disabled               = true;
             document.getElementById('ab-ai-stop').style.display            = 'inline-block';
 
@@ -3837,11 +3866,14 @@ trait CS_SEO_Settings_Page {
             }
 
             } catch(e) { abLog('✗ Unexpected error: ' + e.message, 'err'); } finally {
-            document.getElementById('ab-ai-gen-missing').disabled = false;
-            document.getElementById('ab-ai-gen-all').disabled      = false;
-            document.getElementById('ab-ai-fix').disabled          = false;
-            document.getElementById('ab-ai-static').disabled       = false;
-            document.getElementById('ab-ai-stop').style.display    = 'none';
+            document.getElementById('ab-ai-gen-missing').disabled         = false;
+            document.getElementById('ab-ai-gen-all').disabled              = false;
+            document.getElementById('ab-ai-fix').disabled                  = false;
+            document.getElementById('ab-ai-fix-titles').disabled           = false;
+            document.getElementById('ab-ai-gen-missing-titles').disabled   = false;
+            document.getElementById('ab-ai-gen-aeo').disabled              = false;
+            document.getElementById('ab-ai-static').disabled               = false;
+            document.getElementById('ab-ai-stop').style.display            = 'none';
             abState.running = false;
             }
         }
@@ -3853,11 +3885,14 @@ trait CS_SEO_Settings_Page {
             abState.stopped = false;
             abState.running = true;
 
-            document.getElementById('ab-ai-gen-missing').disabled = true;
-            document.getElementById('ab-ai-gen-all').disabled     = true;
-            document.getElementById('ab-ai-fix').disabled         = true;
-            document.getElementById('ab-ai-static').disabled      = true;
-            document.getElementById('ab-ai-stop').style.display   = 'inline-block';
+            document.getElementById('ab-ai-gen-missing').disabled         = true;
+            document.getElementById('ab-ai-gen-all').disabled              = true;
+            document.getElementById('ab-ai-fix').disabled                  = true;
+            document.getElementById('ab-ai-fix-titles').disabled           = true;
+            document.getElementById('ab-ai-gen-missing-titles').disabled   = true;
+            document.getElementById('ab-ai-gen-aeo').disabled              = true;
+            document.getElementById('ab-ai-static').disabled               = true;
+            document.getElementById('ab-ai-stop').style.display            = 'inline-block';
 
             try {
             abLog('Starting fix run — scanning for short and long descriptions...', 'info');
@@ -3939,12 +3974,14 @@ trait CS_SEO_Settings_Page {
             abLog('Fix run complete: ' + done + ' fixed, ' + skipped + ' skipped, ' + errors + ' errors', done > 0 ? 'ok' : 'info');
 
             } catch(e) { abLog('✗ Unexpected error: ' + e.message, 'err'); } finally {
-            document.getElementById('ab-ai-gen-missing').disabled    = false;
-            document.getElementById('ab-ai-gen-all').disabled         = false;
-            document.getElementById('ab-ai-fix').disabled             = false;
-            document.getElementById('ab-ai-fix-titles').disabled      = false;
-            document.getElementById('ab-ai-static').disabled          = false;
-            document.getElementById('ab-ai-stop').style.display       = 'none';
+            document.getElementById('ab-ai-gen-missing').disabled         = false;
+            document.getElementById('ab-ai-gen-all').disabled              = false;
+            document.getElementById('ab-ai-fix').disabled                  = false;
+            document.getElementById('ab-ai-fix-titles').disabled           = false;
+            document.getElementById('ab-ai-gen-missing-titles').disabled   = false;
+            document.getElementById('ab-ai-gen-aeo').disabled              = false;
+            document.getElementById('ab-ai-static').disabled               = false;
+            document.getElementById('ab-ai-stop').style.display            = 'none';
             abState.running = false;
             }
         }
@@ -3961,6 +3998,7 @@ trait CS_SEO_Settings_Page {
             document.getElementById('ab-ai-fix').disabled                  = true;
             document.getElementById('ab-ai-fix-titles').disabled           = true;
             document.getElementById('ab-ai-gen-missing-titles').disabled   = true;
+            document.getElementById('ab-ai-gen-aeo').disabled              = true;
             document.getElementById('ab-ai-static').disabled               = true;
             document.getElementById('ab-ai-stop').style.display            = 'inline-block';
 
@@ -4043,6 +4081,7 @@ trait CS_SEO_Settings_Page {
             document.getElementById('ab-ai-fix').disabled                  = false;
             document.getElementById('ab-ai-fix-titles').disabled           = false;
             document.getElementById('ab-ai-gen-missing-titles').disabled   = false;
+            document.getElementById('ab-ai-gen-aeo').disabled              = false;
             document.getElementById('ab-ai-static').disabled               = false;
             document.getElementById('ab-ai-stop').style.display            = 'none';
             abState.running = false;
@@ -4060,6 +4099,7 @@ trait CS_SEO_Settings_Page {
             document.getElementById('ab-ai-fix').disabled                  = true;
             document.getElementById('ab-ai-fix-titles').disabled           = true;
             document.getElementById('ab-ai-gen-missing-titles').disabled   = true;
+            document.getElementById('ab-ai-gen-aeo').disabled              = true;
             document.getElementById('ab-ai-static').disabled               = true;
             document.getElementById('ab-ai-stop').style.display            = 'inline-block';
 
@@ -4148,6 +4188,7 @@ trait CS_SEO_Settings_Page {
             document.getElementById('ab-ai-fix').disabled                  = false;
             document.getElementById('ab-ai-fix-titles').disabled           = false;
             document.getElementById('ab-ai-gen-missing-titles').disabled   = false;
+            document.getElementById('ab-ai-gen-aeo').disabled              = false;
             document.getElementById('ab-ai-static').disabled               = false;
             document.getElementById('ab-ai-stop').style.display            = 'none';
             abState.running = false;
@@ -4159,11 +4200,14 @@ trait CS_SEO_Settings_Page {
             abState.running = true;
             abState.stopped = false;
 
-            document.getElementById('ab-ai-gen-missing').disabled = true;
-            document.getElementById('ab-ai-gen-all').disabled     = true;
-            document.getElementById('ab-ai-fix').disabled         = true;
-            document.getElementById('ab-ai-static').disabled      = true;
-            document.getElementById('ab-ai-stop').style.display   = 'inline-block';
+            document.getElementById('ab-ai-gen-missing').disabled         = true;
+            document.getElementById('ab-ai-gen-all').disabled              = true;
+            document.getElementById('ab-ai-fix').disabled                  = true;
+            document.getElementById('ab-ai-fix-titles').disabled           = true;
+            document.getElementById('ab-ai-gen-missing-titles').disabled   = true;
+            document.getElementById('ab-ai-gen-aeo').disabled              = true;
+            document.getElementById('ab-ai-static').disabled               = true;
+            document.getElementById('ab-ai-stop').style.display            = 'inline-block';
 
             try {
             abLog('Starting static regeneration — clearing stale OG image data for all posts...', 'info');
@@ -4208,11 +4252,113 @@ trait CS_SEO_Settings_Page {
             abLog('Static regeneration complete: ' + cleared + ' OG images cleared, ' + (done - cleared) + ' already clean, ' + errors + ' errors', cleared > 0 ? 'ok' : 'info');
 
             } catch(e) { abLog('✗ Unexpected error: ' + e.message, 'err'); } finally {
-            document.getElementById('ab-ai-gen-missing').disabled = false;
-            document.getElementById('ab-ai-gen-all').disabled     = false;
-            document.getElementById('ab-ai-fix').disabled         = false;
-            document.getElementById('ab-ai-static').disabled      = false;
-            document.getElementById('ab-ai-stop').style.display   = 'none';
+            document.getElementById('ab-ai-gen-missing').disabled         = false;
+            document.getElementById('ab-ai-gen-all').disabled              = false;
+            document.getElementById('ab-ai-fix').disabled                  = false;
+            document.getElementById('ab-ai-fix-titles').disabled           = false;
+            document.getElementById('ab-ai-gen-missing-titles').disabled   = false;
+            document.getElementById('ab-ai-gen-aeo').disabled              = false;
+            document.getElementById('ab-ai-static').disabled               = false;
+            document.getElementById('ab-ai-stop').style.display            = 'none';
+            abState.running = false;
+            }
+        }
+
+        // ── Generate AEO answer paragraphs ────────────────────────────────────
+        async function abGenAEO() {
+            if (!abCheckApiKey()) return;
+            if (abState.running) return;
+            abState.stopped = false;
+            abState.running = true;
+
+            document.getElementById('ab-ai-gen-missing').disabled         = true;
+            document.getElementById('ab-ai-gen-all').disabled              = true;
+            document.getElementById('ab-ai-fix').disabled                  = true;
+            document.getElementById('ab-ai-fix-titles').disabled           = true;
+            document.getElementById('ab-ai-gen-missing-titles').disabled   = true;
+            document.getElementById('ab-ai-gen-aeo').disabled              = true;
+            document.getElementById('ab-ai-static').disabled               = true;
+            document.getElementById('ab-ai-stop').style.display            = 'inline-block';
+
+            try {
+            abLog('Generating AEO answer paragraphs — fetching full post list...', 'info');
+
+            let allPosts = [];
+            abSetStatus('Fetching full post list...');
+            for (let pg = 1; pg <= abState.totalPages; pg++) {
+                if (abState.stopped) break;
+                try {
+                    const data = await abPost('cs_seo_ai_get_posts', {page: pg});
+                    if (data.success) allPosts = allPosts.concat(data.data.posts);
+                } catch(e) { console.error('[cs-seo] page-fetch failed (pg=' + pg + ')', e); }
+            }
+
+            const targets = allPosts.filter(p => !p.is_homepage && !p.no_post && !p.has_aeo);
+            abLog('Found ' + targets.length + ' post(s) with no AEO answer paragraph', 'info');
+
+            if (targets.length === 0) {
+                abLog('All posts have AEO answer paragraphs — nothing to generate.', 'info');
+                abSetStatus('Nothing to generate.');
+            } else {
+
+            let done = 0, errors = 0, skipped = 0;
+            const queue = targets.slice();
+
+            async function aeoWorker() {
+                while (queue.length > 0 && !abState.stopped) {
+                    const post = queue.shift();
+                    if (!post) break;
+
+                    abSetStatus('Generating AEO answers — ' + (done + skipped + errors) + '/' + targets.length + ' done, ' + queue.length + ' remaining');
+                    abSetProgress(done + skipped + errors, targets.length);
+
+                    try {
+                        const data = await abPost('cs_seo_aeo_gen_one', {post_id: post.id});
+                        if (data.success) {
+                            const r = data.data;
+                            if (r.status === 'skipped') {
+                                skipped++;
+                                abLog('⊘ "' + post.title.slice(0, 55) + '" — already has AEO answer', 'skip');
+                            } else {
+                                done++;
+                                const local = abState.posts.find(p => p.id === post.id);
+                                if (local) local.has_aeo = true;
+                                abLog('✓ AEO (' + r.words + 'w): "' + post.title.slice(0, 50) + '"', 'ok');
+                            }
+                        } else {
+                            errors++;
+                            const msg = typeof data.data === 'object' ? data.data.message : data.data;
+                            abLog('✗ "' + post.title.slice(0, 45) + '": ' + msg, 'err');
+                            await abSleep(5000);
+                        }
+                    } catch(e) {
+                        errors++;
+                        abLog('✗ Network error: ' + e.message, 'err');
+                        await abSleep(5000);
+                    }
+
+                    abRenderTable();
+                }
+            }
+
+            if (abState.stopped) { abLog('Stopped by user', 'skip'); }
+            else { await Promise.all(Array.from({length: Math.min(3, targets.length)}, aeoWorker)); }
+
+            abSetProgress(done + skipped, targets.length);
+            abSetStatus('Done — ' + done + ' generated, ' + skipped + ' skipped, ' + errors + ' errors');
+            abLog('AEO generation complete: ' + done + ' generated, ' + skipped + ' skipped, ' + errors + ' errors', done > 0 ? 'ok' : 'info');
+
+            } // end if targets.length > 0
+
+            } catch(e) { abLog('✗ Unexpected error: ' + e.message, 'err'); } finally {
+            document.getElementById('ab-ai-gen-missing').disabled         = false;
+            document.getElementById('ab-ai-gen-all').disabled              = false;
+            document.getElementById('ab-ai-fix').disabled                  = false;
+            document.getElementById('ab-ai-fix-titles').disabled           = false;
+            document.getElementById('ab-ai-gen-missing-titles').disabled   = false;
+            document.getElementById('ab-ai-gen-aeo').disabled              = false;
+            document.getElementById('ab-ai-static').disabled               = false;
+            document.getElementById('ab-ai-stop').style.display            = 'none';
             abState.running = false;
             }
         }
@@ -4391,8 +4537,10 @@ trait CS_SEO_Settings_Page {
 
         function altLoad() {
             altSetStatus('Scanning posts...');
+            const altRldBtn = document.getElementById('ab-alt-reload-hdr');
+            if (altRldBtn) { altRldBtn.disabled = true; altRldBtn.textContent = '⟳ Loading…'; }
             abPost('cs_seo_alt_get_posts', {}).then(data => {
-                if (!data.success) { altLog('Failed to scan: ' + data.data, 'err'); return; }
+                if (!data.success) { altLog('Failed to scan: ' + data.data, 'err'); if (altRldBtn) { altRldBtn.disabled = false; altRldBtn.textContent = '↻ Reload'; } return; }
                 altState.posts = data.data.posts;
                 // Auto-enable show-all when nothing is missing so the audit view is useful
                 if (data.data.missing_alt === 0) altState.showAll = true;
@@ -4402,7 +4550,7 @@ trait CS_SEO_Settings_Page {
                 altRenderTable();
                 altState.page = 0;
                 document.getElementById('ab-alt-toolbar').style.display  = 'flex';
-                document.getElementById('ab-alt-reload-hdr').style.visibility = 'visible';
+                if (altRldBtn) { altRldBtn.disabled = false; altRldBtn.textContent = '↻ Reload'; altRldBtn.style.visibility = 'visible'; }
                 document.getElementById('ab-alt-gen-all').disabled       = data.data.missing_alt === 0;
                 const total = data.data.missing_alt;
                 altSetStatus(total > 0
@@ -4413,6 +4561,7 @@ trait CS_SEO_Settings_Page {
                 }
             }).catch(e => {
                 altLog('Error: ' + e.message, 'err');
+                if (altRldBtn) { altRldBtn.disabled = false; altRldBtn.textContent = '↻ Reload'; }
             });
         }
 
@@ -4557,24 +4706,29 @@ trait CS_SEO_Settings_Page {
 
         async function sumLoad() {
             sumSetStatus('Loading...');
-            const data = await abPost('cs_seo_summary_load', {});
-            if (!data.success) { sumSetStatus('Error: ' + (data.data || 'Unknown')); return; }
-            const d = data.data;
-            sumState.page    = 0;
-            sumState.total   = d.total;
-            sumState.missing = d.missing;
-            document.getElementById('sum-s-total').textContent   = d.total;
-            document.getElementById('sum-s-has').textContent     = d.has;
-            document.getElementById('sum-s-missing').textContent = d.missing;
-            document.getElementById('sum-s-done').textContent    = 0;
-            document.getElementById('ab-sum-summary').style.display = '';
-            document.getElementById('ab-sum-toolbar').style.display = '';
-            document.getElementById('ab-sum-gen-all').disabled = d.missing === 0;
-            sumSetStatus(d.missing === 0 ? '✓ All posts have summaries' : d.missing + ' posts need summaries');
-            // Store posts and render table
-            sumState.posts = d.posts || [];
-            sumRenderTable();
-            document.getElementById('ab-sum-reload-hdr').style.visibility = 'visible';
+            const sumRldBtn = document.getElementById('ab-sum-reload-hdr');
+            if (sumRldBtn) { sumRldBtn.disabled = true; sumRldBtn.textContent = '⟳ Loading…'; }
+            try {
+                const data = await abPost('cs_seo_summary_load', {});
+                if (!data.success) { sumSetStatus('Error: ' + (data.data || 'Unknown')); return; }
+                const d = data.data;
+                sumState.page    = 0;
+                sumState.total   = d.total;
+                sumState.missing = d.missing;
+                document.getElementById('sum-s-total').textContent   = d.total;
+                document.getElementById('sum-s-has').textContent     = d.has;
+                document.getElementById('sum-s-missing').textContent = d.missing;
+                document.getElementById('sum-s-done').textContent    = 0;
+                document.getElementById('ab-sum-summary').style.display = '';
+                document.getElementById('ab-sum-toolbar').style.display = '';
+                document.getElementById('ab-sum-gen-all').disabled = d.missing === 0;
+                sumSetStatus(d.missing === 0 ? '✓ All posts have summaries' : d.missing + ' posts need summaries');
+                sumState.posts = d.posts || [];
+                sumRenderTable();
+                if (sumRldBtn) { sumRldBtn.style.visibility = 'visible'; }
+            } finally {
+                if (sumRldBtn) { sumRldBtn.disabled = false; sumRldBtn.textContent = '↻ Reload'; }
+            }
         }
 
         function sumRenderTable() {
@@ -6503,6 +6657,7 @@ trait CS_SEO_Settings_Page {
             on('ab-ai-fix', function() { if (typeof abFixAll === 'function') abFixAll(); });
             on('ab-ai-fix-titles', function() { if (typeof abFixTitles === 'function') abFixTitles(); });
             on('ab-ai-gen-missing-titles', function() { if (typeof abGenMissingTitles === 'function') abGenMissingTitles(); });
+            on('ab-ai-gen-aeo', function() { if (typeof abGenAEO === 'function') abGenAEO(); });
             on('ab-ai-static', function() { if (typeof abRegenStatic === 'function') abRegenStatic(); });
             on('ab-ai-score-all', function() { if (typeof abScoreAll === 'function') abScoreAll(); });
             on('ab-ai-stop', function() { if (typeof abStop === 'function') abStop(); });

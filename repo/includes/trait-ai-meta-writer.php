@@ -635,6 +635,61 @@ trait CS_SEO_AI_Meta_Writer {
         }
     }
 
+    /**
+     * AJAX handler: generates an SEO title for posts that have none yet.
+     * Skips posts that already have a custom _cs_seo_title set.
+     *
+     * @since 4.20.82
+     * @return void
+     */
+    public function ajax_generate_missing_title(): void {
+        check_ajax_referer( 'cs_seo_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+        $post_id = absint( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+        if ( ! $post_id ) wp_send_json_error( 'Missing post_id' );
+
+        $post = get_post( $post_id );
+        if ( ! $post ) wp_send_json_error( 'Post not found' );
+
+        $existing = trim( (string) get_post_meta( $post_id, self::META_TITLE, true ) );
+        if ( $existing !== '' ) {
+            wp_send_json_success( [
+                'post_id' => $post_id,
+                'status'  => 'skipped',
+                'message' => 'Skipped — title already set',
+                'title'   => $existing,
+                'chars'   => mb_strlen( $existing ),
+            ] );
+            return;
+        }
+
+        $raw_title = html_entity_decode( (string) get_the_title( $post_id ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+        try {
+            $new_title = $this->call_ai_fix_title( $post_id, $raw_title );
+            $new_len   = mb_strlen( $new_title );
+            $in_range  = ( $new_len >= 50 && $new_len <= 60 );
+            update_post_meta( $post_id, self::META_TITLE, sanitize_text_field( $new_title ) );
+            wp_send_json_success( [
+                'post_id'  => $post_id,
+                'status'   => $in_range ? 'generated' : 'generated_imperfect',
+                'title'    => $new_title,
+                'chars'    => $new_len,
+                'in_range' => $in_range,
+            ] );
+        } catch ( \Throwable $e ) {
+            wp_send_json_error( [ 'post_id' => $post_id, 'message' => $e->getMessage() ] );
+        }
+    }
+
+    /**
+     * Calls the configured AI provider to rewrite a post title to 50–60 characters.
+     *
+     * @since 4.10.24
+     * @param int    $post_id       The post ID being fixed.
+     * @param string $current_title The existing title that needs rewriting.
+     * @return string The AI-generated replacement title.
+     * @throws \RuntimeException If the post is not found or no API key is configured.
+     */
     private function call_ai_fix_title(int $post_id, string $current_title): string {
         $post = get_post($post_id);
         if (!$post) throw new \RuntimeException( "Post {$post_id} not found" ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
@@ -744,6 +799,67 @@ trait CS_SEO_AI_Meta_Writer {
             ]);
         }
     }
+    /**
+     * AJAX handler: generates (or regenerates) the AEO direct-answer paragraph for a single post.
+     *
+     * @since 4.20.83
+     * @return void
+     */
+    public function ajax_aeo_gen_one(): void {
+        check_ajax_referer( 'cs_seo_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+
+        $post_id = (int) sanitize_key( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce verified above
+        if ( ! $post_id ) wp_send_json_error( 'Missing post_id' );
+
+        $post = get_post( $post_id );
+        if ( ! $post || $post->post_status !== 'publish' ) wp_send_json_error( 'Post not found' );
+
+        $force = (int) sanitize_key( wp_unslash( $_POST['force'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce verified above
+        if ( ! $force ) {
+            $existing = trim( (string) get_post_meta( $post_id, self::META_AEO_ANSWER, true ) );
+            if ( $existing ) {
+                wp_send_json_success( [ 'status' => 'skipped', 'post_id' => $post_id ] );
+                return;
+            }
+        }
+
+        $provider = (string) ( $this->ai_opts['provider'] ?? 'anthropic' );
+        $key      = $provider === 'gemini'
+            ? (string) ( $this->ai_opts['gemini_key'] ?? '' )
+            : (string) ( $this->ai_opts['anthropic_key'] ?? '' );
+        if ( ! $key ) wp_send_json_error( 'No AI key configured' );
+        $model = (string) ( $this->ai_opts['model'] ?? 'auto' );
+
+        // Strip HTML/blocks, collapse whitespace, cap at 800 chars for context.
+        $content = wp_strip_all_tags( apply_filters( 'the_content', $post->post_content ), true );
+        $content = trim( (string) preg_replace( '/\s+/', ' ', $content ) );
+        $content = mb_substr( $content, 0, 800 );
+
+        $system = 'You are an SEO specialist writing AEO (Answer Engine Optimisation) answer paragraphs. '
+            . 'Task: write one direct-answer paragraph that Google can extract as a featured snippet. '
+            . 'Rules: (1) Answer the primary question implied by the post title, directly. '
+            . '(2) Plain prose only — no bullet lists, no headers, no markdown. '
+            . '(3) Target 40–60 words. Count carefully. '
+            . '(4) No preamble such as "In this article" or "This guide covers". '
+            . '(5) First word must be an action verb, noun, or direct fact — never "I", "This", "In". '
+            . 'Respond with ONLY the paragraph text. No quotes, no labels, no explanation.';
+
+        $user_msg = "Post title: \"{$post->post_title}\"\n\nOpening content:\n{$content}";
+
+        $answer = trim( (string) $this->dispatch_ai( $provider, $key, $model, $system, $user_msg, null, 150 ) );
+        $answer = trim( $answer, '"\'');
+        if ( ! $answer ) wp_send_json_error( 'Empty response from AI' );
+
+        update_post_meta( $post_id, self::META_AEO_ANSWER, sanitize_textarea_field( $answer ) );
+        wp_send_json_success( [
+            'status'  => 'generated',
+            'post_id' => $post_id,
+            'answer'  => $answer,
+            'words'   => str_word_count( $answer ),
+        ] );
+    }
+
     /**
      * AJAX handler: regenerates the static admin JS/CSS assets and refreshes OPcache.
      *
@@ -885,6 +1001,8 @@ trait CS_SEO_AI_Meta_Writer {
                 'title'             => $raw_title,
                 'effective_title'   => $effective_title,
                 'title_chars'       => mb_strlen($effective_title),
+                'has_title'         => $custom_title !== '',
+                'has_aeo'           => trim((string) get_post_meta($p->ID, self::META_AEO_ANSWER, true)) !== '',
                 'type'              => $p->post_type,
                 'date'              => get_the_date('Y-m-d', $p->ID),
                 'has_desc'          => $desc !== '',
@@ -906,12 +1024,12 @@ trait CS_SEO_AI_Meta_Writer {
         }
 
         wp_send_json_success([
-            'posts'           => $items,
-            'homepage'        => $homepage,
-            'total'           => (int) $q->found_posts,
-            'total_pages'     => (int) $q->max_num_pages,
-            'page'            => $page,
-            'total_with_desc' => (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            'posts'            => $items,
+            'homepage'         => $homepage,
+            'total'            => (int) $q->found_posts,
+            'total_pages'      => (int) $q->max_num_pages,
+            'page'             => $page,
+            'total_with_desc'  => (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
                 $wpdb->prepare(
                     "SELECT COUNT(DISTINCT p.ID)
                      FROM {$wpdb->posts} p
@@ -925,6 +1043,23 @@ trait CS_SEO_AI_Meta_Writer {
                          WHERE meta_key = %s AND meta_value = '1'
                      )",
                     self::META_DESC,
+                    self::META_NOINDEX
+                )
+            ),
+            'total_with_title' => (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                $wpdb->prepare(
+                    "SELECT COUNT(DISTINCT p.ID)
+                     FROM {$wpdb->posts} p
+                     INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
+                     WHERE p.post_type IN ('post','page')
+                     AND p.post_status = 'publish'
+                     AND pm.meta_key = %s
+                     AND pm.meta_value != ''
+                     AND p.ID NOT IN (
+                         SELECT post_id FROM {$wpdb->postmeta}
+                         WHERE meta_key = %s AND meta_value = '1'
+                     )",
+                    self::META_TITLE,
                     self::META_NOINDEX
                 )
             ),

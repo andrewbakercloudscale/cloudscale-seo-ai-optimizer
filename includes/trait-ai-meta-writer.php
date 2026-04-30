@@ -639,7 +639,7 @@ trait CS_SEO_AI_Meta_Writer {
      * AJAX handler: generates an SEO title for posts that have none yet.
      * Skips posts that already have a custom _cs_seo_title set.
      *
-     * @since 4.20.82
+     * @since 4.20.83
      * @return void
      */
     public function ajax_generate_missing_title(): void {
@@ -800,6 +800,67 @@ trait CS_SEO_AI_Meta_Writer {
         }
     }
     /**
+     * AJAX handler: generates (or regenerates) the AEO direct-answer paragraph for a single post.
+     *
+     * @since 4.20.83
+     * @return void
+     */
+    public function ajax_aeo_gen_one(): void {
+        check_ajax_referer( 'cs_seo_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Forbidden', 403 );
+
+        $post_id = (int) sanitize_key( wp_unslash( $_POST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce verified above
+        if ( ! $post_id ) wp_send_json_error( 'Missing post_id' );
+
+        $post = get_post( $post_id );
+        if ( ! $post || $post->post_status !== 'publish' ) wp_send_json_error( 'Post not found' );
+
+        $force = (int) sanitize_key( wp_unslash( $_POST['force'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce verified above
+        if ( ! $force ) {
+            $existing = trim( (string) get_post_meta( $post_id, self::META_AEO_ANSWER, true ) );
+            if ( $existing ) {
+                wp_send_json_success( [ 'status' => 'skipped', 'post_id' => $post_id ] );
+                return;
+            }
+        }
+
+        $provider = (string) ( $this->ai_opts['provider'] ?? 'anthropic' );
+        $key      = $provider === 'gemini'
+            ? (string) ( $this->ai_opts['gemini_key'] ?? '' )
+            : (string) ( $this->ai_opts['anthropic_key'] ?? '' );
+        if ( ! $key ) wp_send_json_error( 'No AI key configured' );
+        $model = (string) ( $this->ai_opts['model'] ?? 'auto' );
+
+        // Strip HTML/blocks, collapse whitespace, cap at 800 chars for context.
+        $content = wp_strip_all_tags( apply_filters( 'the_content', $post->post_content ), true );
+        $content = trim( (string) preg_replace( '/\s+/', ' ', $content ) );
+        $content = mb_substr( $content, 0, 800 );
+
+        $system = 'You are an SEO specialist writing AEO (Answer Engine Optimisation) answer paragraphs. '
+            . 'Task: write one direct-answer paragraph that Google can extract as a featured snippet. '
+            . 'Rules: (1) Answer the primary question implied by the post title, directly. '
+            . '(2) Plain prose only — no bullet lists, no headers, no markdown. '
+            . '(3) Target 40–60 words. Count carefully. '
+            . '(4) No preamble such as "In this article" or "This guide covers". '
+            . '(5) First word must be an action verb, noun, or direct fact — never "I", "This", "In". '
+            . 'Respond with ONLY the paragraph text. No quotes, no labels, no explanation.';
+
+        $user_msg = "Post title: \"{$post->post_title}\"\n\nOpening content:\n{$content}";
+
+        $answer = trim( (string) $this->dispatch_ai( $provider, $key, $model, $system, $user_msg, null, 150 ) );
+        $answer = trim( $answer, '"\'');
+        if ( ! $answer ) wp_send_json_error( 'Empty response from AI' );
+
+        update_post_meta( $post_id, self::META_AEO_ANSWER, sanitize_textarea_field( $answer ) );
+        wp_send_json_success( [
+            'status'  => 'generated',
+            'post_id' => $post_id,
+            'answer'  => $answer,
+            'words'   => str_word_count( $answer ),
+        ] );
+    }
+
+    /**
      * AJAX handler: regenerates the static admin JS/CSS assets and refreshes OPcache.
      *
      * @since 4.10.18
@@ -941,6 +1002,7 @@ trait CS_SEO_AI_Meta_Writer {
                 'effective_title'   => $effective_title,
                 'title_chars'       => mb_strlen($effective_title),
                 'has_title'         => $custom_title !== '',
+                'has_aeo'           => trim((string) get_post_meta($p->ID, self::META_AEO_ANSWER, true)) !== '',
                 'type'              => $p->post_type,
                 'date'              => get_the_date('Y-m-d', $p->ID),
                 'has_desc'          => $desc !== '',

@@ -33,9 +33,11 @@ trait CS_SEO_Metabox {
         $title   = (string) get_post_meta($post->ID, self::META_TITLE,    true);
         $desc    = (string) get_post_meta($post->ID, self::META_DESC,     true);
         $ogimg   = (string) get_post_meta($post->ID, self::META_OGIMG,    true);
-        $sum_what = (string) get_post_meta($post->ID, self::META_SUM_WHAT, true);
-        $sum_why  = (string) get_post_meta($post->ID, self::META_SUM_WHY,  true);
-        $sum_key  = (string) get_post_meta($post->ID, self::META_SUM_KEY,  true);
+        $sum_what   = (string) get_post_meta($post->ID, self::META_SUM_WHAT,   true);
+        $sum_why    = (string) get_post_meta($post->ID, self::META_SUM_WHY,    true);
+        $sum_key    = (string) get_post_meta($post->ID, self::META_SUM_KEY,    true);
+        $aeo_answer = (string) get_post_meta($post->ID, self::META_AEO_ANSWER, true);
+        $aeo_wc     = $aeo_answer ? str_word_count($aeo_answer) : 0;
         $has_key = !empty($this->ai_opts['anthropic_key']) || !empty($this->ai_opts['gemini_key']);
         $r_raw   = (string) get_post_meta($post->ID, self::META_READABILITY, true);
         $r_data  = $r_raw ? json_decode($r_raw, true) : null;
@@ -379,6 +381,84 @@ trait CS_SEO_Metabox {
         <?php wp_add_inline_script('cs-seo-metabox-js', ob_get_clean()); ?>
         <?php endif; ?>
 
+        <hr style="margin:16px 0;border:none;border-top:1px solid #ddd">
+        <p style="margin:0 0 8px">
+            <strong><?php esc_html_e( 'AEO Answer Paragraph', 'cloudscale-seo-ai-optimizer' ); ?></strong>
+            <span style="font-size:11px;font-weight:400;color:#888"><?php esc_html_e( '— 40–60 word direct-answer paragraph prepended before the summary box for Google featured snippets', 'cloudscale-seo-ai-optimizer' ); ?></span>
+        </p>
+        <p style="margin:0 0 6px">
+            <textarea class="widefat" rows="3" name="cs_seo_aeo_answer" id="cs_seo_aeo_answer_<?php echo (int) $post->ID; ?>" style="font-size:13px"><?php echo esc_textarea($aeo_answer); ?></textarea>
+            <span id="cs_seo_aeo_wc_<?php echo (int) $post->ID; ?>" style="font-size:11px;color:<?php echo esc_attr($aeo_wc >= 40 && $aeo_wc <= 60 ? '#46b450' : ($aeo_wc > 0 ? '#dc3232' : '#888')); ?>">
+                <?php echo $aeo_answer ? esc_html((string) $aeo_wc) . ' ' . esc_html__( 'words', 'cloudscale-seo-ai-optimizer' ) : esc_html__( 'No AEO answer set', 'cloudscale-seo-ai-optimizer' ); ?>
+            </span>
+        </p>
+        <?php if ($has_key): ?>
+        <p style="margin:0">
+            <button type="button" class="button cs-aeo-gen-btn" id="cs_seo_aeo_gen_<?php echo (int) $post->ID; ?>"
+                data-post-id="<?php echo esc_attr( (string) $post->ID ); ?>" data-force="0">
+                <?php esc_html_e( '✦ Generate AEO Answer', 'cloudscale-seo-ai-optimizer' ); ?>
+            </button>
+            <button type="button" class="button cs-aeo-gen-btn" style="margin-left:6px" id="cs_seo_aeo_regen_<?php echo (int) $post->ID; ?>"
+                data-post-id="<?php echo esc_attr( (string) $post->ID ); ?>" data-force="1">
+                <?php esc_html_e( '↺ Regenerate', 'cloudscale-seo-ai-optimizer' ); ?>
+            </button>
+            <span id="cs_seo_aeo_status_<?php echo (int) $post->ID; ?>" style="margin-left:8px;font-size:12px;color:#888;"></span>
+        </p>
+        <?php ob_start(); ?>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.cs-aeo-gen-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var postId   = btn.getAttribute('data-post-id');
+                    var force    = btn.getAttribute('data-force') || '0';
+                    var genBtn   = document.getElementById('cs_seo_aeo_gen_'    + postId);
+                    var regenBtn = document.getElementById('cs_seo_aeo_regen_'  + postId);
+                    var status   = document.getElementById('cs_seo_aeo_status_' + postId);
+                    var field    = document.getElementById('cs_seo_aeo_answer_' + postId);
+                    var wc       = document.getElementById('cs_seo_aeo_wc_'     + postId);
+                    genBtn.disabled   = true;
+                    regenBtn.disabled = true;
+                    status.textContent = '⟳ Generating...';
+                    status.style.color = '#888';
+                    fetch(ajaxurl, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: new URLSearchParams({
+                            action:  'cs_seo_aeo_gen_one',
+                            post_id: postId,
+                            force:   force,
+                            nonce:   csSeoMetabox.nonce
+                        })
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.success) {
+                            if (data.data.status === 'skipped') {
+                                status.textContent = '✓ Already set — use Regenerate to overwrite';
+                                status.style.color = '#888';
+                            } else {
+                                field.value = data.data.answer;
+                                var w = data.data.words;
+                                wc.textContent = w + ' words';
+                                wc.style.color = (w >= 40 && w <= 60) ? '#46b450' : '#dc3232';
+                                status.textContent = '✓ Done — save post to keep';
+                                status.style.color = '#46b450';
+                            }
+                        } else {
+                            status.textContent = '✗ ' + (data.data || 'Error');
+                            status.style.color = '#dc3232';
+                        }
+                    })
+                    .catch(function(e) {
+                        status.textContent = '✗ ' + e.message;
+                        status.style.color = '#dc3232';
+                    })
+                    .finally(function() { genBtn.disabled = false; regenBtn.disabled = false; });
+                });
+            });
+        });
+        <?php wp_add_inline_script('cs-seo-metabox-js', ob_get_clean()); ?>
+        <?php endif; ?>
+
         <?php
     }
 
@@ -398,9 +478,10 @@ trait CS_SEO_Metabox {
         $this->set_meta($post_id, self::META_TITLE,    sanitize_text_field( wp_unslash( (string) ($_POST['cs_seo_title'] ?? '') ) ));
         $this->set_meta($post_id, self::META_DESC,     sanitize_textarea_field( wp_unslash( (string) ($_POST['cs_seo_desc'] ?? '') ) ));
         $this->set_meta($post_id, self::META_OGIMG,    esc_url_raw( wp_unslash( (string) ($_POST['cs_seo_ogimg'] ?? '') ) ));
-        $this->set_meta($post_id, self::META_SUM_WHAT, sanitize_textarea_field( wp_unslash( (string) ($_POST['cs_seo_sum_what'] ?? '') ) ));
-        $this->set_meta($post_id, self::META_SUM_WHY,  sanitize_textarea_field( wp_unslash( (string) ($_POST['cs_seo_sum_why']  ?? '') ) ));
-        $this->set_meta($post_id, self::META_SUM_KEY,  sanitize_textarea_field( wp_unslash( (string) ($_POST['cs_seo_sum_key']  ?? '') ) ));
+        $this->set_meta($post_id, self::META_SUM_WHAT,   sanitize_textarea_field( wp_unslash( (string) ($_POST['cs_seo_sum_what']   ?? '') ) ));
+        $this->set_meta($post_id, self::META_SUM_WHY,    sanitize_textarea_field( wp_unslash( (string) ($_POST['cs_seo_sum_why']    ?? '') ) ));
+        $this->set_meta($post_id, self::META_SUM_KEY,    sanitize_textarea_field( wp_unslash( (string) ($_POST['cs_seo_sum_key']    ?? '') ) ));
+        $this->set_meta($post_id, self::META_AEO_ANSWER, sanitize_textarea_field( wp_unslash( (string) ($_POST['cs_seo_aeo_answer'] ?? '') ) ));
         $hide = isset($_POST['cs_seo_hide_summary']) ? 1 : 0;
         $hide ? update_post_meta($post_id, self::META_HIDE_SUMMARY, 1) : delete_post_meta($post_id, self::META_HIDE_SUMMARY);
         $noindex = isset($_POST['cs_seo_noindex']) ? 1 : 0;

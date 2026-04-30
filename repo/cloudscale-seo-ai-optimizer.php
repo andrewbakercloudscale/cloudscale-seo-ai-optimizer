@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale SEO AI Optimizer
  * Plugin URI:  https://andrewbaker.ninja/2026/02/24/cloudscale-seo-ai-optimiser-enterprise-grade-wordpress-seo-completely-free/
  * Description: Lightweight SEO with AI meta descriptions via Claude API. Titles, canonicals, OpenGraph, Twitter Cards, JSON-LD schema, sitemaps, robots.txt, and font display optimization.
- * Version:     4.20.82
+ * Version:     4.20.83
  * Author:      Andrew Baker
  * Author URI:  https://andrewbaker.ninja/
  * License:     GPLv2 or later
@@ -160,6 +160,9 @@ final class Cs_Seo_Plugin {
     const OPT_TITLE_JOB               = 'cs_seo_title_opt_job';
     const CRON_TITLE_OPT              = 'cs_seo_title_opt_process';
 
+    // AEO (Answer Engine Optimisation) direct-answer paragraph
+    const META_AEO_ANSWER = '_cs_seo_aeo_answer';
+
     // Related Articles step constants
     const RC_STEP_LOAD         = 1;
     const RC_STEP_VALIDATE     = 2;
@@ -173,7 +176,7 @@ final class Cs_Seo_Plugin {
     // Related Articles generator version — bump when scoring logic changes
     const RC_VERSION = '1.0';
 
-    const VERSION    = '4.20.82';
+    const VERSION    = '4.20.83';
 
     // Separate option key for AI config — keeps sensitive data isolated.
     const AI_OPT     = 'cs_seo_ai_options';
@@ -230,6 +233,7 @@ final class Cs_Seo_Plugin {
         add_action('save_post',      [$this, 'on_save_post_readability'], 20, 2);
         add_action('save_post',    function() { delete_transient('cs_seo_llms_txt'); delete_transient(self::SITEMAP_URLS_CACHE); });
         add_action('deleted_post', function() { delete_transient('cs_seo_llms_txt'); delete_transient(self::SITEMAP_URLS_CACHE); });
+        add_filter('the_content',    [$this, 'prepend_aeo_answer'], 8);
         add_filter('the_content',    [$this, 'prepend_summary_box']);
         add_filter('the_content',    [$this, 'inject_related_links'], 20);
         add_action('wp_enqueue_scripts', [$this, 'enqueue_rc_front_styles']);
@@ -292,6 +296,7 @@ final class Cs_Seo_Plugin {
         add_action('wp_ajax_cs_seo_save_desc',          [$this, 'ajax_save_desc']);
         add_action('wp_ajax_cs_seo_ai_fix_desc',        [$this, 'ajax_fix_desc']);
         add_action('wp_ajax_cs_seo_ai_fix_title',       [$this, 'ajax_fix_title']);
+        add_action('wp_ajax_cs_seo_aeo_gen_one',        [$this, 'ajax_aeo_gen_one']);
         add_action('wp_ajax_cs_seo_ai_get_posts',       [$this, 'ajax_get_posts']);
         add_action('wp_ajax_cs_seo_ai_test_key',        [$this, 'ajax_test_key']);
         add_action('wp_ajax_cs_seo_ai_get_batch_log',   [$this, 'ajax_get_batch_log']);
